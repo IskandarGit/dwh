@@ -14,12 +14,16 @@ import javax.sql.DataSource;
  * Второй {@link DataSource} — {@code pg-dwh}. Единственное место, где он создаётся; за пределы пакета
  * {@code fnd} квалификатор {@code "dwh"} не выходит (AC-5, 18 п.14). Пул не проверяет соединение при
  * старте: доступность pg-dwh — забота {@code DwhSchemaVersionGate} и фасадов (AC-36).
+ *
+ * <p>{@code defaultCandidate = false}: бины второй БД видны только по квалификатору {@code "dwh"}.
+ * Иначе каркас, который инжектит {@code DataSource}/{@code JdbcClient} по типу, получал бы двух
+ * кандидатов и контекст не поднимался бы — ни в тестах, ни в бою.
  */
 @Configuration
 @EnableConfigurationProperties(DwhDataSourceProperties.class)
 public class FndDwhConfig {
 
-    @Bean(name = "dwhDataSource", destroyMethod = "close")
+    @Bean(name = "dwhDataSource", destroyMethod = "close", defaultCandidate = false)
     @Qualifier(FndPref.DWH)
     public DataSource dwhDataSource(DwhDataSourceProperties props) {
         HikariDataSource ds = new HikariDataSource();
@@ -38,7 +42,7 @@ public class FndDwhConfig {
         return ds;
     }
 
-    @Bean(name = "dwhJdbcClient")
+    @Bean(name = "dwhJdbcClient", defaultCandidate = false)
     @Qualifier(FndPref.DWH)
     public JdbcClient dwhJdbcClient(@Qualifier(FndPref.DWH) DataSource dwhDataSource) {
         return JdbcClient.create(dwhDataSource);
