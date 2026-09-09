@@ -61,6 +61,14 @@ declare
     v_allowed text[] := array['lock_version'];
     v_changed text[];
 begin
+    -- Режим обслуживания каркаса (как у audit_log в V014): чистка данных при сопровождении
+    -- и в тестах идёт в сессии с set_config('dwh.maintenance','on',true), прикладной код его не ставит.
+    if coalesce(current_setting('dwh.maintenance', true), '') = 'on' then
+        if tg_op = 'DELETE' then
+            return old;
+        end if;
+        return new;
+    end if;
     if old.status = 'draft' then
         if tg_op = 'DELETE' then
             return old;
