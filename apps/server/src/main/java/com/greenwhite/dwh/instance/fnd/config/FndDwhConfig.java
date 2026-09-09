@@ -13,7 +13,7 @@ import javax.sql.DataSource;
 /**
  * Второй {@link DataSource} — {@code pg-dwh}. Единственное место, где он создаётся; за пределы пакета
  * {@code fnd} квалификатор {@code "dwh"} не выходит (AC-5, 18 п.14). Пул не проверяет соединение при
- * старте: доступность pg-dwh — забота {@code SchemaVersionGate} и фасадов (AC-36).
+ * старте: доступность pg-dwh — забота {@code DwhSchemaVersionGate} и фасадов (AC-36).
  */
 @Configuration
 @EnableConfigurationProperties(DwhDataSourceProperties.class)

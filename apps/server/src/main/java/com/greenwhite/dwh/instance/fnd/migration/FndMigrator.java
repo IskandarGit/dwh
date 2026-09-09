@@ -20,7 +20,7 @@ public final class FndMigrator {
     private FndMigrator() {
     }
 
-    /** Миграции OLTP из {@code db/oltp}; возвращает число применённых файлов. */
+    /** Миграции OLTP из каталога каркаса {@code db/migration} (миграции каркаса + наши V1xx); возвращает число применённых файлов. */
     public static int migrateOltp(DataSource oltp) {
         return migrate(oltp, FndPref.OLTP_MIGRATIONS, "oltp");
     }
@@ -30,9 +30,16 @@ public final class FndMigrator {
         return migrate(dwh, FndPref.DWH_MIGRATIONS, "dwh");
     }
 
+    /**
+     * Миграции всегда применяются в UTC: {@code V011} каркаса создаёт партиции {@code audit_log}
+     * по date-литералам, и при другой зоне соединения границы съезжают (см. FlywayUtcConfiguration каркаса).
+     */
+    static final String UTC_INIT_SQL = "set time zone 'UTC'";
+
     private static int migrate(DataSource dataSource, String location, String db) {
         Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
+                .initSql(UTC_INIT_SQL)
                 .locations("classpath:" + location)
                 .baselineOnMigrate(false)
                 .validateOnMigrate(true)

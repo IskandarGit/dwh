@@ -16,15 +16,17 @@ import java.sql.SQLException;
 
 
 /**
- * Проверка при старте: в обеих БД последняя миграция сборки применена и успешна (промпт 02 п.10; AC-4).
+ * Проверка при старте второй базы {@code pg-dwh}: последняя миграция сборки применена и успешна
+ * (промпт 02 п.10; AC-4). Схему OLTP проверяет gate каркаса
+ * ({@code com.greenwhite.dwh.instance.config.db.SchemaVersionGate}) — здесь она не дублируется.
  * Gate только читает {@code flyway_schema_history} и никогда не мигрирует: применение — отдельный шаг
  * ({@link MigrateMain}) до запуска приложения. Расхождение — {@link SchemaVersionMismatchException},
  * процесс завершается кодом 3.
  */
 @Component
-public class SchemaVersionGate implements InitializingBean {
+public class DwhSchemaVersionGate implements InitializingBean {
 
-    private static final Logger log = LoggerFactory.getLogger(SchemaVersionGate.class);
+    private static final Logger log = LoggerFactory.getLogger(DwhSchemaVersionGate.class);
     static final String EVENT = "schema_version_mismatch";
     private static final String HISTORY_SQL = """
             select version, success
@@ -33,19 +35,16 @@ public class SchemaVersionGate implements InitializingBean {
              order by installed_rank desc
             """;
 
-    private final DataSource oltp;
     private final DataSource dwh;
 
-    public SchemaVersionGate(DataSource oltp, @Qualifier(FndPref.DWH) DataSource dwh) {
-        this.oltp = oltp;
+    public DwhSchemaVersionGate(@Qualifier(FndPref.DWH) DataSource dwh) {
         this.dwh = dwh;
     }
 
     @Override
     public void afterPropertiesSet() {
-        check("oltp", oltp, MigrationCatalog.onClasspath(FndPref.OLTP_MIGRATIONS));
         check("dwh", dwh, MigrationCatalog.onClasspath(FndPref.DWH_MIGRATIONS));
-        log.info("schema_version_ok");
+        log.info("schema_version_ok db=dwh");
     }
 
     /** Одна БД: ожидаемая версия найдена, ни одна строка истории не помечена {@code success=false}. */
