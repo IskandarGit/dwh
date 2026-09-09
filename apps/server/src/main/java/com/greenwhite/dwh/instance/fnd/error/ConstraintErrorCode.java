@@ -10,6 +10,11 @@ import java.util.Optional;
  */
 public enum ConstraintErrorCode {
 
+    // fnd_job_schedule, fnd_job_queue, fnd_job_runs (блок B, V100)
+    FND_JOB_SCHEDULE_CK_INTERVAL("fnd_job_schedule_ck_interval"),
+    FND_JOB_QUEUE_FK_SCHEDULE("fnd_job_queue_fk_schedule"),
+    FND_JOB_RUNS_CK_STATUS("fnd_job_runs_ck_status"),
+
     // fnd_units (блок D)
     FND_UNITS_UK_CODE("fnd_units_uk_code"),
     FND_UNITS_FK_BASE_UNIT("fnd_units_fk_base_unit"),

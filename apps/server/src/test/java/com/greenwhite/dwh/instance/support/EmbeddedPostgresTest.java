@@ -58,6 +58,9 @@ public abstract class EmbeddedPostgresTest {
         registry.add("dwh.instance.client-code", () -> "TEST-INSTANCE");
         registry.add("dwh.instance.client-name", () -> "TEST instance");
         // Сгенерированный пароль bootstrap пишется в файл (AC-1/AC-17) — в тестах во временный каталог
+        // Файлы модуля mf каркаса (AC-8) — на диске во временном каталоге теста, не в ./data/storage
+        registry.add("dwh.storage.local-path",
+                () -> System.getProperty("java.io.tmpdir") + "/dwh-test-storage");
         registry.add("platform.bootstrap.admin-password-file",
                 () -> System.getProperty("java.io.tmpdir") + "/dwh-test-bootstrap-password.txt");
     }

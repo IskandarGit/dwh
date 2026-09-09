@@ -112,7 +112,8 @@ create table fnd_job_queue (
     run_at         timestamptz not null default now(),
     created_at     timestamptz not null default now(),
     attempts       integer     not null default 0,
-    schedule_code  text        references fnd_job_schedule (code)
+    schedule_code  text,
+    constraint fnd_job_queue_fk_schedule foreign key (schedule_code) references fnd_job_schedule (code)
 );
 create index fnd_job_queue_run_at_idx on fnd_job_queue (run_at);
 
