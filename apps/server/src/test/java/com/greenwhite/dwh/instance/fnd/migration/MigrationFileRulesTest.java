@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,9 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** AC-2: регламент файлов миграций (промпт 02 п.1–2, п.8) — без базы, по содержимому файлов. */
 class MigrationFileRulesTest {
 
-    /** Унаследованные файлы A1 (до появления регламента имён {@code V\d{3}}) — проверяются только по деструктивности. */
-    static final Set<String> LEGACY_A1 = Set.of("V1__auth_roles.sql", "V2__api_guards.sql", "V3__oneid.sql",
-            "V4__system_roles_immutable.sql", "V5__login_failures_by_login_ip.sql");
+    /** Наши файлы в общем каталоге каркаса — от V100; всё ниже принадлежит upstream и не проверяется (AC-2). */
+    private static final Pattern OURS = Pattern.compile("^V([1-9]\\d{2,})__.+\\.sql$");
 
     private static final Pattern NAME = Pattern.compile("^V\\d{3}__[a-z0-9_]+\\.sql$");
     private static final Pattern DESTRUCTIVE = Pattern.compile(
@@ -34,7 +32,7 @@ class MigrationFileRulesTest {
     }
 
     @Test
-    @DisplayName("AC-2: реальные каталоги db/oltp и db/dwh соответствуют регламенту")
+    @DisplayName("AC-2: наши миграции (V1xx и db/dwh) соответствуют регламенту; файлы каркаса не проверяются")
     void realCatalogsAreClean() throws IOException {
         List<Violation> violations = new ArrayList<>();
         violations.addAll(check("classpath*:" + FndPref.OLTP_MIGRATIONS + "/V*.sql"));
@@ -58,8 +56,11 @@ class MigrationFileRulesTest {
         for (Resource file : files) {
             String name = file.getFilename();
             String text = file.getContentAsString(StandardCharsets.UTF_8);
-            boolean legacy = LEGACY_A1.contains(name);
-            if (!legacy) {
+            // Файлы каркаса (V0xx) — зона upstream: их регламент мы не проверяем и не правим (AC-2)
+            if (name == null || !OURS.matcher(name).matches()) {
+                continue;
+            }
+            {
                 if (!NAME.matcher(name).matches()) {
                     out.add(new Violation(name, "file_name"));
                 }

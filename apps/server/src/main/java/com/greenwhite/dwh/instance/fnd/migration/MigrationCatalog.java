@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 
 /**
  * Каталог версионных миграций одной БД на classpath: имена файлов и последняя ожидаемая версия.
- * Не зависит от Flyway — используется и мигратором, и {@link SchemaVersionGate} (AC-4).
+ * Не зависит от Flyway — используется и мигратором, и {@link DwhSchemaVersionGate} (AC-4).
  */
 public final class MigrationCatalog {
 

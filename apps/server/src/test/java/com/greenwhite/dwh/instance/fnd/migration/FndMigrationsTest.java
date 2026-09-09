@@ -1,5 +1,6 @@
 package com.greenwhite.dwh.instance.fnd.migration;
 
+import com.greenwhite.dwh.instance.fnd.FndPref;
 import com.greenwhite.dwh.instance.support.TestDatabases;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -18,12 +19,12 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * AC-1 (две БД, два набора миграций) и AC-3 (повторный прогон, схема A1 не изменена).
+ * AC-1 (две БД, два набора миграций) и AC-3 (повторный прогон, схема каркаса не изменена).
  * Без Spring-контекста: только мигратор и JDBC на встроенном PostgreSQL.
  */
 class FndMigrationsTest {
 
-    static final String SNAPSHOT = "a1-schema-snapshot.json";
+    static final String SNAPSHOT = "cms-schema-snapshot.json";
     private static final String COLUMNS_SQL = """
             select table_name, column_name, data_type, is_nullable
               from information_schema.columns
@@ -49,9 +50,9 @@ class FndMigrationsTest {
 
         List<String> oltpTables = oltp.sql("select table_name from information_schema.tables where table_schema='public'")
                 .query(String.class).list();
-        assertThat(oltpTables).contains("md_users", "kauth_sessions", "audit_log", "security_events");
-        // Таблицы основы появляются миграциями блоков B–E; здесь — только те, что уже есть
-        // (список расширяется вместе с миграциями fnd; итоговый — в AC-1 после всех блоков)
+        assertThat(oltpTables).contains("md_users", "kauth_sessions", "audit_log", "mf_files", "md_settings");
+        // Наши таблицы (V100 и далее); список расширяется вместе с миграциями fnd
+        assertThat(oltpTables).contains("fnd_audit_tables", "fnd_job_schedule", "fnd_job_queue", "fnd_job_runs");
 
         List<String> schemas = dwh.sql("select schema_name from information_schema.schemata").query(String.class).list();
         assertThat(schemas).contains("raw", "core", "mart", "cache");
@@ -69,8 +70,8 @@ class FndMigrationsTest {
     }
 
     @Test
-    @DisplayName("AC-3: схема таблиц A1 (снимок до миграций фичи) не изменена — только новые таблицы и колонки")
-    void a1SchemaUnchanged() throws IOException {
+    @DisplayName("AC-3: схема каркаса (снимок до наших миграций) не изменена — только новые таблицы и колонки")
+    void frameworkSchemaUnchanged() throws IOException {
         List<Map<String, Object>> snapshot = readSnapshot();
         List<Map<String, Object>> current = oltp.sql(COLUMNS_SQL).query().listOfRows();
         List<String> missingOrChanged = new ArrayList<>();
@@ -81,7 +82,17 @@ class FndMigrationsTest {
                         + " " + row.get("data_type") + " nullable=" + row.get("is_nullable"));
             }
         }
-        assertThat(missingOrChanged).as("колонки A1, изменённые или удалённые миграциями фичи").isEmpty();
+        assertThat(missingOrChanged).as("колонки каркаса, изменённые или удалённые нашими миграциями").isEmpty();
+    }
+
+    /** Последняя миграция каркаса: наши файлы нумеруются с V100, всё ниже — upstream. */
+    static String frameworkBaselineVersion() {
+        return MigrationCatalog.onClasspath(FndPref.OLTP_MIGRATIONS).fileNames().stream()
+                .map(MigrationCatalog::versionOf)
+                .filter(v -> v.intValue() < 100)
+                .max(java.math.BigInteger::compareTo)
+                .orElseThrow(() -> new IllegalStateException("В каталоге нет миграций каркаса (V0xx)"))
+                .toString();
     }
 
     private static boolean sameColumn(Map<String, Object> a, Map<String, Object> b) {
@@ -92,20 +103,21 @@ class FndMigrationsTest {
     }
 
     /**
-     * Снимок схемы A1 — тест-ресурс, снятый один раз с базы, мигрированной только файлами A1 (V1–V5).
-     * Пересъёмка: {@code mvn test -Dtest=FndMigrationsTest -Da1.snapshot.generate=true} — пишет файл в
-     * {@code src/test/resources}; выполнять только при осознанном изменении схемы A1.
+     * Снимок схемы каркаса — тест-ресурс, снятый с базы, мигрированной только файлами каркаса (V0xx,
+     * до наших V1xx). Пересъёмка: {@code mvn test -Dtest=FndMigrationsTest -Dcms.snapshot.generate=true}
+     * — пишет файл в {@code src/test/resources}; выполнять только при подъёме upstream, дельту показывать в отчёте.
      */
     private static List<Map<String, Object>> readSnapshot() throws IOException {
         ObjectMapper json = new ObjectMapper();
-        if (Boolean.getBoolean("a1.snapshot.generate")) {
-            TestDatabases.createDatabase("a1_snapshot");
+        if (Boolean.getBoolean("cms.snapshot.generate")) {
+            TestDatabases.createDatabase("cms_snapshot");
             org.flywaydb.core.Flyway.configure()
-                    .dataSource(TestDatabases.database("a1_snapshot"))
-                    .locations("classpath:db/oltp")
-                    .target("5")
+                    .dataSource(TestDatabases.database("cms_snapshot"))
+                    .initSql(FndMigrator.UTC_INIT_SQL)
+                    .locations("classpath:" + FndPref.OLTP_MIGRATIONS)
+                    .target(frameworkBaselineVersion())
                     .load().migrate();
-            List<Map<String, Object>> rows = JdbcClient.create(TestDatabases.database("a1_snapshot"))
+            List<Map<String, Object>> rows = JdbcClient.create(TestDatabases.database("cms_snapshot"))
                     .sql(COLUMNS_SQL).query().listOfRows();
             Path target = Path.of("src/test/resources", SNAPSHOT);
             Files.writeString(target, json.writerWithDefaultPrettyPrinter().writeValueAsString(rows));

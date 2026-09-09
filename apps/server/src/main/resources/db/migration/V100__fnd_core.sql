@@ -5,13 +5,7 @@ set statement_timeout = '60s';
 -- Нумерация V1xx — наши миграции; файлы V0xx принадлежат каркасу и не меняются (AC-2).
 -- Только expand: таблицы и колонки каркаса не изменяются (AC-3).
 -- Файлы (AC-8) хранит модуль mf каркаса, настройки — md_settings каркаса: своих таблиц не заводим.
-
--- ---------- техническая учётка для операций заданий (AC-6) ----------
--- audit_log.changed_by каркаса — bigint, поэтому актор 'system' наших заданий должен быть
--- настоящей записью md_users. Учётка неактивна (state = 'P') и без пароля: входить ей нельзя.
-insert into md_users (name, login, email, state, language, timezone)
-select 'System (DW jobs)', 'system', 'system@localhost', 'P', 'uz', 'UTC'
-where not exists (select 1 from md_users where login = 'system');
+-- Сид (техническая учётка system) — отдельным файлом V101: DDL и сид в одном файле запрещены (AC-2).
 
 -- ---------- аудит fnd-таблиц: реестр и триггер (02 п.6, п.13; AC-6) ----------
 create table fnd_audit_tables (

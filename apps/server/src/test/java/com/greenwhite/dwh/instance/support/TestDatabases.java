@@ -33,7 +33,7 @@ public final class TestDatabases {
     public static synchronized EmbeddedPostgres instance() {
         if (postgres == null) {
             try {
-                postgres = EmbeddedPostgres.builder().start();
+                postgres = EmbeddedPostgres.builder().setServerConfig("timezone", "UTC").start();
             } catch (IOException e) {
                 throw new UncheckedIOException("Встроенный PostgreSQL не запустился", e);
             }
