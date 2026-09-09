@@ -52,7 +52,9 @@ class FndMigrationsTest {
                 .query(String.class).list();
         assertThat(oltpTables).contains("md_users", "kauth_sessions", "audit_log", "mf_files", "md_settings");
         // Наши таблицы (V100 и далее); список расширяется вместе с миграциями fnd
-        assertThat(oltpTables).contains("fnd_audit_tables", "fnd_job_schedule", "fnd_job_queue", "fnd_job_runs");
+        assertThat(oltpTables).contains("fnd_audit_tables", "fnd_job_schedule", "fnd_job_queue", "fnd_job_runs",
+                "fnd_versioned_tables", "fnd_units", "fnd_unit_coefficients", "fnd_unit_coefficient_versions",
+                "fnd_loads", "fnd_load_log");
 
         List<String> schemas = dwh.sql("select schema_name from information_schema.schemata").query(String.class).list();
         assertThat(schemas).contains("raw", "core", "mart", "cache");

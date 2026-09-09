@@ -36,7 +36,8 @@ class MigrationFileRulesTest {
     void realCatalogsAreClean() throws IOException {
         List<Violation> violations = new ArrayList<>();
         violations.addAll(check("classpath*:" + FndPref.OLTP_MIGRATIONS + "/V*.sql"));
-        violations.addAll(check("classpath*:" + FndPref.DWH_MIGRATIONS + "/V*.sql"));
+        // Каталог pg-dwh целиком наш: там нумерация начинается с V001 и правила действуют для всех файлов
+        violations.addAll(check("classpath*:" + FndPref.DWH_MIGRATIONS + "/V*.sql", true));
         violations.addAll(check("classpath*:migration-fixtures/good/V*.sql"));
         assertThat(violations).isEmpty();
     }
@@ -50,6 +51,11 @@ class MigrationFileRulesTest {
     }
 
     static List<Violation> check(String pattern) throws IOException {
+        return check(pattern, false);
+    }
+
+    /** {@code allOurs} — каталог, где нет файлов каркаса: проверяются все файлы, а не только V1xx. */
+    static List<Violation> check(String pattern, boolean allOurs) throws IOException {
         Resource[] files = new PathMatchingResourcePatternResolver().getResources(pattern);
         assertThat(files).as("каталог %s не пуст", pattern).isNotEmpty();
         List<Violation> out = new ArrayList<>();
@@ -57,7 +63,7 @@ class MigrationFileRulesTest {
             String name = file.getFilename();
             String text = file.getContentAsString(StandardCharsets.UTF_8);
             // Файлы каркаса (V0xx) — зона upstream: их регламент мы не проверяем и не правим (AC-2)
-            if (name == null || !OURS.matcher(name).matches()) {
+            if (name == null || !(allOurs || OURS.matcher(name).matches())) {
                 continue;
             }
             {

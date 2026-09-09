@@ -48,6 +48,7 @@ public enum ConstraintErrorCode {
     FND_VERSION_PUBLISHED_IMMUTABLE(null),
     AUDIT_ACTOR_MISSING(null),
     FND_LOAD_STATUS_TRANSITION(null),
+    FND_LOAD_LOG_APPEND_ONLY(null),
     DWH_READ_FORBIDDEN(null),
     DWH_UNAVAILABLE(null);
 
