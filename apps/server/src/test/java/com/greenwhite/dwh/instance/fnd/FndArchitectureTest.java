@@ -1,7 +1,12 @@
 package com.greenwhite.dwh.instance.fnd;
 
+import com.greenwhite.dwh.instance.fnd.fixtures.FndDependsOnUplViolator;
+import com.greenwhite.dwh.instance.mf.service.MfFileService;
 import com.greenwhite.dwh.instance.support.fixtures.DwhQualifierViolator;
+import com.greenwhite.dwh.instance.upl.fixtures.UplModuleFixture;
+import com.greenwhite.dwh.spi.storage.StorageProvider;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaField;
@@ -20,6 +25,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,12 +92,46 @@ class FndArchitectureTest {
         assertThat(result.getFailureReport().toString()).contains("DwhQualifierViolator");
     }
 
+    /** AC-37: основа не знает прикладных модулей; платформенные модули каркаса (common, config, kauth, md, mf, audit) — можно. */
+    static ArchRule fndDependsOnNoApplicationModuleRule() {
+        return noClasses().that().resideInAPackage(FND)
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(ROOT + ".upl..", ROOT + ".ref..", ROOT + ".reg..", ROOT + ".vit..");
+    }
+
     @Test
     @DisplayName("AC-37: fnd не зависит от прикладных модулей upl/ref/reg/vit")
     void fndDependsOnNoApplicationModule() {
+        fndDependsOnNoApplicationModuleRule().check(main);
+    }
+
+    @Test
+    @DisplayName("AC-37: фикстура-нарушитель в fnd, импортирующая upl, делает правило красным")
+    void fndDependingOnUplIsRed() {
+        JavaClasses withViolator = new ClassFileImporter()
+                .importClasses(FndDependsOnUplViolator.class, UplModuleFixture.class);
+        EvaluationResult result = fndDependsOnNoApplicationModuleRule().evaluate(withViolator);
+        assertThat(result.hasViolation()).isTrue();
+        assertThat(result.getFailureReport().toString()).contains("FndDependsOnUplViolator").contains("UplModuleFixture");
+    }
+
+    /** AC-8: файлы хранит модуль mf каркаса — своего хранилища и обращений к SPI в основе нет. */
+    @Test
+    @DisplayName("AC-8: в fnd нет своего FileStorage и зависимости от StorageProvider")
+    void fndHasNoOwnFileStorage() {
         noClasses().that().resideInAPackage(FND)
-                .should().dependOnClassesThat()
-                .resideInAnyPackage(ROOT + ".upl..", ROOT + ".ref..", ROOT + ".reg..", ROOT + ".vit..")
+                .should().haveSimpleNameContaining("FileStorage")
+                .orShould().dependOnClassesThat().areAssignableTo(StorageProvider.class)
+                .check(main);
+    }
+
+    /** AC-8: fnd не вызывает удаление файла — исходный файл загрузки неизменяем (13 инв.4). */
+    @Test
+    @DisplayName("AC-8: fnd не вызывает удаление файла в модуле mf")
+    void fndNeverDeletesFiles() {
+        noClasses().that().resideInAPackage(FND)
+                .should().callMethodWhere(JavaCall.Predicates.target(owner(assignableTo(MfFileService.class)))
+                        .and(JavaCall.Predicates.target(name("deleteFile"))))
                 .check(main);
     }
 
