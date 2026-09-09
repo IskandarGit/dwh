@@ -2,6 +2,7 @@ package com.greenwhite.dwh.instance.support;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.filter.annotation.TypeExcludeFilters;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -16,6 +17,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * замена обратима правкой одного класса.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TypeExcludeFilters(TestFixtureExcludeFilter.class)
 public abstract class EmbeddedPostgresTest {
 
     @Autowired
@@ -52,6 +54,9 @@ public abstract class EmbeddedPostgresTest {
         registry.add("app.dwh.connect-timeout", () -> "2s");
         // OneID в тестах — mock-провайдер без сети (AC [допущение 10]); включается каждым тестом явно
         registry.add("platform.oneid.mock", () -> true);
+        // Каркас требует код и имя экземпляра при первом старте (FR-INST-1); в тестах — синтетические
+        registry.add("dwh.instance.client-code", () -> "TEST-INSTANCE");
+        registry.add("dwh.instance.client-name", () -> "TEST instance");
         // Сгенерированный пароль bootstrap пишется в файл (AC-1/AC-17) — в тестах во временный каталог
         registry.add("platform.bootstrap.admin-password-file",
                 () -> System.getProperty("java.io.tmpdir") + "/dwh-test-bootstrap-password.txt");
