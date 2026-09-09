@@ -4,7 +4,7 @@ package com.greenwhite.dwh.instance.fnd;
 public final class FndPref {
 
     /** Каталог миграций OLTP (02 п.10, п.18). */
-    public static final String OLTP_MIGRATIONS = "db/oltp";
+    public static final String OLTP_MIGRATIONS = "db/migration";
     /** Каталог миграций pg-dwh. */
     public static final String DWH_MIGRATIONS = "db/dwh";
     /** Квалификатор бинов второй БД; используется только внутри {@code ..instance.fnd..} (AC-5). */
