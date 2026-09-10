@@ -94,6 +94,15 @@ class FndUnitServiceTest extends EmbeddedPostgresTest {
                 .isEqualTo(ConstraintErrorCode.FND_UNITS_FK_BASE_UNIT);
         assertThat(codeOf(() -> units.registerUnit(base, Map.of("uz", "TEST"), base, actor)))
                 .isEqualTo(ConstraintErrorCode.FND_UNITS_UK_CODE);
+        // Единица без базовой не заводится ни фасадом, ни прямым SQL (S-3: base_unit_code not null, V107)
+        assertThat(codeOf(() -> units.registerUnit(other, Map.of("uz", "TEST"), null, actor)))
+                .isEqualTo(ConstraintErrorCode.FND_UNIT_BASE_REQUIRED);
+        assertThat(codeOf(() -> units.registerUnit(other, Map.of("uz", "TEST"), " ", actor)))
+                .isEqualTo(ConstraintErrorCode.FND_UNIT_BASE_REQUIRED);
+        assertThat(jdbc.sql("select is_nullable from information_schema.columns"
+                        + " where table_name = 'fnd_units' and column_name = 'base_unit_code'")
+                .query(String.class).single()).isEqualTo("NO");
+        assertThat(units.findUnit(other)).isEmpty();
     }
 
     @ParameterizedTest(name = "конфигурация {0}")

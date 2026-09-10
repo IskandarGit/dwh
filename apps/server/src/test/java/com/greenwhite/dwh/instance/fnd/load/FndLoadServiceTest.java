@@ -292,6 +292,88 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
                 .isEqualTo("text");
     }
 
+    @Test
+    @DisplayName("AC-27: два параллельных apply одной загрузки — один успех, второй fnd_load_status_transition")
+    void concurrentApplyIsRejected() throws Exception {
+        use(DepartmentFixture.departments().findFirst().orElseThrow());
+        long loadId = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
+        rawWriter.write(loadId, null, rows(3));
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<Throwable>> outcomes = new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                outcomes.add(pool.submit(() -> {
+                    barrier.await();
+                    return catchThrowable(() -> loads.apply(loadId, 3, 3, 0, user));
+                }));
+            }
+            List<Throwable> errors = new java.util.ArrayList<>();
+            for (var outcome : outcomes) {
+                errors.add(outcome.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            assertThat(errors).filteredOn(java.util.Objects::isNull).hasSize(1);
+            assertThat(errors).filteredOn(java.util.Objects::nonNull).singleElement()
+                    .isInstanceOfSatisfying(ConstraintViolationException.class,
+                            e -> assertThat(e.code()).isEqualTo(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION));
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(loads.find(loadId).orElseThrow().status()).isEqualTo(FndLoad.APPLIED);
+    }
+
+    @Test
+    @DisplayName("AC-33: apply ждёт конца незавершённой записи строк — строки не попадают в применённую загрузку")
+    void applyWaitsForRunningWrite() throws Exception {
+        use(DepartmentFixture.departments().findFirst().orElseThrow());
+        long loadId = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
+        java.util.concurrent.CountDownLatch writeStarted = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch gate = new java.util.concurrent.CountDownLatch(1);
+        Iterable<FndRawRow> slowRows = () -> new java.util.Iterator<>() {
+            private final java.util.Iterator<FndRawRow> delegate = rows(3).iterator();
+            private int served;
+
+            @Override
+            public boolean hasNext() {
+                return delegate.hasNext();
+            }
+
+            @Override
+            public FndRawRow next() {
+                if (++served == 2) {
+                    writeStarted.countDown();
+                    try {
+                        assertThat(gate.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                    }
+                }
+                return delegate.next();
+            }
+        };
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Future<?> write = pool.submit(() -> rawWriter.write(loadId, null, slowRows));
+            assertThat(writeStarted.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            java.util.concurrent.Future<?> apply = pool.submit(() -> loads.apply(loadId, 3, 3, 0, user));
+            assertThatThrownBy(() -> apply.get(700, java.util.concurrent.TimeUnit.MILLISECONDS))
+                    .as("apply не должен завершиться, пока запись строк держит загрузку")
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+            gate.countDown();
+            write.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            apply.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            gate.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(loads.find(loadId).orElseThrow().status()).isEqualTo(FndLoad.APPLIED);
+        assertThat(rawWriter.read(loadId)).hasSize(3);
+        // После apply запись отвергается: статус уже не pending
+        assertThat(codeOf(() -> rawWriter.write(loadId, null, rows(1))))
+                .isEqualTo(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);
+    }
+
     // ---------- вспомогательное ----------
 
     private long userId() {

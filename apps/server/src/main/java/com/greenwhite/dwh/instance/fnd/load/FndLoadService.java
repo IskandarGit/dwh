@@ -61,10 +61,9 @@ public class FndLoadService {
      */
     @Transactional
     public void apply(long loadId, int rowsTotal, int rowsAccepted, int rowsRejected, FndActor actor) {
-        FndLoad load = require(loadId);
-        requireStatus(load, FndLoad.PENDING);
+        FndLoad load = lockPending(loadId);
         actors.apply(actor);
-        FndSqlErrors.translating(() -> jdbc.sql("""
+        int updated = FndSqlErrors.translating(() -> jdbc.sql("""
                         update fnd_loads
                            set status = 'applied', applied_at = now(), applied_by = :actor,
                                rows_total = :total, rows_accepted = :accepted, rows_rejected = :rejected
@@ -73,6 +72,7 @@ public class FndLoadService {
                 .param("actor", actor.name()).param("total", rowsTotal)
                 .param("accepted", rowsAccepted).param("rejected", rowsRejected)
                 .param("id", loadId).update());
+        requireUpdated(updated);
         FndSqlErrors.translating(() -> jdbc.sql("""
                         update fnd_loads
                            set status = 'superseded', superseded_by = :id
@@ -89,12 +89,12 @@ public class FndLoadService {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Причина сбоя не задана: загрузка без причины не отмечается");
         }
-        FndLoad load = require(loadId);
-        requireStatus(load, FndLoad.PENDING);
+        FndLoad load = lockPending(loadId);
         actors.apply(actor);
-        FndSqlErrors.translating(() -> jdbc.sql("update fnd_loads set status = 'failed'"
+        int updated = FndSqlErrors.translating(() -> jdbc.sql("update fnd_loads set status = 'failed'"
                         + " where id = :id and status = 'pending'")
                 .param("id", loadId).update());
+        requireUpdated(updated);
         log(load.packageRef(), "failed", FndLoad.PENDING, FndLoad.FAILED, actor, reason, null);
     }
 
@@ -136,13 +136,26 @@ public class FndLoadService {
                 .param("id", loadId).query(FndLoadService::mapLoad).optional();
     }
 
-    private FndLoad require(long loadId) {
-        return find(loadId).orElseThrow(() ->
-                new ConstraintViolationException(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION));
+    /**
+     * Читает загрузку под блокировкой строки ({@code for update}) и требует статус {@code pending}.
+     * Параллельный {@code apply}/{@code fail} той же загрузки ждёт коммита и видит уже новый статус;
+     * незавершённая запись строк ({@code FndRawWriter.write} держит {@code for share}) тоже дожидается конца.
+     */
+    private FndLoad lockPending(long loadId) {
+        FndLoad load = jdbc.sql("select id, source_code, package_ref, period_from, period_to, format_version,"
+                        + " applied_at, applied_by, rows_total, rows_accepted, rows_rejected, status, superseded_by"
+                        + " from fnd_loads where id = :id for update")
+                .param("id", loadId).query(FndLoadService::mapLoad).optional()
+                .orElseThrow(() -> new ConstraintViolationException(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION));
+        if (!FndLoad.PENDING.equals(load.status())) {
+            throw new ConstraintViolationException(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);
+        }
+        return load;
     }
 
-    private void requireStatus(FndLoad load, String expected) {
-        if (!expected.equals(load.status())) {
+    /** Переход статуса выполняется одним UPDATE с условием на текущий статус: 0 строк — состояние уже ушло. */
+    private static void requireUpdated(int updated) {
+        if (updated != 1) {
             throw new ConstraintViolationException(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);
         }
     }

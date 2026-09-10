@@ -134,6 +134,117 @@ class FndMaintenanceJobsTest extends EmbeddedPostgresTest {
                 .query(Long.class).single()).isGreaterThanOrEqualTo(2L);
     }
 
+    // ---------- AC-7: очередь под нагрузкой, путь failed, выключатель ----------
+
+    @Autowired
+    private tools.jackson.databind.ObjectMapper json;
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactions;
+
+    /** Воркер с тестовыми обработчиками: бины расписания не нужны — очередь принимает любой код обработчика. */
+    private FndJobRunner testRunner(FndJobHandler... handlers) {
+        return new FndJobRunner(jdbc, json, transactions, List.of(handlers));
+    }
+
+    private static FndJobHandler handler(String code, java.util.function.Consumer<Map<String, Object>> body) {
+        return new FndJobHandler() {
+            @Override
+            public String code() {
+                return code;
+            }
+
+            @Override
+            public void run(Map<String, Object> args) {
+                body.accept(args);
+            }
+        };
+    }
+
+    private long enqueueRaw(String handlerCode, String args) {
+        return jdbc.sql("insert into fnd_job_queue (handler, args) values (:h, cast(:a as jsonb)) returning id")
+                .param("h", handlerCode).param("a", args).query(Long.class).single();
+    }
+
+    @Test
+    @DisplayName("AC-7: два воркера берут разные задания (for update skip locked), третий вызов пуст и не ждёт дольше 1 с")
+    void twoWorkersTakeDifferentJobs() throws Exception {
+        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch gate = new java.util.concurrent.CountDownLatch(1);
+        FndJobRunner runner = testRunner(handler("test.block", args -> {
+            started.countDown();
+            try {
+                assertThat(gate.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }));
+        long first = enqueueRaw("test.block", "{}");
+        long second = enqueueRaw("test.block", "{}");
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var c1 = pool.submit(runner::runNext);
+            var c2 = pool.submit(runner::runNext);
+            assertThat(started.await(30, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("оба воркера держат по заданию, не дожидаясь чужого коммита").isTrue();
+            long begun = System.nanoTime();
+            assertThat(runner.runNext()).as("третий вызов при двух занятых заданиях").isEmpty();
+            assertThat(java.time.Duration.ofNanos(System.nanoTime() - begun)).isLessThan(java.time.Duration.ofSeconds(1));
+            gate.countDown();
+            assertThat(c1.get(30, java.util.concurrent.TimeUnit.SECONDS)).contains(true);
+            assertThat(c2.get(30, java.util.concurrent.TimeUnit.SECONDS)).contains(true);
+        } finally {
+            gate.countDown();
+            pool.shutdownNow();
+        }
+        assertThat(jdbc.sql("select queue_id from fnd_job_runs where handler = 'test.block' and status = 'done'")
+                .query(Long.class).list()).containsExactlyInAnyOrder(first, second);
+        assertThat(jdbc.sql("select count(*) from fnd_job_queue").query(Long.class).single()).isZero();
+    }
+
+    @Test
+    @DisplayName("AC-7: исключение обработчика — запуск failed с текстом ошибки и args; ошибка SQL внутри обработчика не ломает фиксацию")
+    void handlerFailureIsRecorded() {
+        FndJobRunner runner = testRunner(
+                handler("test.fail", args -> {
+                    throw new IllegalStateException("boom TEST " + args.get("k"));
+                }),
+                handler("test.sqlfail", args -> jdbc.sql("select 1 from fnd_no_such_table_test").query().listOfRows()));
+        enqueueRaw("test.fail", "{\"k\": \"v\"}");
+        enqueueRaw("test.sqlfail", "{}");
+        enqueueRaw("test.unknown", "{}");
+
+        assertThat(runner.runQueued()).isZero();
+
+        List<Map<String, Object>> runs = jdbc.sql("select handler, status, error, args::text as args from fnd_job_runs"
+                + " where handler like 'test.%' order by id").query().listOfRows();
+        assertThat(runs).extracting(r -> r.get("status")).containsExactly("failed", "failed", "failed");
+        assertThat((String) runs.get(0).get("error")).contains("boom TEST v");
+        assertThat((String) runs.get(0).get("args")).contains("\"k\"").contains("\"v\"");
+        assertThat((String) runs.get(1).get("error")).contains("fnd_no_such_table_test");
+        assertThat((String) runs.get(2).get("error")).contains("test.unknown");
+        assertThat(jdbc.sql("select count(*) from fnd_job_queue").query(Long.class).single()).isZero();
+    }
+
+    @Test
+    @DisplayName("AC-7: jobs_enabled=false в md_settings каркаса — воркер ничего не берёт; после включения — выполняет")
+    void jobsEnabledSwitch() {
+        FndJobRunner runner = testRunner(handler("test.noop", args -> { }));
+        enqueueRaw("test.noop", "{}");
+        jdbc.sql("insert into md_settings (user_id, key, value) values (null, :key, 'false')")
+                .param("key", FndJobRunner.JOBS_ENABLED_KEY).update();
+        try {
+            assertThat(runner.runNext()).isEmpty();
+            assertThat(jdbc.sql("select count(*) from fnd_job_queue").query(Long.class).single()).isEqualTo(1L);
+            assertThat(jdbc.sql("select count(*) from fnd_job_runs").query(Long.class).single()).isZero();
+        } finally {
+            jdbc.sql("delete from md_settings where user_id is null and key = :key")
+                    .param("key", FndJobRunner.JOBS_ENABLED_KEY).update();
+        }
+        assertThat(runner.runQueued()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from fnd_job_queue").query(Long.class).single()).isZero();
+    }
+
     private static List<FndRawRow> rows(int count) {
         return java.util.stream.IntStream.rangeClosed(1, count)
                 .mapToObj(number -> new FndRawRow(number, null, number, Map.of("n", number)))

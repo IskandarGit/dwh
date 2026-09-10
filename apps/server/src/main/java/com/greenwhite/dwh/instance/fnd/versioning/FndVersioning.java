@@ -78,8 +78,10 @@ public class FndVersioning {
                         LocalDate validFrom, LocalDate validTo, FndActor actor) {
         String header = headerColumn(versionsTable);
         actors.apply(actor);
+        // Строка черновика берётся под блокировку: параллельный publish той же версии ждёт коммита
+        // и видит уже published — отказ, а не «успех» с нулём обновлённых строк
         String status = jdbc.sql("select status from " + versionsTable
-                        + " where " + header + " = :h and version = :v")
+                        + " where " + header + " = :h and version = :v for update")
                 .param("h", headerId).param("v", version).query(String.class).optional().orElse(null);
         if (!FndVersion.DRAFT.equals(status)) {
             throw new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_UNKNOWN);
@@ -93,7 +95,7 @@ public class FndVersioning {
         if (previous.isPresent() && !validFrom.isAfter(previous.get().validFrom())) {
             throw new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_NOT_AFTER_PREVIOUS);
         }
-        FndSqlErrors.translating(() -> {
+        int published = FndSqlErrors.translating(() -> {
             if (previous.isPresent() && previous.get().validTo() == null) {
                 jdbc.sql("update " + versionsTable + " set valid_to = :to where " + header + " = :h and version = :v")
                         .param("to", validFrom.minusDays(1))
@@ -105,6 +107,10 @@ public class FndVersioning {
                     .param("from", validFrom).param("to", validTo).param("by", actor.name())
                     .param("h", headerId).param("v", version).update();
         });
+        if (published != 1) {
+            // Черновик исчез между проверкой и обновлением: транзакция откатывается вместе с закрытием предыдущей
+            throw new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_UNKNOWN);
+        }
     }
 
     /** Снимает ошибочно опубликованную версию: интервал освобождается, строка остаётся историей (AC-17). */
