@@ -1,6 +1,7 @@
 package com.greenwhite.dwh.instance.fnd;
 
 import com.greenwhite.dwh.instance.fnd.fixtures.FndDependsOnUplViolator;
+import com.greenwhite.dwh.instance.fnd.fixtures.FndScheduledViolator;
 import com.greenwhite.dwh.instance.mf.service.MfFileService;
 import com.greenwhite.dwh.instance.support.fixtures.DwhQualifierViolator;
 import com.greenwhite.dwh.instance.upl.fixtures.UplModuleFixture;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,6 +32,7 @@ import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nam
 import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Правила основы (18 п.11, п.13–14): AC-5, AC-37, AC-42. Без Spring и базы. */
@@ -142,5 +145,32 @@ class FndArchitectureTest {
                 .should().beAnnotatedWith(RestController.class)
                 .orShould().beAnnotatedWith(Controller.class)
                 .check(main);
+    }
+
+    /** AC-7: планировщика в основе нет — момент запуска заданий выбирает экземпляр; воркеры каркаса правило не трогает. */
+    static ArchRule noScheduledInFndRule() {
+        return noMethods().that().areDeclaredInClassesThat().resideInAPackage(FND)
+                .should().beAnnotatedWith(Scheduled.class);
+    }
+
+    @Test
+    @DisplayName("AC-7: @Scheduled отсутствует в ..instance.fnd.. (в модулях каркаса — есть, правило их не касается)")
+    void fndHasNoScheduled() {
+        noScheduledInFndRule().check(main);
+        // Контроль, что правило действительно узкое: у каркаса @Scheduled есть, и импорт его видит
+        boolean frameworkHasScheduled = main.stream()
+                .filter(type -> !type.getPackageName().startsWith(ROOT + ".fnd"))
+                .flatMap(type -> type.getMethods().stream())
+                .anyMatch(method -> method.isAnnotatedWith(Scheduled.class));
+        assertThat(frameworkHasScheduled).as("в модулях каркаса есть @Scheduled").isTrue();
+    }
+
+    @Test
+    @DisplayName("AC-7: фикстура-нарушитель с @Scheduled в fnd делает правило красным")
+    void fndScheduledViolatorIsRed() {
+        JavaClasses withViolator = new ClassFileImporter().importClasses(FndScheduledViolator.class);
+        EvaluationResult result = noScheduledInFndRule().evaluate(withViolator);
+        assertThat(result.hasViolation()).isTrue();
+        assertThat(result.getFailureReport().toString()).contains("FndScheduledViolator");
     }
 }

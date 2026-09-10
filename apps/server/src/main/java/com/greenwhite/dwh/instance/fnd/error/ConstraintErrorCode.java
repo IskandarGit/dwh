@@ -46,6 +46,7 @@ public enum ConstraintErrorCode {
     // логические коды основы (не ограничения БД)
     STALE_VERSION(null),
     FND_UNIT_UNKNOWN(null),
+    FND_UNIT_BASE_REQUIRED(null),
     FND_VERSION_DRAFT_EXISTS(null),
     FND_VERSION_UNKNOWN(null),
     FND_VERSION_NOT_AFTER_PREVIOUS(null),

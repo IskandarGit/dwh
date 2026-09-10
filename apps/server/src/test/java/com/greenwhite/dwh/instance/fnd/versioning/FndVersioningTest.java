@@ -261,6 +261,36 @@ class FndVersioningTest extends EmbeddedPostgresTest {
                 .query(Long.class).single()).isEqualTo(3L);
     }
 
+    @Test
+    @DisplayName("AC-12: два параллельных publish одного черновика — один успех, второй fnd_version_unknown")
+    void concurrentPublishIsRejected() throws Exception {
+        int version = versioning.createDraft(VERSIONS, thing, actor);
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<Throwable>> outcomes = new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                outcomes.add(pool.submit(() -> {
+                    barrier.await();
+                    return catchThrowable(() -> versioning.publish(VERSIONS, thing, version,
+                            LocalDate.parse("2026-01-01"), null, actor));
+                }));
+            }
+            List<Throwable> errors = new java.util.ArrayList<>();
+            for (var outcome : outcomes) {
+                errors.add(outcome.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            assertThat(errors).filteredOn(java.util.Objects::isNull).hasSize(1);
+            assertThat(errors).filteredOn(java.util.Objects::nonNull).singleElement()
+                    .isInstanceOfSatisfying(ConstraintViolationException.class,
+                            e -> assertThat(e.code()).isEqualTo(ConstraintErrorCode.FND_VERSION_UNKNOWN));
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(jdbc.sql("select count(*) from " + VERSIONS + " where thing_id = :h and status = 'published'")
+                .param("h", thing).query(Long.class).single()).isEqualTo(1L);
+    }
+
     // ---------- вспомогательное ----------
 
     private long insertThing(String code) {

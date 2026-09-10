@@ -169,7 +169,7 @@ class FndDwhFacadesTest extends EmbeddedPostgresTest {
     void dwhUnavailable() {
         try (HikariDataSource closedPort = closedPortDataSource()) {
             FndMartReader reader = new FndMartReader(closedPort);
-            FndRawWriter writer = new JdbcFndRawWriter(closedPort, jdbc, json);
+            FndRawWriter writer = new JdbcFndRawWriter(closedPort, jdbc, tx.getTransactionManager(), json);
             long loadId = newLoad();
 
             Instant start = Instant.now();

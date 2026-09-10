@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import javax.sql.DataSource;
@@ -26,8 +28,11 @@ import java.util.UUID;
  * видят только этот фасад, поэтому переход с общей таблицы на таблицу-на-источник их не затронет.
  *
  * <p>Статус загрузки живёт в OLTP, строки — в pg-dwh; распределённой транзакции между ними нет
- * (02 п.18). Поэтому порядок такой: сначала проверяется, что загрузка в {@code pending},
- * затем строки пишутся одной транзакцией pg-dwh. Сбой на любой строке — откат всей записи.
+ * (02 п.18). Поэтому порядок такой: в транзакции OLTP строка загрузки берётся {@code for share}
+ * и проверяется статус {@code pending}, затем строки пишутся одной транзакцией pg-dwh, и только
+ * после её коммита отпускается OLTP-блокировка. Параллельный {@code apply}/{@code fail} (они берут
+ * {@code for update}) ждёт конца записи — строки не попадут в уже применённую загрузку (13 инв.4).
+ * Сбой на любой строке — откат всей записи.
  */
 @Component
 public class JdbcFndRawWriter implements FndRawWriter {
@@ -41,17 +46,26 @@ public class JdbcFndRawWriter implements FndRawWriter {
 
     private final DataSource dwh;
     private final JdbcClient oltp;
+    private final TransactionTemplate oltpTx;
     private final ObjectMapper json;
 
-    public JdbcFndRawWriter(@Qualifier(FndPref.DWH) DataSource dwh, JdbcClient oltp, ObjectMapper json) {
+    public JdbcFndRawWriter(@Qualifier(FndPref.DWH) DataSource dwh, JdbcClient oltp,
+                            PlatformTransactionManager oltpTransactions, ObjectMapper json) {
         this.dwh = dwh;
         this.oltp = oltp;
+        this.oltpTx = new TransactionTemplate(oltpTransactions);
         this.json = json;
     }
 
     @Override
     public void write(long loadId, UUID sourceFileId, Iterable<FndRawRow> rows) {
-        requirePending(loadId);
+        oltpTx.executeWithoutResult(status -> {
+            requirePending(loadId);
+            writeRows(loadId, sourceFileId, rows);
+        });
+    }
+
+    private void writeRows(long loadId, UUID sourceFileId, Iterable<FndRawRow> rows) {
         int written = 0;
         try (Connection connection = connect()) {
             boolean autoCommit = connection.getAutoCommit();
@@ -116,8 +130,9 @@ public class JdbcFndRawWriter implements FndRawWriter {
         return rows;
     }
 
+    /** Проверка статуса под {@code for share}: блокировка держится до конца OLTP-транзакции {@link #write}. */
     private void requirePending(long loadId) {
-        String status = oltp.sql("select status from fnd_loads where id = :id")
+        String status = oltp.sql("select status from fnd_loads where id = :id for share")
                 .param("id", loadId).query(String.class).optional().orElse(null);
         if (!FndLoad.PENDING.equals(status)) {
             throw new ConstraintViolationException(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);

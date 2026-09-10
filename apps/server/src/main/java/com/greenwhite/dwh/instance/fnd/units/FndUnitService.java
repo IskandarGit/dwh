@@ -45,10 +45,15 @@ public class FndUnitService {
 
     /**
      * Заводит единицу. {@code baseUnitCode} указывает на существующую единицу; базовая единица
-     * ссылается сама на себя (AC-18). Проверки кода и обязательного имени на узбекском — ограничения БД.
+     * ссылается сама на себя (AC-18). Без базовой единицы — отказ {@code fnd_unit_base_required}:
+     * иначе {@link #toBase} не отличил бы «базовая» от «база не задана». Проверки кода и обязательного
+     * имени на узбекском — ограничения БД.
      */
     @Transactional
     public long registerUnit(String code, Map<String, String> nameI18n, String baseUnitCode, FndActor actor) {
+        if (baseUnitCode == null || baseUnitCode.isBlank()) {
+            throw new ConstraintViolationException(ConstraintErrorCode.FND_UNIT_BASE_REQUIRED);
+        }
         actors.apply(actor);
         String names = json.writeValueAsString(nameI18n == null ? Map.of() : nameI18n);
         return FndSqlErrors.translating(() -> jdbc.sql("insert into fnd_units (code, name_i18n, base_unit_code)"
@@ -118,7 +123,11 @@ public class FndUnitService {
         FndUnit unit = findUnit(unitCode)
                 .orElseThrow(() -> new ConstraintViolationException(ConstraintErrorCode.FND_UNIT_UNKNOWN));
         String base = unit.baseUnitCode();
-        if (base == null || base.equals(unitCode)) {
+        if (base == null) {
+            // Схема (V107) этого не допускает; ветка — защита от данных, заведённых мимо фасада
+            throw new ConstraintViolationException(ConstraintErrorCode.FND_UNIT_BASE_REQUIRED);
+        }
+        if (base.equals(unitCode)) {
             return new FndConversion(value, unitCode, null, date);
         }
         return convert(value, unitCode, base, date);
