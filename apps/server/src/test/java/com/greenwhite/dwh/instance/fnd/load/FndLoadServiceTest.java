@@ -8,9 +8,12 @@ import com.greenwhite.dwh.instance.fnd.dwh.FndRawWriter;
 import com.greenwhite.dwh.instance.fnd.error.ConstraintErrorCode;
 import com.greenwhite.dwh.instance.fnd.error.ConstraintViolationException;
 import com.greenwhite.dwh.instance.support.EmbeddedPostgresTest;
+import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
@@ -21,17 +24,37 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-/** Блок E основы: версии загрузок и журнал (AC-25…AC-32), плюс состав колонок fnd_loads (AC-44). */
+/**
+ * Блок E основы: версии загрузок и журнал (AC-25…AC-32), плюс состав колонок fnd_loads (AC-44).
+ * Тесты протокола идут по двум конфигурациям ведомств А и Б ({@link DepartmentFixture}, AC-41):
+ * источники, периоды и версии формата — параметр, а не знание ядра.
+ */
 class FndLoadServiceTest extends EmbeddedPostgresTest {
 
-    private static final String SOURCE = "src_test";
-    private static final LocalDate PERIOD_FROM = LocalDate.parse("2026-01-01");
-    private static final LocalDate PERIOD_TO = LocalDate.parse("2026-01-31");
+    /** Основная загрузка текущей конфигурации: источник, период, версия формата. */
+    private String SOURCE;
+    private LocalDate PERIOD_FROM;
+    private LocalDate PERIOD_TO;
+    private String FORMAT;
+    private DepartmentFixture dept;
+
+    static Stream<DepartmentFixture> departments() {
+        return DepartmentFixture.departments();
+    }
+
+    private void use(DepartmentFixture fixture) {
+        dept = fixture;
+        SOURCE = fixture.mainLoad().source();
+        PERIOD_FROM = fixture.mainLoad().periodFrom();
+        PERIOD_TO = fixture.mainLoad().periodTo();
+        FORMAT = fixture.mainLoad().format();
+    }
 
     @Autowired
     private FndLoadService loads;
@@ -65,11 +88,13 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
         dwhJdbc.sql("delete from raw.rows").update();
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-25: begin → запись строк → apply; несходящиеся счётчики строк — отказ")
-    void applyProtocol() {
+    void applyProtocol(DepartmentFixture fixture) {
+        use(fixture);
         UUID packageRef = UUID.randomUUID();
-        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, "v1", user);
+        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, FORMAT, user);
         assertThat(loads.find(loadId).orElseThrow().status()).isEqualTo(FndLoad.PENDING);
 
         rawWriter.write(loadId, null, rows(3));
@@ -84,16 +109,18 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
         assertThat(applied.rowsRejected()).isEqualTo(1);
         assertThat(loads.appliedLoadIds(SOURCE)).containsExactly(loadId);
 
-        long another = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+        long another = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         assertThat(codeOf(() -> loads.apply(another, 10, 2, 1, user)))
                 .isEqualTo(ConstraintErrorCode.FND_LOADS_CK_ROWS);
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-26: сбой записи доходит до вызывающего; fail помечает загрузку и пишет причину")
-    void failedLoad() {
+    void failedLoad(DepartmentFixture fixture) {
+        use(fixture);
         UUID packageRef = UUID.randomUUID();
-        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, "v1", user);
+        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, FORMAT, user);
 
         FndRawWriter broken = new BrokenRawWriter();
         assertThatThrownBy(() -> broken.write(loadId, null, rows(1)))
@@ -106,15 +133,17 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
                 .param("p", packageRef).query().singleRow();
         assertThat(logRow).containsEntry("event", "failed").containsEntry("note", "источник вернул ошибку TEST");
 
-        long other = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+        long other = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         assertThatThrownBy(() -> loads.fail(other, "  ", user)).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-27: разрешены только pending→applied, pending→failed, applied→superseded")
-    void statusTransitions() {
+    void statusTransitions(DepartmentFixture fixture) {
+        use(fixture);
         UUID packageRef = UUID.randomUUID();
-        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, "v1", user);
+        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, FORMAT, user);
         loads.apply(loadId, 1, 1, 0, user);
 
         assertThat(codeOf(() -> loads.apply(loadId, 1, 1, 0, user)))
@@ -123,7 +152,7 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
                 .isEqualTo(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);
         assertThat(codeOf(() -> loads.apply(-1, 1, 1, 0, user)))
                 .isEqualTo(ConstraintErrorCode.FND_LOAD_STATUS_TRANSITION);
-        assertThat(codeOf(() -> loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, "v1", user)))
+        assertThat(codeOf(() -> loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, FORMAT, user)))
                 .isEqualTo(ConstraintErrorCode.FND_LOADS_UK_PACKAGE_REF);
         assertThatThrownBy(() -> jdbc.sql("update fnd_loads set status = 'unknown' where id = :id")
                 .param("id", loadId).update())
@@ -131,20 +160,23 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
                 .hasMessageContaining("fnd_loads_ck_status");
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-28: повторная загрузка периода снимает предыдущую, её строки raw остаются")
-    void repeatedPeriodSupersedes() {
-        long first = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+    void repeatedPeriodSupersedes(DepartmentFixture fixture) {
+        use(fixture);
+        long first = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         rawWriter.write(first, null, rows(2));
         loads.apply(first, 2, 2, 0, user);
 
-        long otherPeriod = loads.begin(SOURCE, UUID.randomUUID(), LocalDate.parse("2026-02-01"),
-                LocalDate.parse("2026-02-28"), "v1", user);
+        DepartmentFixture.Load other = dept.otherPeriodLoad();
+        long otherPeriod = loads.begin(SOURCE, UUID.randomUUID(), other.periodFrom(), other.periodTo(), FORMAT, user);
         loads.apply(otherPeriod, 1, 1, 0, user);
-        long otherSource = loads.begin("src_test_2", UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+        long otherSource = loads.begin(dept.otherSourceLoad().source(), UUID.randomUUID(), PERIOD_FROM, PERIOD_TO,
+                FORMAT, user);
         loads.apply(otherSource, 1, 1, 0, user);
 
-        long second = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+        long second = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         loads.apply(second, 2, 2, 0, user);
 
         FndLoad superseded = loads.find(first).orElseThrow();
@@ -155,9 +187,11 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
         assertThat(loads.find(otherSource).orElseThrow().status()).isEqualTo(FndLoad.APPLIED);
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-29: журнал пакета только дополняется; load_id появляется после применения")
-    void packageJournal() {
+    void packageJournal(DepartmentFixture fixture) {
+        use(fixture);
         UUID packageRef = UUID.randomUUID();
         String sha = "a".repeat(64);
         loads.log(packageRef, "получен", null, null, user, "файл принят TEST", sha);
@@ -165,7 +199,7 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
         assertThat(jdbc.sql("select count(*) from fnd_load_log where package_ref = :p and load_id is null")
                 .param("p", packageRef).query(Long.class).single()).isEqualTo(2L);
 
-        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, "v1", user);
+        long loadId = loads.begin(SOURCE, packageRef, PERIOD_FROM, PERIOD_TO, FORMAT, user);
         loads.apply(loadId, 1, 1, 0, user);
         String longNote = "ў".repeat(4000);
         loads.log(packageRef, "применён", FndLoad.PENDING, FndLoad.APPLIED, user, longNote, null);
@@ -190,16 +224,19 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
                 .isInstanceOf(DataAccessException.class).hasMessageContaining("fnd_load_log_append_only");
         // Сессия обслуживания — единственное исключение (как для audit_log каркаса)
         tx.executeWithoutResult(status -> {
+            actors.apply(user); // журнал под аудитом (V106): и обслуживание идёт с актором
             jdbc.sql("select set_config('dwh.maintenance', 'on', true)").query(String.class).single();
             assertThat(jdbc.sql("delete from fnd_load_log where package_ref = :p").param("p", packageRef).update())
                     .isEqualTo(3);
         });
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-30: строки raw и поколение кеша ссылаются на один и тот же load_id")
-    void singleLoadId() {
-        long loadId = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+    void singleLoadId(DepartmentFixture fixture) {
+        use(fixture);
+        long loadId = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         rawWriter.write(loadId, null, rows(2));
         loads.apply(loadId, 2, 2, 0, user);
 
@@ -216,13 +253,15 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
         assertThat(cacheVersions).contains(String.valueOf(loadId));
     }
 
-    @Test
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-32: в журналах — id пользователя или system, в audit_log — тот же актор; метки timestamptz")
-    void actorAndTime() {
-        long byUser = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, "v1", user);
+    void actorAndTime(DepartmentFixture fixture) {
+        use(fixture);
+        long byUser = loads.begin(SOURCE, UUID.randomUUID(), PERIOD_FROM, PERIOD_TO, FORMAT, user);
         loads.apply(byUser, 1, 1, 0, user);
-        long byJob = loads.begin(SOURCE, UUID.randomUUID(), LocalDate.parse("2026-03-01"),
-                LocalDate.parse("2026-03-31"), "v1", actor);
+        long byJob = loads.begin(SOURCE, UUID.randomUUID(), dept.otherPeriodLoad().periodFrom(),
+                dept.otherPeriodLoad().periodTo(), FORMAT, actor);
         loads.apply(byJob, 1, 1, 0, actor);
 
         assertThat(loads.find(byUser).orElseThrow().appliedBy()).isEqualTo(String.valueOf(user.userId()));
