@@ -293,6 +293,50 @@ class FndVersioningTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("S-5/доп.14: индекс <таблица>_draft_uidx есть у таблицы теста (fnd_versioning_enable) и у fnd_unit_coefficient_versions (V109)")
+    void draftUniqueIndexIsApplied() {
+        List<String> indexes = jdbc.sql("select indexname from pg_indexes where indexname like '%\\_draft\\_uidx' order by 1")
+                .query(String.class).list();
+        assertThat(indexes).contains(VERSIONS + "_draft_uidx", "fnd_unit_coefficient_versions_draft_uidx");
+        assertThat(jdbc.sql("select indexdef from pg_indexes where indexname = :n").param("n", VERSIONS + "_draft_uidx")
+                .query(String.class).single()).contains("UNIQUE").contains("thing_id").contains("status = 'draft'");
+    }
+
+    @Test
+    @DisplayName("S-5/доп.14: 30 × два параллельных createDraft одного заголовка — черновик один, второй поток получает fnd_version_draft_exists или fnd_version_conflict")
+    void concurrentCreateDraftLeavesSingleDraft() throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            for (int attempt = 0; attempt < 30; attempt++) {
+                long header = insertThing("TEST-RACE-" + attempt);
+                java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(2);
+                List<java.util.concurrent.Future<Throwable>> outcomes = new java.util.ArrayList<>();
+                for (int i = 0; i < 2; i++) {
+                    outcomes.add(pool.submit(() -> {
+                        barrier.await();
+                        return catchThrowable(() -> versioning.createDraft(VERSIONS, header, actor));
+                    }));
+                }
+                List<Throwable> errors = new java.util.ArrayList<>();
+                for (var outcome : outcomes) {
+                    errors.add(outcome.get(30, java.util.concurrent.TimeUnit.SECONDS));
+                }
+                long drafts = jdbc.sql("select count(*) from " + VERSIONS + " where thing_id = :h and status = 'draft'")
+                        .param("h", header).query(Long.class).single();
+                assertThat(drafts).as("попытка %d: черновиков у заголовка", attempt).isLessThanOrEqualTo(1L);
+                assertThat(errors).as("попытка %d: ровно один успех", attempt)
+                        .filteredOn(java.util.Objects::isNull).hasSize(1);
+                assertThat(errors).filteredOn(java.util.Objects::nonNull).singleElement()
+                        .as("попытка %d: код второго потока", attempt)
+                        .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.code())
+                                .isIn(ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS, ConstraintErrorCode.FND_VERSION_CONFLICT));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("M-3: updateDraft не даёт обойти publish через служебные колонки")
     void updateDraftRejectsReservedColumns() {
         int version = versioning.createDraft(VERSIONS, thing, actor);
