@@ -235,6 +235,23 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
 
     @ParameterizedTest(name = "конфигурация {0}")
     @MethodSource("departments")
+    @DisplayName("AC-29 (M-4): две строки журнала в одной транзакции получают разное время at")
+    void journalTimeIsPerRowNotPerTransaction(DepartmentFixture fixture) {
+        use(fixture);
+        UUID packageRef = UUID.randomUUID();
+        tx.executeWithoutResult(status -> {
+            loads.log(packageRef, "получен", null, null, user, "первая строка TEST", null);
+            loads.log(packageRef, "проверен", null, null, user, "вторая строка TEST", null);
+        });
+        List<java.time.OffsetDateTime> times = jdbc.sql("select at from fnd_load_log where package_ref = :p order by id")
+                .param("p", packageRef).query(java.time.OffsetDateTime.class).list();
+        assertThat(times).hasSize(2);
+        assertThat(times.get(1)).as("at второй строки строго позже первой (clock_timestamp, не now())")
+                .isAfter(times.get(0));
+    }
+
+    @ParameterizedTest(name = "конфигурация {0}")
+    @MethodSource("departments")
     @DisplayName("AC-30: строки raw и поколение кеша ссылаются на один и тот же load_id")
     void singleLoadId(DepartmentFixture fixture) {
         use(fixture);
