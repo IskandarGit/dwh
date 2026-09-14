@@ -1,0 +1,5 @@
+# AC-24/M-9: числовые константы, разрешённые в ядре. Формат: путь-от-apps/server:число # причина.
+# Коэффициентов пересчёта единиц здесь быть не должно — они живут в fnd_unit_coefficients (экземпляр).
+src/main/java/com/greenwhite/dwh/instance/fnd/config/FndDwhConfig.java:1000 # миллисекунды → секунды для драйвера PostgreSQL
+src/main/resources/db/migration/V105__fnd_seed_jobs.sql:3600 # период задания fnd.load_cleanup, секунды
+src/main/resources/db/migration/V105__fnd_seed_jobs.sql:86400 # период задания fnd.xdb_check, секунды
