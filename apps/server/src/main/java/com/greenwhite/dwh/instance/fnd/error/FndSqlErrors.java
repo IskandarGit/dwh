@@ -10,7 +10,8 @@ import java.util.Optional;
 /**
  * Перевод ошибок PostgreSQL в {@link ConstraintViolationException} (AC-9б): по имени ограничения
  * ({@code SQLException.getMessage()} содержит его; у драйвера PostgreSQL — {@code ServerErrorMessage.getConstraint()})
- * или по тексту {@code raise exception '<код>'} триггеров основы. Неопознанная ошибка возвращается как есть.
+ * или по тексту {@code raise exception '<код>'} триггеров основы либо (для таблиц версий, {@link #translatingVersions}) по нарушению их первичного ключа — {@code fnd_version_conflict}.
+ * Неопознанная ошибка возвращается как есть.
  */
 public final class FndSqlErrors {
 
@@ -43,6 +44,29 @@ public final class FndSqlErrors {
             return new StaleVersionException();
         }
         return new ConstraintViolationException(code.get(), e);
+    }
+
+    /**
+     * То же, что {@link #translating(SqlAction)}, но нарушение первичного ключа таблицы версий
+     * ({@code <versionsTable>_pkey}: параллельный createDraft одного заголовка, M-13) переводится
+     * в {@code fnd_version_conflict}.
+     */
+    public static <T> T translatingVersions(String versionsTable, SqlAction<T> action) {
+        try {
+            return action.run();
+        } catch (DataAccessException e) {
+            throw translateVersions(versionsTable, e);
+        }
+    }
+
+    static RuntimeException translateVersions(String versionsTable, DataAccessException e) {
+        SQLException sql = sqlCause(e);
+        if (sql != null && constraintName(sql).filter((versionsTable + "_pkey")::equals).isPresent()) {
+            log.warn("constraint_violation code={} sqlState={}",
+                    ConstraintErrorCode.FND_VERSION_CONFLICT.code(), sql.getSQLState());
+            return new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_CONFLICT, e);
+        }
+        return translate(e);
     }
 
     private static Optional<String> constraintName(SQLException sql) {

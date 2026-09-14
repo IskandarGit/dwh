@@ -3,6 +3,7 @@ package com.greenwhite.dwh.instance.fnd.versioning;
 import com.greenwhite.dwh.instance.fnd.FndActor;
 import com.greenwhite.dwh.instance.fnd.FndActors;
 import com.greenwhite.dwh.instance.fnd.error.ConstraintErrorCode;
+import com.greenwhite.dwh.instance.fnd.error.FndSqlErrors;
 import com.greenwhite.dwh.instance.fnd.error.ConstraintViolationException;
 import com.greenwhite.dwh.instance.fnd.error.StaleVersionException;
 import com.greenwhite.dwh.instance.support.EmbeddedPostgresTest;
@@ -301,6 +302,26 @@ class FndVersioningTest extends EmbeddedPostgresTest {
         }
         assertThat(jdbc.sql("select status from " + VERSIONS + " where thing_id = :t and version = :v")
                 .param("t", thing).param("v", version).query(String.class).single()).isEqualTo("draft");
+    }
+
+    @Test
+    @DisplayName("M-13: дубль (заголовок, версия) через транслятор версий — fnd_version_conflict, а не DuplicateKeyException")
+    void duplicateVersionNumberIsTranslatedToConflictCode() {
+        insertVersionDirectly(thing, 1, "2026-01-01", null, "published");
+
+        // гонка createDraft: оба посчитали max+1 — воспроизводим без триггера, PK срабатывает первым
+        jdbc.sql("alter table " + VERSIONS + " disable trigger " + VERSIONS + "_bump_version").update();
+        try {
+            ConstraintErrorCode code = codeOf(() -> FndSqlErrors.translatingVersions(VERSIONS,
+                    () -> jdbc.sql("insert into " + VERSIONS + " (thing_id, version, valid_from, status)"
+                                    + " overriding system value values (:h, 1, current_date, 'draft')")
+                            .param("h", thing).update()));
+            assertThat(code).isEqualTo(ConstraintErrorCode.FND_VERSION_CONFLICT);
+        } finally {
+            jdbc.sql("alter table " + VERSIONS + " enable trigger " + VERSIONS + "_bump_version").update();
+        }
+        assertThat(jdbc.sql("select count(*) from " + VERSIONS + " where thing_id = :t").param("t", thing)
+                .query(Long.class).single()).as("дубль не вставлен").isEqualTo(1L);
     }
 
     // ---------- вспомогательное ----------

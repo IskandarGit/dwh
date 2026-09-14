@@ -56,6 +56,7 @@ public class FndVersioning {
      * колонка объявлена {@code not null}, а действующие даты задаёт публикация [допущение архитектора].
      *
      * @throws ConstraintViolationException {@code fnd_version_draft_exists} — черновик уже есть (доп.14)
+     * @throws ConstraintViolationException {@code fnd_version_conflict} — параллельный createDraft того же заголовка (M-13)
      */
     @Transactional
     public int createDraft(String versionsTable, long headerId, FndActor actor) {
@@ -67,7 +68,7 @@ public class FndVersioning {
         if (existing != null) {
             throw new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS);
         }
-        return FndSqlErrors.translating(() -> jdbc.sql("insert into " + versionsTable
+        return FndSqlErrors.translatingVersions(versionsTable, () -> jdbc.sql("insert into " + versionsTable
                         + " (" + header + ", valid_from, status) values (:h, current_date, 'draft') returning version")
                 .param("h", headerId).query(Integer.class).single());
     }

@@ -52,6 +52,7 @@ public enum ConstraintErrorCode {
     FND_VERSION_NOT_AFTER_PREVIOUS(null),
     FND_VERSION_GAP(null),
     FND_VERSION_PUBLISHED_IMMUTABLE(null),
+    FND_VERSION_CONFLICT(null),
     AUDIT_ACTOR_MISSING(null),
     FND_LOAD_STATUS_TRANSITION(null),
     FND_LOAD_LOG_APPEND_ONLY(null),
