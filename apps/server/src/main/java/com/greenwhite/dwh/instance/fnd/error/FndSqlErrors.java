@@ -47,9 +47,10 @@ public final class FndSqlErrors {
     }
 
     /**
-     * То же, что {@link #translating(SqlAction)}, но нарушение первичного ключа таблицы версий
-     * ({@code <versionsTable>_pkey}: параллельный createDraft одного заголовка, M-13) переводится
-     * в {@code fnd_version_conflict}.
+     * То же, что {@link #translating(SqlAction)}, но нарушения ограничений таблицы версий переводятся в коды:
+     * первичный ключ {@code <versionsTable>_pkey} (параллельный createDraft посчитал тот же номер, M-13) —
+     * {@code fnd_version_conflict}; частичный уникальный индекс {@code <versionsTable>_draft_uidx}
+     * (второй черновик того же заголовка, S-5) — {@code fnd_version_draft_exists}.
      */
     public static <T> T translatingVersions(String versionsTable, SqlAction<T> action) {
         try {
@@ -61,10 +62,18 @@ public final class FndSqlErrors {
 
     static RuntimeException translateVersions(String versionsTable, DataAccessException e) {
         SQLException sql = sqlCause(e);
-        if (sql != null && constraintName(sql).filter((versionsTable + "_pkey")::equals).isPresent()) {
-            log.warn("constraint_violation code={} sqlState={}",
-                    ConstraintErrorCode.FND_VERSION_CONFLICT.code(), sql.getSQLState());
-            return new ConstraintViolationException(ConstraintErrorCode.FND_VERSION_CONFLICT, e);
+        Optional<String> constraint = sql == null ? Optional.empty() : constraintName(sql);
+        if (constraint.isPresent()) {
+            ConstraintErrorCode code = null;
+            if ((versionsTable + "_pkey").equals(constraint.get())) {
+                code = ConstraintErrorCode.FND_VERSION_CONFLICT;
+            } else if ((versionsTable + "_draft_uidx").equals(constraint.get())) {
+                code = ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS;
+            }
+            if (code != null) {
+                log.warn("constraint_violation code={} sqlState={}", code.code(), sql.getSQLState());
+                return new ConstraintViolationException(code, e);
+            }
         }
         return translate(e);
     }
