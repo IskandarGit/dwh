@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -29,6 +30,10 @@ class FndCorePurityTest {
     private static final Path OLTP_MIGRATIONS = Path.of("src/main/resources/db/migration");
     private static final Path DWH_MIGRATIONS = Path.of("src/main/resources/db/dwh");
     private static final Path TERMS = Path.of("src/test/resources/forbidden-terms.txt");
+    private static final Path ALLOWED_NUMBERS = Path.of("src/test/resources/allowed-numbers.txt");
+    /** Дробь или число от 4 цифр как отдельный токен: 127.0.0.1, V100, id_2026 не считаются. */
+    private static final Pattern NUMBER = Pattern.compile("(?<![\\p{L}\\p{N}_.])(\\d+\\.\\d+|\\d{4,})(?![\\p{L}\\p{N}_.])");
+    private static final Pattern LINE_COMMENT = Pattern.compile("//.*$|--.*$");
 
     @Test
     @DisplayName("AC-24/AC-40: ядро и наши миграции не упоминают единиц, множителей и имён покупателей")
@@ -74,6 +79,34 @@ class FndCorePurityTest {
                 .anySatisfy(hit -> assertThat(hit).startsWith(violator + ":3").contains("sqb"));
     }
 
+    @Test
+    @DisplayName("AC-24/M-9: в ядре и наших миграциях нет числовых констант пересчёта вне allowed-numbers.txt")
+    void coreHasNoUnlistedNumbers() throws IOException {
+        Set<String> allowed = allowedNumbers();
+        for (String entry : allowed) {
+            String path = entry.substring(0, entry.lastIndexOf(':'));
+            assertThat(Files.exists(Path.of(path))).as("устаревшая запись allowlist: %s", entry).isTrue();
+        }
+        assertThat(scanNumbers(coreFiles(), allowed)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AC-24/M-9: нарушитель — красный с файл:строка и числом; комментарии, версии и IP не считаются")
+    void numberViolatorIsReported(@TempDir Path root) throws IOException {
+        Path violator = root.resolve("UplUnits.java");
+        Files.writeString(violator, "class UplUnits {\n"
+                + "  long grams = kg * 1000; // 2026 — в комментарии не считается\n"
+                + "  double toTonnes = 0.001;\n"
+                + "  String ip = \"127.0.0.1\"; String v = \"V100\"; int id_2026 = 1;\n"
+                + "}\n", StandardCharsets.UTF_8);
+        String key = violator.toString().replace('\\', '/');
+
+        assertThat(scanNumbers(List.of(violator), Set.of())).hasSize(2)
+                .anySatisfy(hit -> assertThat(hit).startsWith(key + ":2").endsWith("1000"))
+                .anySatisfy(hit -> assertThat(hit).startsWith(key + ":3").endsWith("0.001"));
+        assertThat(scanNumbers(List.of(violator), Set.of(key + ":1000"))).hasSize(1);
+    }
+
     // ---------- механика ----------
 
     static List<String> scan(List<Path> files, List<String> terms) throws IOException {
@@ -90,6 +123,37 @@ class FndCorePurityTest {
             }
         }
         return hits;
+    }
+
+    /** AC-24/M-9: числовые токены вне allowlist; ключ — {@code путь:число}, путь с прямыми слэшами от apps/server. */
+    static List<String> scanNumbers(List<Path> files, Set<String> allowed) throws IOException {
+        List<String> hits = new ArrayList<>();
+        for (Path file : files) {
+            String key = file.toString().replace('\\', '/');
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int number = 1; number <= lines.size(); number++) {
+                String line = lines.get(number - 1).trim();
+                if (line.startsWith("*") || line.startsWith("/*")) {
+                    continue; // javadoc и блочные комментарии
+                }
+                Matcher matcher = NUMBER.matcher(LINE_COMMENT.matcher(line).replaceAll(""));
+                while (matcher.find()) {
+                    if (!allowed.contains(key + ":" + matcher.group(1))) {
+                        hits.add(key + ":" + number + " — " + matcher.group(1));
+                    }
+                }
+            }
+        }
+        return hits;
+    }
+
+    /** Строки {@code путь:число # причина}; пустые и {@code #} пропускаются. */
+    private static Set<String> allowedNumbers() throws IOException {
+        try (Stream<String> lines = Files.lines(ALLOWED_NUMBERS, StandardCharsets.UTF_8)) {
+            return lines.map(line -> line.contains("#") ? line.substring(0, line.indexOf('#')) : line)
+                    .map(String::trim).filter(line -> !line.isEmpty())
+                    .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        }
     }
 
     /** Термин как отдельное слово, без учёта регистра; {@code sum(} — SQL-агрегат, а не единица. */
