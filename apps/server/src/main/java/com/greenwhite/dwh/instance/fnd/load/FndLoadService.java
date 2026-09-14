@@ -106,6 +106,9 @@ public class FndLoadService {
     @Transactional
     public void log(UUID packageRef, String event, String fromStatus, String toStatus,
                     FndActor actor, String note, String fileSha) {
+        if (actor == null) {
+            throw new ConstraintViolationException(ConstraintErrorCode.AUDIT_ACTOR_MISSING);
+        }
         actors.apply(actor);
         Long loadId = jdbc.sql("select id from fnd_loads where package_ref = :package"
                         + " and status in ('applied', 'superseded')")

@@ -230,6 +230,12 @@ class FndUnitServiceTest extends EmbeddedPostgresTest {
 
         assertThatThrownBy(() -> units.convert(null, derived, base, from))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> units.convert(BigDecimal.ONE, null, base, from))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("unit code required");
+        assertThatThrownBy(() -> units.convert(BigDecimal.ONE, derived, " ", from))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("unit code required");
+        assertThatThrownBy(() -> units.toBase(BigDecimal.ONE, null, from))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("unit code required");
         assertThatThrownBy(() -> units.publishCoefficient(derived, dept.otherUnit().code(), null, from, actor))
                 .isInstanceOf(IllegalArgumentException.class);
     }

@@ -15,8 +15,10 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -34,6 +36,10 @@ public class FndVersioning {
 
     /** Имя таблицы/колонки в динамическом SQL: только то, что мы сами создаём миграциями. */
     private static final Pattern IDENTIFIER = Pattern.compile("^[a-z][a-z0-9_]{0,62}$");
+
+    /** Колонки, которыми управляет стандарт версионности (02 п.12, AC-13/AC-16): правятся только через фасад. */
+    private static final Set<String> RESERVED_COLUMNS = Set.of(
+            "id", "status", "version", "valid_from", "valid_to", "lock_version", "published_at", "published_by");
 
     private final JdbcClient jdbc;
     private final FndActors actors;
@@ -142,6 +148,11 @@ public class FndVersioning {
         columns.forEach((column, value) -> {
             if (!IDENTIFIER.matcher(column).matches()) {
                 throw new IllegalArgumentException("Недопустимое имя колонки: " + column);
+            }
+            String normalized = column.toLowerCase(Locale.ROOT);
+            if (RESERVED_COLUMNS.contains(normalized) || normalized.equals(header)) {
+                throw new IllegalArgumentException(
+                        "Колонка управляется версионностью, правка через updateDraft запрещена: " + column);
             }
             checked.put(column, value);
         });

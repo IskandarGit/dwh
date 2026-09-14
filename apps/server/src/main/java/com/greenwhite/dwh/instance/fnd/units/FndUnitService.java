@@ -103,6 +103,8 @@ public class FndUnitService {
         if (value == null) {
             throw new IllegalArgumentException("Значение не задано: пересчитывать нечего");
         }
+        requireUnitCode(fromUnit);
+        requireUnitCode(toUnit);
         if (fromUnit.equals(toUnit)) {
             return new FndConversion(value, toUnit, null, date);
         }
@@ -120,6 +122,7 @@ public class FndUnitService {
     /** Пересчёт в базовую единицу (13 инв.3): база единицы берётся из справочника, не из кода. */
     @Transactional(readOnly = true)
     public FndConversion toBase(BigDecimal value, String unitCode, LocalDate date) {
+        requireUnitCode(unitCode);
         FndUnit unit = findUnit(unitCode)
                 .orElseThrow(() -> new ConstraintViolationException(ConstraintErrorCode.FND_UNIT_UNKNOWN));
         String base = unit.baseUnitCode();
@@ -131,6 +134,13 @@ public class FndUnitService {
             return new FndConversion(value, unitCode, null, date);
         }
         return convert(value, unitCode, base, date);
+    }
+
+    private static String requireUnitCode(String unitCode) {
+        if (unitCode == null || unitCode.isBlank()) {
+            throw new IllegalArgumentException("unit code required");
+        }
+        return unitCode;
     }
 
     private Optional<Long> coefficientId(String fromUnit, String toUnit) {
