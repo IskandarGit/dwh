@@ -120,7 +120,7 @@ public class FndLoadService {
                         """)
                 .param("package", packageRef).param("load", loadId).param("event", event)
                 .param("from", fromStatus).param("to", toStatus)
-                .param("actor", actor == null ? null : actor.name())
+                .param("actor", actor.name())
                 .param("note", note).param("sha", fileSha).update());
     }
 
