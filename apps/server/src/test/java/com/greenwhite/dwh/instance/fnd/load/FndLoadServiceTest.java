@@ -212,6 +212,8 @@ class FndLoadServiceTest extends EmbeddedPostgresTest {
 
         assertThat(codeOf(() -> loads.log(packageRef, "получен", null, null, user, null, "не-hex")))
                 .isEqualTo(ConstraintErrorCode.FND_LOAD_LOG_CK_FILE_SHA);
+        assertThat(codeOf(() -> loads.log(packageRef, "получен", null, null, null, null, null)))
+                .isEqualTo(ConstraintErrorCode.AUDIT_ACTOR_MISSING);
         assertThatThrownBy(() -> jdbc.sql("insert into fnd_load_log (package_ref, event, actor)"
                         + " values (:p, 'получен', ' ')").param("p", packageRef).update())
                 .isInstanceOf(DataAccessException.class).hasMessageContaining("fnd_load_log_ck_actor");

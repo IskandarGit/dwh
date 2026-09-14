@@ -291,6 +291,18 @@ class FndVersioningTest extends EmbeddedPostgresTest {
                 .param("h", thing).query(Long.class).single()).isEqualTo(1L);
     }
 
+    @Test
+    @DisplayName("M-3: updateDraft не даёт обойти publish через служебные колонки")
+    void updateDraftRejectsReservedColumns() {
+        int version = versioning.createDraft(VERSIONS, thing, actor);
+        for (String column : List.of("status", "version", "valid_from", "lock_version", "published_at", "thing_id", "STATUS")) {
+            assertThatThrownBy(() -> versioning.updateDraft(VERSIONS, thing, version, 0, Map.of(column, "published"), actor))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining(column);
+        }
+        assertThat(jdbc.sql("select status from " + VERSIONS + " where thing_id = :t and version = :v")
+                .param("t", thing).param("v", version).query(String.class).single()).isEqualTo("draft");
+    }
+
     // ---------- вспомогательное ----------
 
     private long insertThing(String code) {
