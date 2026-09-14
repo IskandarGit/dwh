@@ -1,5 +1,6 @@
 package com.greenwhite.dwh.instance.support;
 
+import com.greenwhite.dwh.instance.fnd.FndPref;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.filter.annotation.TypeExcludeFilters;
@@ -28,6 +29,7 @@ public abstract class EmbeddedPostgresTest {
     /**
      * Очищает пользователей, сессии, права и журналы между тестами. Журналы защищены триггером
      * append-only (миграция V2), поэтому удаление идёт в одной транзакции с флагом обслуживания.
+     * Учётка {@code system} не удаляется (M-5).
      */
     protected void cleanUsersAndJournals() {
         cleanupTx.executeWithoutResult(tx -> {
@@ -35,9 +37,12 @@ public abstract class EmbeddedPostgresTest {
             for (String table : new String[] {"security_events", "audit_log", "idempotency_keys", "kauth_login_failures", "kauth_sessions",
                     "kauth_auth_flows", "kauth_auth_codes_used", "kauth_link_requests",
                     "kauth_external_identities", "md_effective_permissions", "md_permissions_version",
-                    "md_user_roles", "md_users"}) {
+                    "md_user_roles"}) {
                 cleanupJdbc.sql("delete from " + table).update();
             }
+            // M-5: учётка system (сид V101) остаётся — её id кеширует FndActors, удаление дало бы audit_actor_missing
+            cleanupJdbc.sql("delete from md_users where login <> :system")
+                    .param("system", FndPref.SYSTEM_ACTOR).update();
         });
     }
 

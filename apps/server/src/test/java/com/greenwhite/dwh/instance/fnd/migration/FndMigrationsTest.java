@@ -45,7 +45,14 @@ class FndMigrationsTest {
     @Test
     @DisplayName("AC-1: в OLTP — таблицы A1 и основы, в pg-dwh — схемы raw/core/mart/cache без таблиц модулей")
     void twoDatabasesTwoMigrationSets() {
-        assertThat(oltp.sql("select count(*) from flyway_schema_history").query(Long.class).single()).isPositive();
+        // AC-1/M-7: одна история OLTP — и миграции каркаса (V0xx), и наши (V1xx)
+        String versionNumber = "split_part(version, '.', 1)::int";
+        Integer oltpMin = oltp.sql("select min(" + versionNumber + ") from flyway_schema_history where version is not null")
+                .query(Integer.class).single();
+        Integer oltpMax = oltp.sql("select max(" + versionNumber + ") from flyway_schema_history where version is not null")
+                .query(Integer.class).single();
+        assertThat(oltpMin).as("миграции каркаса V0xx").isLessThan(100);
+        assertThat(oltpMax).as("наши миграции V1xx").isGreaterThanOrEqualTo(100);
         assertThat(dwh.sql("select count(*) from flyway_schema_history").query(Long.class).single()).isPositive();
 
         List<String> oltpTables = oltp.sql("select table_name from information_schema.tables where table_schema='public'")
