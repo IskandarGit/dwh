@@ -122,6 +122,41 @@ class FndMaintenanceJobsTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("AC-31 / M-14: за один вызов — 3 сироты найдены, 2 чистые загрузки не помечены")
+    void xdbCheckBatchFindsOnlyOrphans() {
+        long first = loads.begin(SOURCE, UUID.randomUUID(), LocalDate.parse("2026-04-01"),
+                LocalDate.parse("2026-04-30"), "v1", actor);
+        rawWriter.write(first, null, rows(3));
+        loads.apply(first, 3, 3, 0, actor);
+        long second = loads.begin(SOURCE, UUID.randomUUID(), LocalDate.parse("2026-05-01"),
+                LocalDate.parse("2026-05-31"), "v1", actor);
+        rawWriter.write(second, null, rows(2));
+        loads.apply(second, 2, 2, 0, actor);
+
+        UUID orphanFile = UUID.randomUUID();
+        dwhJdbc.sql("insert into raw.rows (load_id, row_no, fields) values (999991, 1, '{}'::jsonb)").update();
+        dwhJdbc.sql("insert into raw.rows (load_id, row_no, fields) values (999992, 1, '{}'::jsonb)").update();
+        dwhJdbc.sql("insert into raw.rows (load_id, source_file_id, row_no, fields)"
+                        + " values (:load, :file, 99, '{}'::jsonb)")
+                .param("load", first).param("file", orphanFile).update();
+
+        jobs.enqueue(FndXdbCheckJob.CODE);
+        assertThat(jobs.runQueued()).isEqualTo(1);
+
+        List<String> events = jdbc.sql("select details::text from security_events where event_type = :event")
+                .param("event", FndXdbCheckJob.EVENT).query(String.class).list();
+        assertThat(events).hasSize(3);
+        assertThat(events).anyMatch(details -> details.contains("999991"));
+        assertThat(events).anyMatch(details -> details.contains("999992"));
+        assertThat(events).anyMatch(details -> details.contains(orphanFile.toString()));
+        assertThat(events).noneMatch(details -> details.contains("\"load_id\": " + first + "}"));
+        assertThat(events).noneMatch(details -> details.contains("\"load_id\": " + second + "}"));
+        assertThat(jdbc.sql("select status from fnd_job_runs where handler = :h")
+                .param("h", FndXdbCheckJob.CODE).query(String.class).list()).containsExactly("done");
+        assertThat(dwhJdbc.sql("select count(*) from raw.rows").query(Long.class).single()).isEqualTo(8L);
+    }
+
+    @Test
     @DisplayName("AC-7: задания попадают в очередь по расписанию и исполняются без планировщика Spring")
     void scheduleEnqueuesDueJobs() {
         assertThat(jobs.enqueueDue()).isGreaterThanOrEqualTo(2);

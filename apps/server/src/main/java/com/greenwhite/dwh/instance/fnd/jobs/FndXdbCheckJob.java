@@ -14,8 +14,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -65,29 +67,47 @@ public class FndXdbCheckJob implements FndJobHandler {
             throw new DwhUnavailableException(failure);
         }
 
+        Long systemUserId = systemUserId();
         int mismatches = 0;
-        for (Long loadId : loadIds) {
-            boolean known = oltp.sql("select count(*) from fnd_loads where id = :id")
-                    .param("id", loadId).query(Long.class).single() > 0;
-            if (!known) {
-                report("{\"load_id\": " + loadId + "}");
-                mismatches++;
-            }
+        for (Long orphan : orphans(loadIds, knownLoadIds(loadIds))) {
+            report(systemUserId, "{\"load_id\": " + orphan + "}");
+            mismatches++;
         }
-        for (UUID fileId : fileIds) {
-            boolean known = oltp.sql("select count(*) from mf_files where id = :id")
-                    .param("id", fileId).query(Long.class).single() > 0;
-            if (!known) {
-                report("{\"source_file_id\": \"" + fileId + "\"}");
-                mismatches++;
-            }
+        for (UUID orphan : orphans(fileIds, knownFileIds(fileIds))) {
+            report(systemUserId, "{\"source_file_id\": \"" + orphan + "\"}");
+            mismatches++;
         }
         log.info("xdb_check loads={} files={} mismatches={}", loadIds.size(), fileIds.size(), mismatches);
     }
 
-    private void report(String details) {
-        Long systemUserId = oltp.sql("select id from md_users where login = :login")
+    /** Один запрос на все id: сравнение массивом, без N+1 (M-14). Пустой список — запросов нет. */
+    private Set<Long> knownLoadIds(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(oltp.sql("select id from fnd_loads where id = any(:ids)")
+                .param("ids", ids.toArray(Long[]::new)).query(Long.class).list());
+    }
+
+    private Set<UUID> knownFileIds(List<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(oltp.sql("select id from mf_files where id = any(cast(:ids as uuid[]))")
+                .param("ids", ids.stream().map(UUID::toString).toArray(String[]::new))
+                .query(UUID.class).list());
+    }
+
+    private static <T> List<T> orphans(List<T> all, Set<T> known) {
+        return all.stream().filter(id -> !known.contains(id)).toList();
+    }
+
+    private Long systemUserId() {
+        return oltp.sql("select id from md_users where login = :login")
                 .param("login", FndPref.SYSTEM_ACTOR).query(Long.class).optional().orElse(null);
+    }
+
+    private void report(Long systemUserId, String details) {
         oltp.sql("insert into security_events (event_type, user_id, ip, user_agent, details)"
                         + " values (:event, :user, cast(:ip as inet), :agent, cast(:details as jsonb))")
                 .param("event", EVENT).param("user", systemUserId).param("ip", LOCAL_IP)
