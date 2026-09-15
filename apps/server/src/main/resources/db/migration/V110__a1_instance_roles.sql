@@ -3,13 +3,18 @@ set statement_timeout = '60s';
 -- Сид И1 (a1-on-cms): преднастроенные роли экземпляра и провайдер OneID.
 -- pcode не NULL — каркас не даёт удалить такую роль (MdRoleService), это и есть «преднастроенные не удаляются» (I-P4).
 -- [допущение] имена ролей — узбекская латиница (интерфейс этапа 1 только uz).
--- Регламент AC-2: файл содержит только сид, без DDL; всё идемпотентно через on conflict do nothing.
+-- Регламент AC-2: файл содержит только сид, без DDL. Идемпотентность — on conflict do nothing без цели: срабатывает и по pcode,
+-- и по name (оба unique, V001). Если имя роли уже занято ролью администратора без pcode, роль экземпляра не создаётся и п.2/3
+-- ничего не вставляют — миграция не падает, ловушка: тест A1InstanceRolesTest.instanceRolesExistWithPcode.
+-- Зачем две роли: admin — системная роль каркаса (перевыдаётся его миграциями), chief_admin — роль экземпляра для покупателя;
+-- на момент V110 они равны. Правило для И3+: каждая миграция, добавляющая md_form_actions, перевыдаёт chief_admin (все пары)
+-- и analyst (только рабочие пары), иначе новые экраны у них не появятся.
 
 -- 1. Роли экземпляра
 insert into md_roles (name, pcode, state, order_no, created_at, modified_at) values
 ('Bosh administrator', 'chief_admin', 'A', 110, now(), now()),
 ('Tahlilchi', 'analyst', 'A', 120, now(), now())
-on conflict (pcode) do nothing;
+on conflict do nothing;
 
 -- 2. chief_admin — все пары каталога (шаблон admin из V002)
 insert into md_role_permissions (role_id, form_code, action)
