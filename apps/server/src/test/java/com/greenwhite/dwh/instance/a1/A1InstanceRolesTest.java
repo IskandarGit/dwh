@@ -36,8 +36,8 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
 
     private static final String TEST_ANALYST_LOGIN = "test-analyst-a1";
 
-    /** S-11 / AC-9: ФИО узбекской кириллицей (ў, қ, ғ, ҳ) с апострофом-ъ — ловит перекос кодировки JDBC/БД. */
-    private static final String TEST_ANALYST_NAME = "TEST Аъзамова Ҳуррият Ғайрат қизи";
+    /** S-11/S-12 / AC-9, п.2 приёмки: ФИО узбекской кириллицей (Ў, Ҳ, Ғ, қ) и латинский апостроф — ловит перекос кодировки JDBC/БД и экранирование. */
+    private static final String TEST_ANALYST_NAME = "TEST Ўринбоева Ҳуррият Ғайрат қизи (G'ijduvon)";
 
     @Autowired
     private JdbcClient jdbc;
@@ -215,10 +215,9 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
         });
 
-        // После отката: права analyst на месте, таймауты соединения — по умолчанию
+        // После отката: права analyst на месте. S-13: проверку show lock_timeout/statement_timeout сняли — вне транзакции
+        // соединение пула не гарантировано то же; сброс SET после rollback гарантирует сам PostgreSQL.
         assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
-        assertThat(jdbc.sql("show lock_timeout").query(String.class).single()).isEqualTo("0");
-        assertThat(jdbc.sql("show statement_timeout").query(String.class).single()).isEqualTo("0");
     }
 
     private long count(String table) {
