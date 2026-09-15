@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,9 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
 
     private static final String TEST_ANALYST_LOGIN = "test-analyst-a1";
 
+    /** S-11 / AC-9: ФИО узбекской кириллицей (ў, қ, ғ, ҳ) с апострофом-ъ — ловит перекос кодировки JDBC/БД. */
+    private static final String TEST_ANALYST_NAME = "TEST Аъзамова Ҳуррият Ғайрат қизи";
+
     @Autowired
     private JdbcClient jdbc;
 
@@ -43,6 +47,9 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
 
     @Autowired
     private SsoProviderRepository ssoProviders;
+
+    @Autowired
+    private TransactionTemplate tx;
 
     @AfterEach
     void removeTestAnalyst() {
@@ -133,13 +140,20 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
         Long systemId = jdbc.sql("select id from md_users where login = 'system'").query(Long.class).single();
         Long analystRoleId = jdbc.sql("select id from md_roles where pcode = 'analyst'").query(Long.class).single();
 
-        var user = userService.createUser("TEST Tahlilchi", TEST_ANALYST_LOGIN, TEST_ANALYST_LOGIN + "@test.local", null,
+        var user = userService.createUser(TEST_ANALYST_NAME, TEST_ANALYST_LOGIN, TEST_ANALYST_LOGIN + "@test.local", null,
                 "StrongPassword2026!", null, "ru", "UTC", null, Map.of(), false, false, List.of(analystRoleId), systemId);
 
         // M-4 (решение 15.09, вариант 1): роль user каркас выдаёт только при пустом списке ролей — здесь её быть не должно
         List<Long> roleIds = jdbc.sql("select role_id from md_user_roles where user_id = :id")
                 .param("id", user.id()).query(Long.class).list();
         assertThat(roleIds).containsExactly(analystRoleId);
+
+        // S-11: ФИО кириллицей прошло через JDBC и БД без перекоса — сверка строки и байтов
+        Map<String, Object> stored = jdbc.sql("select name, octet_length(name) as bytes from md_users where id = :id")
+                .param("id", user.id()).query().singleRow();
+        assertThat(stored.get("name")).isEqualTo(TEST_ANALYST_NAME);
+        assertThat(((Number) stored.get("bytes")).intValue())
+                .isEqualTo(TEST_ANALYST_NAME.getBytes(StandardCharsets.UTF_8).length);
 
         // M-3: эффективные права материализованы каркасом при создании (scopeService.recalculateFor)
         List<String> effective = jdbc.sql("select form_code || ':' || action from md_effective_permissions where user_id = :id")
@@ -182,30 +196,29 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
         long permissionsBefore = count("md_role_permissions");
         long providersBefore = count("md_sso_providers");
 
-        // Частичное состояние (обрыв прошлого применения): роль есть, прав analyst нет
-        jdbc.sql("delete from md_role_permissions where role_id = (select id from md_roles where pcode = 'analyst')").update();
-        assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore - ANALYST_PAIRS.size());
+        // S-10: всё в одной транзакции с откатом — общая БД прогона не отравляется при любом исходе,
+        // а set lock_timeout/statement_timeout из скрипта снимаются откатом (PostgreSQL откатывает и обычный SET)
+        tx.executeWithoutResult(status -> {
+            status.setRollbackOnly();
 
-        try {
+            // Частичное состояние (обрыв прошлого применения): роль есть, прав analyst нет
+            jdbc.sql("delete from md_role_permissions where role_id = (select id from md_roles where pcode = 'analyst')").update();
+            assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore - ANALYST_PAIRS.size());
+
             jdbc.sql(script).update();
-        } finally {
-            // Скрипт выставляет lock_timeout/statement_timeout на соединении пула — вернуть значения по умолчанию
-            jdbc.sql("reset lock_timeout").update();
-            jdbc.sql("reset statement_timeout").update();
-        }
+            assertThat(count("md_roles")).isEqualTo(rolesBefore);
+            assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
+            assertThat(count("md_sso_providers")).isEqualTo(providersBefore);
 
-        assertThat(count("md_roles")).isEqualTo(rolesBefore);
-        assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
-        assertThat(count("md_sso_providers")).isEqualTo(providersBefore);
-
-        // Второй повтор — уже ничего не добавляет
-        try {
+            // Второй повтор — уже ничего не добавляет
             jdbc.sql(script).update();
-        } finally {
-            jdbc.sql("reset lock_timeout").update();
-            jdbc.sql("reset statement_timeout").update();
-        }
+            assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
+        });
+
+        // После отката: права analyst на месте, таймауты соединения — по умолчанию
         assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore);
+        assertThat(jdbc.sql("show lock_timeout").query(String.class).single()).isEqualTo("0");
+        assertThat(jdbc.sql("show statement_timeout").query(String.class).single()).isEqualTo("0");
     }
 
     private long count(String table) {
