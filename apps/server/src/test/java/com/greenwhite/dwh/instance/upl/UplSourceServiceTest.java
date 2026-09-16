@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -60,6 +61,8 @@ class UplSourceServiceTest extends EmbeddedPostgresTest {
     private FndActors actors;
     @Autowired
     private JdbcClient jdbc;
+    @Autowired
+    private TransactionTemplate tx;
 
     private long userId;
 
@@ -306,6 +309,75 @@ class UplSourceServiceTest extends EmbeddedPostgresTest {
                 return null;
             }, "UPL_FORMAT_NOT_DRAFT");
             assertThat(service.getVersion(id, version).status()).isEqualTo("published");
+        }
+    }
+
+    @Test
+    @DisplayName("М-9, С-5: публикация ждёт незавершённую правку черновика и проверяет уже её листы")
+    void publishWaitsForConcurrentDraftEdit() throws Exception {
+        long id = newSource();
+        int version = service.createDraft(id, null, userId).version();
+        replace(id, version, validDraft());
+        int lock = service.getVersion(id, version).lockVersion();
+        DraftData invalid = new DraftData(null, null, null, null,
+                List.of(new Sheet(null, 0, "TEST no columns", 1, null, List.of())));
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Object> edit = pool.submit(() -> tx.execute(status -> {
+                service.replaceDraft(id, version, lock, invalid, userId);
+                locked.countDown();
+                awaitOrFail(release);
+                return null;
+            }));
+            Future<Object> publish = pool.submit(() -> {
+                awaitOrFail(locked);
+                service.publish(id, version, LocalDate.of(2026, 1, 1), userId);
+                return null;
+            });
+            assertThat(waitForLockWaiter()).as("публикация ждёт блокировку черновика").isTrue();
+            release.countDown();
+
+            edit.get(30, TimeUnit.SECONDS);
+            assertThatThrownBy(() -> publish.get(30, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class)
+                    .cause()
+                    .isInstanceOfSatisfying(ApiException.class, e -> {
+                        assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED);
+                        assertThat(e.getMessage()).isEqualTo("UPL_FORMAT_INVALID");
+                    });
+            assertThat(service.getVersion(id, version).status()).isEqualTo("draft");
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    /** Опрашивает до 5 с, есть ли другой сеанс, ждущий блокировку строки. */
+    private boolean waitForLockWaiter() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            long waiting = jdbc.sql("""
+                    select count(*) from pg_stat_activity
+                    where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()
+                    """).query(Long.class).single();
+            if (waiting > 0) {
+                return true;
+            }
+            TimeUnit.MILLISECONDS.sleep(20);
+        }
+        return false;
+    }
+
+    private static void awaitOrFail(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("latch timeout");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted", e);
         }
     }
 

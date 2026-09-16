@@ -7,10 +7,8 @@ import com.greenwhite.dwh.core.pagination.KeysetPage;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.fnd.FndActor;
 import com.greenwhite.dwh.instance.fnd.FndActors;
-import com.greenwhite.dwh.instance.fnd.error.ConstraintErrorCode;
 import com.greenwhite.dwh.instance.fnd.error.ConstraintViolationException;
 import com.greenwhite.dwh.instance.fnd.error.FndSqlErrors;
-import com.greenwhite.dwh.instance.fnd.error.StaleVersionException;
 import com.greenwhite.dwh.instance.fnd.versioning.FndVersion;
 import com.greenwhite.dwh.instance.fnd.versioning.FndVersioning;
 import com.greenwhite.dwh.instance.upl.UplPref;
@@ -52,7 +50,6 @@ public class UplSourceService {
 
     private static final String TABLE = UplPref.TABLE_FORMAT_VERSIONS;
     private static final String CODE_UNIQUE_INDEX = "upl_sources_code_uidx";
-    private static final String NOT_DRAFT_DB_ERROR = "upl_format_not_draft";
     private static final int MAX_LIMIT = 200;
 
     private final UplFormatRepository repo;
@@ -86,10 +83,10 @@ public class UplSourceService {
         try {
             id = repo.insertSource(data, actor.name());
         } catch (DataIntegrityViolationException e) {
-            if (chainContains(e, CODE_UNIQUE_INDEX)) {
+            if (UplErrors.chainContains(e, CODE_UNIQUE_INDEX)) {
                 throw ApiException.badRequest(ErrorCode.CODE_ALREADY_EXISTS, UPL_SOURCE_CODE_TAKEN);
             }
-            throw toApi(e);
+            throw UplErrors.toApi(e);
         }
         return view(id);
     }
@@ -111,7 +108,7 @@ public class UplSourceService {
         try {
             updated = repo.updateSource(id, lockVersion, data, actor.name());
         } catch (DataAccessException e) {
-            throw toApi(e);
+            throw UplErrors.toApi(e);
         }
         if (updated == 0) {
             throw ApiException.conflict(ErrorCode.CONFLICT, STALE_VERSION);
@@ -177,7 +174,7 @@ public class UplSourceService {
                 repo.replaceSheets(sourceId, version, copy.sheets());
             }
         } catch (ConstraintViolationException | DataAccessException e) {
-            throw toApi(e);
+            throw UplErrors.toApi(e);
         }
         return getVersion(sourceId, version);
     }
@@ -195,7 +192,7 @@ public class UplSourceService {
                     fileColumns(kind, d.encoding(), d.delimiter(), match), actor);
             repo.replaceSheets(sourceId, version, d.sheets() == null ? List.of() : d.sheets());
         } catch (ConstraintViolationException | DataAccessException e) {
-            throw toApi(e);
+            throw UplErrors.toApi(e);
         }
         return getVersion(sourceId, version);
     }
@@ -204,10 +201,10 @@ public class UplSourceService {
     public void publish(long sourceId, int version, LocalDate validFrom, long userId) {
         FndActor actor = actors.user(userId);
         actors.apply(actor);
+        requireSource(sourceId);
         if (validFrom == null) {
             throw invalidField("validFrom", VALID_FROM_REQUIRED);
         }
-        requireSource(sourceId);
         lockDraft(sourceId, version);
         FormatVersion draft = getVersion(sourceId, version);
         List<FieldErrorItem> errors = validator.validate(draft);
@@ -217,7 +214,7 @@ public class UplSourceService {
         try {
             versioning.publish(TABLE, sourceId, version, validFrom, null, actor);
         } catch (ConstraintViolationException | DataAccessException e) {
-            throw toApi(e);
+            throw UplErrors.toApi(e);
         }
     }
 
@@ -272,39 +269,5 @@ public class UplSourceService {
 
     private static ApiException invalidField(String field, String code) {
         return ApiException.validation(code, List.of(new FieldErrorItem(field, code, code)));
-    }
-
-    /** Перевод ошибок основы и БД в ответ API по таблице «Ошибки» контракта; незнакомое — как есть. */
-    private static RuntimeException toApi(RuntimeException e) {
-        if (e instanceof StaleVersionException) {
-            return ApiException.conflict(ErrorCode.CONFLICT, STALE_VERSION);
-        }
-        if (e instanceof ConstraintViolationException cve) {
-            ConstraintErrorCode code = cve.code();
-            if (code == ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS
-                    || code == ConstraintErrorCode.FND_VERSION_CONFLICT) {
-                return ApiException.conflict(ErrorCode.CONFLICT, FND_VERSION_DRAFT_EXISTS);
-            }
-            if (code == ConstraintErrorCode.FND_VERSION_NOT_AFTER_PREVIOUS) {
-                return ApiException.conflict(ErrorCode.CONFLICT, FND_VERSION_NOT_AFTER_PREVIOUS);
-            }
-            if (code == ConstraintErrorCode.FND_VERSION_UNKNOWN) {
-                return ApiException.notFound(ErrorCode.NOT_FOUND, FND_VERSION_UNKNOWN);
-            }
-            return e;
-        }
-        if (e instanceof DataAccessException && chainContains(e, NOT_DRAFT_DB_ERROR)) {
-            return ApiException.conflict(ErrorCode.CONFLICT, UPL_FORMAT_NOT_DRAFT);
-        }
-        return e;
-    }
-
-    private static boolean chainContains(Throwable e, String text) {
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            if (t.getMessage() != null && t.getMessage().contains(text)) {
-                return true;
-            }
-        }
-        return false;
     }
 }
