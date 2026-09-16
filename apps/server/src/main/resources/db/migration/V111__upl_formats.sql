@@ -79,11 +79,23 @@ create table upl_format_columns (
 
 -- Листы и колонки опубликованной версии неизменны; правка возможна лишь в сессии обслуживания
 -- (dwh.maintenance = on) — тот же порядок, что у журнала загрузок основы (V104).
+-- При UPDATE проверяются и старая, и новая версия: перенос строки между версиями не обходит запрет.
+create or replace function upl_sheet_version_status(p_source_id bigint, p_version integer) returns text
+language sql stable as $$
+    select fv.status from upl_format_versions fv
+     where fv.source_id = p_source_id and fv.version = p_version
+$$;
+
+create or replace function upl_column_version_status(p_sheet_id bigint) returns text
+language sql stable as $$
+    select upl_sheet_version_status(s.source_id, s.version) from upl_format_sheets s
+     where s.id = p_sheet_id
+$$;
+
 create or replace function upl_format_children_guard() returns trigger
 language plpgsql as $$
 declare
-    v_row record;
-    v_status text;
+    v_statuses text[] := array[]::text[];
 begin
     if coalesce(current_setting('dwh.maintenance', true), '') = 'on' then
         if tg_op = 'DELETE' then
@@ -91,20 +103,22 @@ begin
         end if;
         return new;
     end if;
-    if tg_op = 'DELETE' then
-        v_row := old;
-    else
-        v_row := new;
-    end if;
     if tg_table_name = 'upl_format_sheets' then
-        select fv.status into v_status from upl_format_versions fv
-         where fv.source_id = v_row.source_id and fv.version = v_row.version;
+        if tg_op in ('UPDATE', 'DELETE') then
+            v_statuses := v_statuses || upl_sheet_version_status(old.source_id, old.version);
+        end if;
+        if tg_op in ('INSERT', 'UPDATE') then
+            v_statuses := v_statuses || upl_sheet_version_status(new.source_id, new.version);
+        end if;
     else
-        select fv.status into v_status from upl_format_sheets s
-          join upl_format_versions fv on fv.source_id = s.source_id and fv.version = s.version
-         where s.id = v_row.sheet_id;
+        if tg_op in ('UPDATE', 'DELETE') then
+            v_statuses := v_statuses || upl_column_version_status(old.sheet_id);
+        end if;
+        if tg_op in ('INSERT', 'UPDATE') then
+            v_statuses := v_statuses || upl_column_version_status(new.sheet_id);
+        end if;
     end if;
-    if v_status is not null and v_status <> 'draft' then
+    if exists (select 1 from unnest(v_statuses) as st (status) where st.status <> 'draft') then
         raise exception 'upl_format_not_draft' using errcode = 'P0001';
     end if;
     if tg_op = 'DELETE' then

@@ -155,6 +155,15 @@ public class UplFormatRepository {
         return header.map(h -> h.withSheets(loadSheets(sourceId, version)));
     }
 
+    /** Статус версии с блокировкой строки до конца транзакции; пусто — версии нет. */
+    public Optional<String> lockVersionStatus(long sourceId, int version) {
+        return jdbc.sql("select status from upl_format_versions where source_id = :s and version = :v for update")
+                .param("s", sourceId)
+                .param("v", version)
+                .query(String.class)
+                .optional();
+    }
+
     public Optional<Integer> latestVersion(long sourceId) {
         return jdbc.sql("select version from upl_format_versions where source_id = :s order by version desc limit 1")
                 .param("s", sourceId)

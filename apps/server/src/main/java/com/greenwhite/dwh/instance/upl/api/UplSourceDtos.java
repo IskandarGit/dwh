@@ -40,7 +40,7 @@ public final class UplSourceDtos {
     }
 
     public record SourceRequest(
-            @NotBlank @Size(max = 63) String code,
+            @NotBlank @Size(max = 63) @Pattern(regexp = "[a-z][a-z0-9._-]{1,62}") String code,
             @NotBlank @Size(max = 200) String name,
             @NotBlank @Size(max = 200) String ownerOrg,
             @Size(max = 200) String ownerContact,
@@ -123,7 +123,7 @@ public final class UplSourceDtos {
             String sheetName,
             @Min(1) int headerRow,
             String totalRowMarker,
-            @NotNull List<@Valid ColumnDto> columns) {
+            @NotNull List<@NotNull @Valid ColumnDto> columns) {
 
         /** Порядок листа и колонок берётся из позиции в списке, id назначает БД. */
         public Sheet toModel(int position) {
@@ -143,10 +143,10 @@ public final class UplSourceDtos {
     public record FormatDraftRequest(
             @NotNull @PositiveOrZero Integer lockVersion,
             @Pattern(regexp = "xlsx|csv") String fileKind,
-            String encoding,
+            @Pattern(regexp = "utf-8|windows-1251") String encoding,
             @Size(min = 1, max = 1) String delimiter,
             @Pattern(regexp = "header|position") String matchColumnsBy,
-            @NotNull List<@Valid SheetDto> sheets) {
+            @NotNull List<@NotNull @Valid SheetDto> sheets) {
 
         public DraftData toData() {
             List<Sheet> models = new ArrayList<>(sheets.size());

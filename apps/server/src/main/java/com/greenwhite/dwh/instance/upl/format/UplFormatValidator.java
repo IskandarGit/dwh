@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -31,6 +32,7 @@ public class UplFormatValidator {
     public static final String UPL_XLSX_NO_CSV_PARAMS = "UPL_XLSX_NO_CSV_PARAMS";
     public static final String UPL_SHEET_NO_COLUMNS = "UPL_SHEET_NO_COLUMNS";
     public static final String UPL_SHEET_NAME_REQUIRED = "UPL_SHEET_NAME_REQUIRED";
+    public static final String UPL_SHEET_NAME_DUPLICATE = "UPL_SHEET_NAME_DUPLICATE";
     public static final String UPL_OBJECT_KEY_COUNT = "UPL_OBJECT_KEY_COUNT";
     public static final String UPL_COLUMN_NAME_DUPLICATE = "UPL_COLUMN_NAME_DUPLICATE";
     public static final String UPL_TARGET_FIELD_DUPLICATE = "UPL_TARGET_FIELD_DUPLICATE";
@@ -58,8 +60,11 @@ public class UplFormatValidator {
         List<FieldErrorItem> errors = new ArrayList<>();
         checkVersion(v, errors);
         List<Sheet> sheets = v.sheets() == null ? List.of() : v.sheets();
+        Set<String> sheetNames = new HashSet<>();
         for (int i = 0; i < sheets.size(); i++) {
-            checkSheet(v, sheets.get(i), "sheets[" + i + "]", errors);
+            String path = "sheets[" + i + "]";
+            checkSheet(v, sheets.get(i), path, errors);
+            checkSheetNameUnique(v, sheets.get(i), path, sheetNames, errors);
         }
         return errors;
     }
@@ -115,6 +120,16 @@ public class UplFormatValidator {
         }
     }
 
+    private static void checkSheetNameUnique(FormatVersion v, Sheet sheet, String path, Set<String> seen,
+                                             List<FieldErrorItem> errors) {
+        if (v.fileKind() == FileKind.CSV || isBlank(sheet.sheetName())) {
+            return;
+        }
+        if (!seen.add(sheet.sheetName().strip().toLowerCase(Locale.ROOT))) {
+            add(errors, path + ".sheetName", UPL_SHEET_NAME_DUPLICATE);
+        }
+    }
+
     private void checkDuplicates(Column c, String path, Set<String> names, Set<String> targets,
                                  List<FieldErrorItem> errors) {
         if (c.nameInFile() != null && !names.add(c.nameInFile().strip().toLowerCase(Locale.ROOT))) {
@@ -161,11 +176,13 @@ public class UplFormatValidator {
         }
         Optional<FndUnit> source = findUnit(c.sourceUnit(), path + ".sourceUnit", errors);
         Optional<FndUnit> base = findUnit(c.baseUnit(), path + ".baseUnit", errors);
-        if (source.isPresent() && base.isPresent()
-                && !c.sourceUnit().equals(c.baseUnit())
-                && !c.baseUnit().equals(source.get().baseUnitCode())) {
+        if (source.isPresent() && base.isPresent() && !c.baseUnit().equals(baseOf(source.get()))) {
             add(errors, path + ".baseUnit", UPL_BASE_UNIT_MISMATCH);
         }
+    }
+
+    private static String baseOf(FndUnit unit) {
+        return Objects.requireNonNullElse(unit.baseUnitCode(), unit.code());
     }
 
     private Optional<FndUnit> findUnit(String code, String field, List<FieldErrorItem> errors) {
