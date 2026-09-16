@@ -148,12 +148,14 @@ public class UplSourceService {
 
     @Transactional(readOnly = true)
     public FormatVersion getVersion(long sourceId, int version) {
+        requireSource(sourceId);
         return repo.findVersion(sourceId, version)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, FND_VERSION_UNKNOWN));
     }
 
     @Transactional(readOnly = true)
     public FormatVersion versionAt(long sourceId, LocalDate at) {
+        requireSource(sourceId);
         int version = versioning.versionAt(TABLE, sourceId, at)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, FND_VERSION_UNKNOWN));
         return getVersion(sourceId, version);
@@ -184,7 +186,8 @@ public class UplSourceService {
     public FormatVersion replaceDraft(long sourceId, int version, int lockVersion, DraftData d, long userId) {
         FndActor actor = actors.user(userId);
         actors.apply(actor);
-        requireDraft(getVersion(sourceId, version));
+        requireSource(sourceId);
+        lockDraft(sourceId, version);
         FileKind kind = d.fileKind() == null ? FileKind.XLSX : d.fileKind();
         MatchBy match = d.matchColumnsBy() == null ? MatchBy.HEADER : d.matchColumnsBy();
         try {
@@ -204,8 +207,9 @@ public class UplSourceService {
         if (validFrom == null) {
             throw invalidField("validFrom", VALID_FROM_REQUIRED);
         }
+        requireSource(sourceId);
+        lockDraft(sourceId, version);
         FormatVersion draft = getVersion(sourceId, version);
-        requireDraft(draft);
         List<FieldErrorItem> errors = validator.validate(draft);
         if (!errors.isEmpty()) {
             throw ApiException.validation(UPL_FORMAT_INVALID, errors);
@@ -229,8 +233,11 @@ public class UplSourceService {
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, UPL_SOURCE_NOT_FOUND));
     }
 
-    private static void requireDraft(FormatVersion v) {
-        if (!FndVersion.DRAFT.equals(v.status())) {
+    /** Блокирует строку версии до конца транзакции: параллельные правка и публикация идут по очереди. */
+    private void lockDraft(long sourceId, int version) {
+        String status = repo.lockVersionStatus(sourceId, version)
+                .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, FND_VERSION_UNKNOWN));
+        if (!FndVersion.DRAFT.equals(status)) {
             throw ApiException.conflict(ErrorCode.CONFLICT, UPL_FORMAT_NOT_DRAFT);
         }
     }
@@ -248,7 +255,7 @@ public class UplSourceService {
     }
 
     private static PageCursor decodeCursor(String cursor) {
-        if (cursor == null) {
+        if (cursor == null || cursor.isBlank()) {
             return null;
         }
         String raw = CursorUtils.decode(cursor);
@@ -274,7 +281,8 @@ public class UplSourceService {
         }
         if (e instanceof ConstraintViolationException cve) {
             ConstraintErrorCode code = cve.code();
-            if (code == ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS) {
+            if (code == ConstraintErrorCode.FND_VERSION_DRAFT_EXISTS
+                    || code == ConstraintErrorCode.FND_VERSION_CONFLICT) {
                 return ApiException.conflict(ErrorCode.CONFLICT, FND_VERSION_DRAFT_EXISTS);
             }
             if (code == ConstraintErrorCode.FND_VERSION_NOT_AFTER_PREVIOUS) {

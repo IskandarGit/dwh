@@ -4,3 +4,4 @@ src/main/java/com/greenwhite/dwh/instance/fnd/config/FndDwhConfig.java:1000 # м
 src/main/resources/db/migration/V105__fnd_seed_jobs.sql:3600 # период задания fnd.load_cleanup, секунды
 src/main/resources/db/migration/V105__fnd_seed_jobs.sql:86400 # период задания fnd.xdb_check, секунды
 src/main/resources/db/migration/V111__upl_formats.sql:1251 # имя кодировки windows-1251 в проверке upl_format_versions, не норматив
+src/main/java/com/greenwhite/dwh/instance/upl/api/UplSourceDtos.java:1251 # имя кодировки windows-1251 в проверке DTO, не норматив
