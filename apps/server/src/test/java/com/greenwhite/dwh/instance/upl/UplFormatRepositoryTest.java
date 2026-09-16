@@ -17,10 +17,13 @@ import com.greenwhite.dwh.instance.upl.format.UplFormatRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +41,8 @@ class UplFormatRepositoryTest extends EmbeddedPostgresTest {
     private FndActors actors;
     @Autowired
     private TransactionTemplate tx;
+    @Autowired
+    private JdbcClient jdbc;
 
     @Test
     @DisplayName("источник: вставка, чтение, правка с оптимистической блокировкой")
@@ -80,20 +85,44 @@ class UplFormatRepositoryTest extends EmbeddedPostgresTest {
     void listSourcesKeyset() {
         inRolledBackTx(() -> {
             String actor = actors.system().name();
-            repo.insertSource(data("test.repo.c", "TEST c"), actor);
-            repo.insertSource(data("test.repo.a", "TEST a"), actor);
-            repo.insertSource(data("test.repo.b", "TEST b"), actor);
+            String p = PREFIX + UUID.randomUUID().toString().substring(0, 6);
+            repo.insertSource(data(p + ".c", "TEST c"), actor);
+            repo.insertSource(data(p + ".a", "TEST a"), actor);
+            repo.insertSource(data(p + ".b", "TEST b"), actor);
             assertThat(repo.countSources()).isGreaterThanOrEqualTo(3);
 
-            List<SourceSummary> first = ours(repo.listSources(null, 2));
-            assertThat(first).extracting(SourceSummary::code).containsExactly("test.repo.a", "test.repo.b");
-            List<SourceSummary> next = ours(repo.listSources("test.repo.b", 2));
-            assertThat(next).extracting(SourceSummary::code).containsExactly("test.repo.c");
+            List<SourceSummary> first = repo.listSources(p, 2);
+            assertThat(first).extracting(SourceSummary::code).containsExactly(p + ".a", p + ".b");
+            List<SourceSummary> next = repo.listSources(p + ".b", 2);
+            assertThat(next).first().extracting(SourceSummary::code).isEqualTo(p + ".c");
 
             SourceSummary a = first.get(0);
             assertThat(a.lastPublishedVersion()).isNull();
             assertThat(a.hasDraft()).isFalse();
             assertThat(a.periodicity()).isEqualTo(Periodicity.MONTH);
+        });
+    }
+
+    @Test
+    @DisplayName("AC-15: таблицы upl под аудитом основы, вставка источника пишет audit_log с актором")
+    void uplTablesAreAudited() {
+        List<String> registered = jdbc.sql("""
+                        select table_name from fnd_audit_tables
+                         where enabled and table_name like 'upl\\_%' order by 1
+                        """).query(String.class).list();
+        assertThat(registered).containsExactlyInAnyOrder(
+                "upl_sources", "upl_format_versions", "upl_format_sheets", "upl_format_columns");
+
+        inRolledBackTx(() -> {
+            long id = repo.insertSource(data(PREFIX + "audit", "TEST audit"), actors.system().name());
+            List<Map<String, Object>> rows = jdbc.sql("""
+                            select event, changed_by from audit_log
+                             where table_name = 'upl_sources' and row_pk = :pk
+                            """).param("pk", String.valueOf(id)).query().listOfRows();
+            assertThat(rows).singleElement().satisfies(row -> {
+                assertThat(row).containsEntry("event", "I");
+                assertThat(row.get("changed_by")).isNotNull();
+            });
         });
     }
 

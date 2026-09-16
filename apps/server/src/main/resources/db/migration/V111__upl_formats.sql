@@ -78,7 +78,7 @@ create table upl_format_columns (
 );
 
 -- Листы и колонки опубликованной версии неизменны; правка возможна лишь в сессии обслуживания
--- (dwh.maintenance = on) — тот же порядок, что у fnd_load_log (V104).
+-- (dwh.maintenance = on) — тот же порядок, что у журнала загрузок основы (V104).
 create or replace function upl_format_children_guard() returns trigger
 language plpgsql as $$
 declare

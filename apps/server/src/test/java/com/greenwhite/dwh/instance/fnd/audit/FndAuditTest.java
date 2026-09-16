@@ -60,11 +60,11 @@ class FndAuditTest extends EmbeddedPostgresTest {
     void auditCoversFndTables() {
         List<String> expected = List.of("fnd_loads", "fnd_load_log", "fnd_units", "fnd_unit_coefficients",
                 "fnd_unit_coefficient_versions");
-        List<String> registered = jdbc.sql("select table_name from fnd_audit_tables where enabled order by 1")
+        List<String> registered = jdbc.sql("select table_name from fnd_audit_tables where enabled and table_name like 'fnd\\_%' order by 1")
                 .query(String.class).list();
         List<String> triggered = jdbc.sql("""
                         select c.relname from pg_trigger t join pg_class c on c.oid = t.tgrelid
-                         where t.tgname like 'fnd\\_%\\_audit\\_trg' and not t.tgisinternal order by 1
+                         where t.tgname like 'fnd\\_%\\_audit\\_trg' and c.relname like 'fnd\\_%' and not t.tgisinternal order by 1
                         """).query(String.class).list();
         assertThat(registered).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(triggered).containsExactlyInAnyOrderElementsOf(expected);
