@@ -1,0 +1,192 @@
+package com.greenwhite.dwh.instance.upl;
+
+import com.greenwhite.dwh.instance.fnd.FndActors;
+import com.greenwhite.dwh.instance.fnd.versioning.FndVersioning;
+import com.greenwhite.dwh.instance.support.EmbeddedPostgresTest;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Column;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.DataType;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.FormatVersion;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Periodicity;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Sheet;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Source;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.SourceData;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.SourceSummary;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.SourceType;
+import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Strictness;
+import com.greenwhite.dwh.instance.upl.format.UplFormatRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/** Репозиторий анкеты файла (И3 шаг 3.4): запись и чтение источника, версии, листов и колонок. */
+class UplFormatRepositoryTest extends EmbeddedPostgresTest {
+
+    private static final String PREFIX = "test.repo.";
+
+    @Autowired
+    private UplFormatRepository repo;
+    @Autowired
+    private FndVersioning versioning;
+    @Autowired
+    private FndActors actors;
+    @Autowired
+    private TransactionTemplate tx;
+
+    @Test
+    @DisplayName("источник: вставка, чтение, правка с оптимистической блокировкой")
+    void insertFindUpdateSource() {
+        inRolledBackTx(() -> {
+            String actor = actors.system().name();
+            long id = repo.insertSource(data("test.repo.1", "TEST source"), actor);
+
+            Source found = repo.findSource(id).orElseThrow();
+            assertThat(found.code()).isEqualTo("test.repo.1");
+            assertThat(found.name()).isEqualTo("TEST source");
+            assertThat(found.ownerOrg()).isEqualTo("TEST org");
+            assertThat(found.ownerContact()).isEqualTo("TEST contact");
+            assertThat(found.periodicity()).isEqualTo(Periodicity.MONTH);
+            assertThat(found.slaDays()).isEqualTo(5);
+            assertThat(found.sourceType()).isEqualTo(SourceType.FILE);
+            assertThat(found.strictness()).isEqualTo(Strictness.ERROR);
+            assertThat(found.lockVersion()).isZero();
+            assertThat(found.createdBy()).isEqualTo(actor);
+            assertThat(found.modifiedBy()).isEqualTo(actor);
+            assertThat(found.createdAt()).isNotNull();
+            assertThat(found.modifiedAt()).isNotNull();
+
+            SourceData changed = new SourceData("test.repo.1", "TEST source 2", "TEST org 2", null,
+                    Periodicity.QUARTER, 10, SourceType.FILE, Strictness.WARNING);
+            assertThat(repo.updateSource(id, 0, changed, actor)).isEqualTo(1);
+            Source updated = repo.findSource(id).orElseThrow();
+            assertThat(updated.lockVersion()).isEqualTo(1);
+            assertThat(updated.name()).isEqualTo("TEST source 2");
+            assertThat(updated.ownerContact()).isNull();
+            assertThat(updated.periodicity()).isEqualTo(Periodicity.QUARTER);
+            assertThat(updated.strictness()).isEqualTo(Strictness.WARNING);
+
+            assertThat(repo.updateSource(id, 0, changed, actor)).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("список источников: keyset по code, признаки версий у источника без версий")
+    void listSourcesKeyset() {
+        inRolledBackTx(() -> {
+            String actor = actors.system().name();
+            repo.insertSource(data("test.repo.c", "TEST c"), actor);
+            repo.insertSource(data("test.repo.a", "TEST a"), actor);
+            repo.insertSource(data("test.repo.b", "TEST b"), actor);
+            assertThat(repo.countSources()).isGreaterThanOrEqualTo(3);
+
+            List<SourceSummary> first = ours(repo.listSources(null, 2));
+            assertThat(first).extracting(SourceSummary::code).containsExactly("test.repo.a", "test.repo.b");
+            List<SourceSummary> next = ours(repo.listSources("test.repo.b", 2));
+            assertThat(next).extracting(SourceSummary::code).containsExactly("test.repo.c");
+
+            SourceSummary a = first.get(0);
+            assertThat(a.lastPublishedVersion()).isNull();
+            assertThat(a.hasDraft()).isFalse();
+            assertThat(a.periodicity()).isEqualTo(Periodicity.MONTH);
+        });
+    }
+
+    @Test
+    @DisplayName("листы и колонки черновика: замена целиком и чтение по порядку")
+    void replaceAndReadSheets() {
+        inRolledBackTx(() -> {
+            long id = repo.insertSource(data("test.repo.s", "TEST sheets"), actors.system().name());
+            int version = versioning.createDraft(UplPref.TABLE_FORMAT_VERSIONS, id, actors.system());
+            assertThat(repo.latestVersion(id)).contains(version);
+
+            Column key = new Column(null, 0, 1, "TEST key", "object_key", DataType.OBJECT_KEY, true,
+                    null, null, "^[0-9]{9}$", 9, 1, null);
+            Column amount = new Column(null, 0, null, "TEST amount", "amount", DataType.NUMBER, false,
+                    "unit.test", "unit.test", null, null, null, null);
+            Column code = new Column(null, 0, null, "TEST code", "ref_value", DataType.REF_CODE, false,
+                    null, null, null, null, null, "test.book");
+            repo.replaceSheets(id, version, List.of(
+                    new Sheet(null, 0, "TEST sheet 1", 2, "TEST total", List.of(key, amount)),
+                    new Sheet(null, 0, "TEST sheet 2", 1, null, List.of(code))));
+
+            FormatVersion read = repo.findVersion(id, version).orElseThrow();
+            assertThat(read.status()).isEqualTo("draft");
+            assertThat(read.sheets()).hasSize(2);
+            Sheet s1 = read.sheets().get(0);
+            assertThat(s1.id()).isNotNull();
+            assertThat(s1.ordinal()).isEqualTo(1);
+            assertThat(s1.sheetName()).isEqualTo("TEST sheet 1");
+            assertThat(s1.headerRow()).isEqualTo(2);
+            assertThat(s1.totalRowMarker()).isEqualTo("TEST total");
+            assertThat(s1.columns()).hasSize(2);
+            Column c1 = s1.columns().get(0);
+            assertThat(c1.id()).isNotNull();
+            assertThat(c1).usingRecursiveComparison().ignoringFields("id", "ordinal").isEqualTo(key);
+            assertThat(c1.ordinal()).isEqualTo(1);
+            Column c2 = s1.columns().get(1);
+            assertThat(c2).usingRecursiveComparison().ignoringFields("id", "ordinal").isEqualTo(amount);
+            assertThat(c2.ordinal()).isEqualTo(2);
+            Sheet s2 = read.sheets().get(1);
+            assertThat(s2.ordinal()).isEqualTo(2);
+            assertThat(s2.totalRowMarker()).isNull();
+            assertThat(s2.columns()).singleElement().satisfies(c -> {
+                assertThat(c.ordinal()).isEqualTo(1);
+                assertThat(c).usingRecursiveComparison().ignoringFields("id", "ordinal").isEqualTo(code);
+            });
+
+            repo.replaceSheets(id, version, List.of(new Sheet(null, 0, "TEST only", 1, null, List.of(code))));
+            FormatVersion replaced = repo.findVersion(id, version).orElseThrow();
+            assertThat(replaced.sheets()).singleElement()
+                    .satisfies(s -> assertThat(s.sheetName()).isEqualTo("TEST only"));
+
+            assertThat(repo.listVersions(id)).singleElement().satisfies(v -> {
+                assertThat(v.status()).isEqualTo("draft");
+                assertThat(v.sheets()).isEmpty();
+            });
+            SourceSummary summary = ours(repo.listSources(null, 1000)).stream()
+                    .filter(s -> s.id() == id).findFirst().orElseThrow();
+            assertThat(summary.hasDraft()).isTrue();
+            assertThat(summary.lastPublishedVersion()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("листы опубликованной версии неизменны: upl_format_not_draft")
+    void publishedChildrenAreGuarded() {
+        inRolledBackTx(() -> {
+            long id = repo.insertSource(data("test.repo.p", "TEST published"), actors.system().name());
+            int version = versioning.createDraft(UplPref.TABLE_FORMAT_VERSIONS, id, actors.system());
+            List<Sheet> sheets = List.of(new Sheet(null, 0, "TEST sheet", 1, null, List.of(
+                    new Column(null, 0, null, "TEST text", "label", DataType.TEXT, false,
+                            null, null, null, null, null, null))));
+            repo.replaceSheets(id, version, sheets);
+            versioning.publish(UplPref.TABLE_FORMAT_VERSIONS, id, version, LocalDate.of(2026, 1, 1), null, actors.system());
+
+            assertThatThrownBy(() -> repo.replaceSheets(id, version, sheets))
+                    .hasStackTraceContaining("upl_format_not_draft");
+        });
+    }
+
+    private void inRolledBackTx(Runnable body) {
+        tx.executeWithoutResult(st -> {
+            st.setRollbackOnly();
+            actors.apply(actors.system());
+            body.run();
+        });
+    }
+
+    private static SourceData data(String code, String name) {
+        return new SourceData(code, name, "TEST org", "TEST contact", Periodicity.MONTH, 5,
+                SourceType.FILE, Strictness.ERROR);
+    }
+
+    private static List<SourceSummary> ours(List<SourceSummary> all) {
+        return all.stream().filter(s -> s.code().startsWith(PREFIX)).toList();
+    }
+}
