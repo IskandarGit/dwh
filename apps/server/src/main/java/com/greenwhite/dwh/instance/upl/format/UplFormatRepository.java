@@ -42,6 +42,15 @@ public class UplFormatRepository {
             file_kind, encoding, delimiter, match_columns_by
             """;
 
+    private static final String SUMMARY_SELECT = """
+            select s.id, s.code, s.name, s.periodicity,
+                   (select max(v.version) from upl_format_versions v
+                     where v.source_id = s.id and v.status <> 'draft') as last_published_version,
+                   exists (select 1 from upl_format_versions v
+                            where v.source_id = s.id and v.status = 'draft') as has_draft
+            from upl_sources s
+            """;
+
     private final JdbcClient jdbc;
 
     public UplFormatRepository(JdbcClient jdbc) {
@@ -105,13 +114,7 @@ public class UplFormatRepository {
     }
 
     public List<SourceSummary> listSources(String afterCode, int limit) {
-        return jdbc.sql("""
-                        select s.id, s.code, s.name, s.periodicity,
-                               (select max(v.version) from upl_format_versions v
-                                 where v.source_id = s.id and v.status <> 'draft') as last_published_version,
-                               exists (select 1 from upl_format_versions v
-                                        where v.source_id = s.id and v.status = 'draft') as has_draft
-                        from upl_sources s
+        return jdbc.sql(SUMMARY_SELECT + """
                         where (:after::text is null or s.code > :after)
                         order by s.code
                         limit :limit
@@ -120,6 +123,13 @@ public class UplFormatRepository {
                 .param("limit", limit)
                 .query(this::mapSummary)
                 .list();
+    }
+
+    public Optional<SourceSummary> findSummary(long id) {
+        return jdbc.sql(SUMMARY_SELECT + " where s.id = :id")
+                .param("id", id)
+                .query(this::mapSummary)
+                .optional();
     }
 
     public long countSources() {
