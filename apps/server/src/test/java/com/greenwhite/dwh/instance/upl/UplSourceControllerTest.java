@@ -86,6 +86,10 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
 
         var stale = send(admin, put(BASE + "/" + id), sourceBody(code, "TEST source 3", "quarter", 0));
         assertProblem(stale, 409, ErrorCode.CONFLICT, "STALE_VERSION");
+        var kept = sendGet(admin, BASE + "/" + id, 200);
+        assertThat((String) read(kept, "$.name")).isEqualTo("TEST source 2");
+        assertThat((String) read(kept, "$.periodicity")).isEqualTo("quarter");
+        assertThat((Integer) read(kept, "$.lockVersion")).isEqualTo(1);
 
         String versions = BASE + "/" + id + "/format-versions";
         var draft = send(admin, post(versions), null);
@@ -99,6 +103,17 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
         assertThat(sheets).hasSize(2);
         assertThat((String) read(replaced, "$.sheets[1].columns[0].dataType")).isEqualTo("object_key");
         assertThat((Integer) read(replaced, "$.sheets[1].ordinal")).isEqualTo(2);
+
+        var fetched = sendGet(admin, versions + "/1", 200);
+        List<String> sheetNames = read(fetched, "$.sheets[*].sheetName");
+        assertThat(sheetNames).containsExactly("TEST sheet 1", "TEST sheet 2");
+        List<String> columnNames = read(fetched, "$.sheets[0].columns[*].nameInFile");
+        assertThat(columnNames).containsExactly("TEST key", "TEST name");
+        List<Integer> columnOrdinals = read(fetched, "$.sheets[0].columns[*].ordinal");
+        assertThat(columnOrdinals).containsExactly(1, 2);
+        sendGet(admin, versions + "/99", 404);
+        var noSource = sendGet(admin, BASE + "/-1/format-versions/1", 404);
+        assertThat((String) read(noSource, "$.detail")).isEqualTo("UPL_SOURCE_NOT_FOUND");
 
         assertThat(send(admin, post(versions + "/1/publish"), Map.of("validFrom", "2026-01-01")).getStatus())
                 .isEqualTo(204);
@@ -163,20 +178,84 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
         var secondDraft = send(admin, post(versions), null);
         assertProblem(secondDraft, 409, ErrorCode.CONFLICT, "FND_VERSION_DRAFT_EXISTS");
 
-        if (idempotencyEnabled) {
-            String idemCode = "test.api." + rnd();
-            String key = UUID.randomUUID().toString();
-            Map<String, Object> body = sourceBody(idemCode, "TEST idem", "year", null);
-            var first = send(admin, post(BASE).header("Idempotency-Key", key), body);
-            var second = send(admin, post(BASE).header("Idempotency-Key", key), body);
-            assertThat(first.getStatus()).isEqualTo(201);
-            assertThat(second.getStatus()).isEqualTo(201);
-            assertThat(((Number) read(second, "$.id")).longValue())
-                    .isEqualTo(((Number) read(first, "$.id")).longValue());
-            Long rows = jdbc.sql("select count(*) from upl_sources where code = :code")
-                    .param("code", idemCode).query(Long.class).single();
-            assertThat(rows).isEqualTo(1L);
+        assertThat(idempotencyEnabled).as("IdempotencyFilter в контексте").isTrue();
+        String idemCode = "test.api." + rnd();
+        String key = UUID.randomUUID().toString();
+        Map<String, Object> body = sourceBody(idemCode, "TEST idem", "year", null);
+        var first = send(admin, post(BASE).header("Idempotency-Key", key), body);
+        var second = send(admin, post(BASE).header("Idempotency-Key", key), body);
+        assertThat(first.getStatus()).isEqualTo(201);
+        assertThat(second.getStatus()).isEqualTo(201);
+        assertThat(((Number) read(second, "$.id")).longValue())
+                .isEqualTo(((Number) read(first, "$.id")).longValue());
+        Long rows = jdbc.sql("select count(*) from upl_sources where code = :code")
+                .param("code", idemCode).query(Long.class).single();
+        assertThat(rows).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("С-1, AC-2, AC-3: неверные поля источника — 422 с полем, новой строки в БД нет")
+    void invalidSourceIs422AndNotStored() throws Exception {
+        Session admin = login(adminLogin);
+        String existing = "test.api." + rnd();
+        assertThat(send(admin, post(BASE), sourceBody(existing, "TEST source", "month", null)).getStatus())
+                .isEqualTo(201);
+
+        for (String code : List.of("Manba A", "1abc", "a")) {
+            assertInvalidSource(admin, sourceBody(code, "TEST bad", "month", null), "code", 0);
         }
+        assertInvalidSource(admin, sourceBody(existing.toUpperCase(Locale.ROOT), "TEST upper", "month", null),
+                "code", 1);
+
+        List<Map.Entry<String, Object>> variants = List.of(
+                Map.entry("slaDays", 367),
+                Map.entry("slaDays", -1),
+                Map.entry("sourceType", "api"),
+                Map.entry("reconciliationStrictness", "soft"));
+        for (Map.Entry<String, Object> variant : variants) {
+            Map<String, Object> body = sourceBody("test.api." + rnd(), "TEST bad", "month", null);
+            body.put(variant.getKey(), variant.getValue());
+            assertInvalidSource(admin, body, variant.getKey(), 0);
+        }
+    }
+
+    @Test
+    @DisplayName("М-1, М-2, AC-8: неверная структура черновика в PUT — 422, не 500")
+    void invalidDraftIs422() throws Exception {
+        Session admin = login(adminLogin);
+        var created = send(admin, post(BASE), sourceBody("test.api." + rnd(), "TEST source", "month", null));
+        assertThat(created.getStatus()).isEqualTo(201);
+        String versions = BASE + "/" + ((Number) read(created, "$.id")).longValue() + "/format-versions";
+        var draft = send(admin, post(versions), null);
+        assertThat(draft.getStatus()).isEqualTo(201);
+        int lock = read(draft, "$.lockVersion");
+        String draftUrl = versions + "/1";
+
+        List<Object> nullSheet = new ArrayList<>();
+        nullSheet.add(null);
+        assertThat(send(admin, put(draftUrl), draftBody(lock, nullSheet)).getStatus()).isEqualTo(422);
+
+        List<Object> nullColumn = new ArrayList<>();
+        nullColumn.add(null);
+        assertThat(send(admin, put(draftUrl), draftBody(lock, List.of(sheet("TEST sheet", 1, nullColumn))))
+                .getStatus()).isEqualTo(422);
+
+        Map<String, Object> koi8 = draftBody(lock, List.of(sheet("TEST sheet 1")));
+        koi8.put("encoding", "koi8");
+        var badEncoding = send(admin, put(draftUrl), koi8);
+        assertThat(badEncoding.getStatus()).isEqualTo(422);
+        List<String> fields = read(badEncoding, "$.errors[*].field");
+        assertThat(fields).contains("encoding");
+
+        List<Object> moneyColumn = List.of(column("TEST money", "money_value", "money"));
+        assertThat(send(admin, put(draftUrl), draftBody(lock, List.of(sheet("TEST sheet", 1, moneyColumn))))
+                .getStatus()).isEqualTo(422);
+        List<Object> unnamedColumn = List.of(column("", "unnamed", "text"));
+        assertThat(send(admin, put(draftUrl), draftBody(lock, List.of(sheet("TEST sheet", 1, unnamedColumn))))
+                .getStatus()).isEqualTo(422);
+        List<Object> textColumn = List.of(column("TEST text", "label", "text"));
+        assertThat(send(admin, put(draftUrl), draftBody(lock, List.of(sheet("TEST sheet", 0, textColumn))))
+                .getStatus()).isEqualTo(422);
     }
 
     @Test
@@ -207,6 +286,8 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
             }
         }
         assertThat(seen).containsExactly(prefix + "a", prefix + "b", prefix + "c");
+
+        sendGet(admin, BASE + "?cursor=", 200);
     }
 
     @Test
@@ -290,6 +371,18 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
         assertThat((String) read(response, "$.detail")).isEqualTo(detail);
     }
 
+    private void assertInvalidSource(Session admin, Map<String, Object> body, String field, long rowsAfter)
+            throws Exception {
+        var response = send(admin, post(BASE), body);
+        String code = (String) body.get("code");
+        assertThat(response.getStatus()).as(code + " " + response.getContentAsString()).isEqualTo(422);
+        List<String> fields = read(response, "$.errors[*].field");
+        assertThat(fields).as(code).contains(field);
+        Long rows = jdbc.sql("select count(*) from upl_sources where lower(code) = lower(:code)")
+                .param("code", code).query(Long.class).single();
+        assertThat(rows).as(code).isEqualTo(rowsAfter);
+    }
+
     private static void assertForbidden(MockHttpServletResponse response) throws Exception {
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(403);
         assertThat((String) read(response, "$.code")).isEqualTo(wireCode(ErrorCode.PERMISSION_DENIED));
@@ -317,11 +410,29 @@ class UplSourceControllerTest extends EmbeddedPostgresTest {
     }
 
     private static Map<String, Object> draftBody(int lockVersion) {
-        return Map.of(
-                "lockVersion", lockVersion,
-                "fileKind", "xlsx",
-                "matchColumnsBy", "header",
-                "sheets", List.of(sheet("TEST sheet 1"), sheet("TEST sheet 2")));
+        return draftBody(lockVersion, List.of(sheet("TEST sheet 1"), sheet("TEST sheet 2")));
+    }
+
+    private static Map<String, Object> draftBody(int lockVersion, List<?> sheets) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("lockVersion", lockVersion);
+        body.put("fileKind", "xlsx");
+        body.put("matchColumnsBy", "header");
+        body.put("sheets", sheets);
+        return body;
+    }
+
+    private static Map<String, Object> sheet(String name, int headerRow, List<?> columns) {
+        Map<String, Object> sheet = new java.util.LinkedHashMap<>();
+        sheet.put("sheetName", name);
+        sheet.put("headerRow", headerRow);
+        sheet.put("columns", columns);
+        return sheet;
+    }
+
+    private static Map<String, Object> column(String nameInFile, String targetField, String dataType) {
+        return Map.of("nameInFile", nameInFile, "targetField", targetField, "dataType", dataType,
+                "required", false);
     }
 
     private static Map<String, Object> sheet(String name) {

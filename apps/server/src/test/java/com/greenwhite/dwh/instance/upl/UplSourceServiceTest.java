@@ -34,6 +34,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -218,6 +225,7 @@ class UplSourceServiceTest extends EmbeddedPostgresTest {
                 .ignoringFieldsMatchingRegexes("(.*\\.)?id")
                 .isEqualTo(first.sheets());
         assertThat(ids(copy)).doesNotContainAnyElementsOf(ids(first));
+        assertThat(service.getVersion(id, v1).sheets()).usingRecursiveComparison().isEqualTo(first.sheets());
 
         service.publish(id, v2, LocalDate.of(2026, 4, 1), userId);
         assertThat(service.versionAt(id, LocalDate.of(2026, 3, 31)).version()).isEqualTo(v1);
@@ -247,6 +255,121 @@ class UplSourceServiceTest extends EmbeddedPostgresTest {
         assertApi(() -> service.publish(id, version, LocalDate.of(2026, 2, 1), userId),
                 ErrorCode.CONFLICT, "UPL_FORMAT_NOT_DRAFT");
         assertThat(service.getVersion(id, version).status()).isEqualTo("published");
+    }
+
+    @Test
+    @DisplayName("С-3, AC-9: единица источника = базовой, но производная — UPL_BASE_UNIT_MISMATCH; базовая = базовой — публикуется")
+    void sourceEqualsBaseUnitMustBeBase() {
+        long derivedId = newSource();
+        int derived = service.createDraft(derivedId, null, userId).version();
+        replace(derivedId, derived, draftWithUnits(UNIT_PART, UNIT_PART));
+        assertThat(publishErrors(derivedId, derived)).contains(new FieldErrorItem(
+                "sheets[0].columns[1].baseUnit", "UPL_BASE_UNIT_MISMATCH", "UPL_BASE_UNIT_MISMATCH"));
+
+        long baseId = newSource();
+        int base = service.createDraft(baseId, null, userId).version();
+        replace(baseId, base, draftWithUnits(UNIT_BASE, UNIT_BASE));
+        service.publish(baseId, base, LocalDate.of(2026, 1, 1), userId);
+        assertThat(service.getVersion(baseId, base).status()).isEqualTo("published");
+    }
+
+    @Test
+    @DisplayName("М-6: повтор имени листа xlsx без учёта регистра и пробелов — UPL_SHEET_NAME_DUPLICATE")
+    void duplicateSheetNameRejected() {
+        long id = newSource();
+        int version = service.createDraft(id, null, userId).version();
+        List<Sheet> valid = validDraft().sheets();
+        replace(id, version, new DraftData(FileKind.XLSX, null, null, MatchBy.HEADER, List.of(
+                renamed(valid.get(0), "Лист"), renamed(valid.get(1), " лист "))));
+        assertThat(publishErrors(id, version)).contains(new FieldErrorItem(
+                "sheets[1].sheetName", "UPL_SHEET_NAME_DUPLICATE", "UPL_SHEET_NAME_DUPLICATE"));
+    }
+
+    @Test
+    @DisplayName("С-4, AC-6: два одновременных черновика — один успех и один FND_VERSION_DRAFT_EXISTS")
+    void concurrentDraftsYieldOneConflict() throws Exception {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            long id = newSource();
+            assertOneWinner(() -> service.createDraft(id, null, userId), "FND_VERSION_DRAFT_EXISTS");
+        }
+    }
+
+    @Test
+    @DisplayName("М-5, С-5: две одновременные публикации — одна успешна, вторая UPL_FORMAT_NOT_DRAFT")
+    void concurrentPublishYieldsNotDraft() throws Exception {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            long id = newSource();
+            int version = service.createDraft(id, null, userId).version();
+            replace(id, version, validDraft());
+            assertOneWinner(() -> {
+                service.publish(id, version, LocalDate.of(2026, 1, 1), userId);
+                return null;
+            }, "UPL_FORMAT_NOT_DRAFT");
+            assertThat(service.getVersion(id, version).status()).isEqualTo("published");
+        }
+    }
+
+    @Test
+    @DisplayName("М-4: версии несуществующего источника — UPL_SOURCE_NOT_FOUND")
+    void versionsOfMissingSource() {
+        assertApi(() -> service.getVersion(-1, 1), ErrorCode.NOT_FOUND, "UPL_SOURCE_NOT_FOUND");
+        assertApi(() -> service.createDraft(-1, null, userId), ErrorCode.NOT_FOUND, "UPL_SOURCE_NOT_FOUND");
+        assertApi(() -> service.publish(-1, 1, LocalDate.of(2026, 1, 1), userId),
+                ErrorCode.NOT_FOUND, "UPL_SOURCE_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("М-3: пустой курсор — первая страница")
+    void blankCursorIsFirstPage() {
+        newSource();
+        for (String cursor : List.of("", " ")) {
+            KeysetPage<SourceSummary> page = service.listSources(50, cursor);
+            assertThat(page.items()).as("cursor '%s'", cursor).isNotEmpty();
+        }
+    }
+
+    /** Запускает вызов из двух потоков одновременно: ровно один успех, второй — CONFLICT с {@code loserDetail}. */
+    private static void assertOneWinner(Callable<?> call, String loserDetail) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            Callable<Object> task = () -> {
+                start.await();
+                return call.call();
+            };
+            List<Future<Object>> futures = List.of(pool.submit(task), pool.submit(task));
+            start.countDown();
+            int succeeded = 0;
+            List<Throwable> failures = new ArrayList<>();
+            for (Future<Object> future : futures) {
+                try {
+                    future.get(60, TimeUnit.SECONDS);
+                    succeeded++;
+                } catch (ExecutionException e) {
+                    failures.add(e.getCause());
+                }
+            }
+            assertThat(succeeded).as("успешных вызовов, ошибки: %s", failures).isEqualTo(1);
+            assertThat(failures).singleElement().isInstanceOfSatisfying(ApiException.class, e -> {
+                assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONFLICT);
+                assertThat(e.getMessage()).isEqualTo(loserDetail);
+            });
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static DraftData draftWithUnits(String sourceUnit, String baseUnit) {
+        List<Sheet> valid = validDraft().sheets();
+        Sheet first = valid.get(0);
+        Column amount = withUnits(first.columns().get(1), sourceUnit, baseUnit);
+        Sheet changed = new Sheet(null, 0, first.sheetName(), first.headerRow(), first.totalRowMarker(),
+                List.of(first.columns().get(0), amount));
+        return new DraftData(null, null, null, null, List.of(changed, valid.get(1)));
+    }
+
+    private static Sheet renamed(Sheet s, String name) {
+        return new Sheet(null, 0, name, s.headerRow(), s.totalRowMarker(), s.columns());
     }
 
     private void ensureUnit(String code, String base) {

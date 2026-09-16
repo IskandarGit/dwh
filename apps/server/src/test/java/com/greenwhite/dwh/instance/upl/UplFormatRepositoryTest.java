@@ -202,6 +202,77 @@ class UplFormatRepositoryTest extends EmbeddedPostgresTest {
         });
     }
 
+    @Test
+    @DisplayName("С-2, AC-12: прямые insert/update/delete листа и колонки опубликованной версии запрещены")
+    void publishedChildrenGuardedForEveryOperation() {
+        Long created = tx.execute(st -> {
+            actors.apply(actors.system());
+            return publishedWithDraft(PREFIX + "guard." + UUID.randomUUID().toString().substring(0, 8));
+        });
+        long id = java.util.Objects.requireNonNull(created);
+        long publishedSheet = sheetId(id, 1);
+        long draftSheet = sheetId(id, 2);
+        long publishedColumn = columnId(publishedSheet);
+        long draftColumn = columnId(draftSheet);
+        Map<String, Object> ids = Map.of("src", id, "ps", publishedSheet, "ds", draftSheet,
+                "pc", publishedColumn, "dc", draftColumn);
+
+        List<String> forbidden = List.of(
+                "insert into upl_format_sheets (source_id, version, ordinal, sheet_name, header_row)"
+                        + " values (:src, 1, 99, 'TEST extra', 1)",
+                "update upl_format_sheets set sheet_name = 'TEST renamed' where id = :ps",
+                "update upl_format_sheets set version = 2 where id = :ps",
+                "update upl_format_sheets set version = 1 where id = :ds",
+                "delete from upl_format_sheets where id = :ps",
+                "insert into upl_format_columns (sheet_id, ordinal, name_in_file, target_field, data_type)"
+                        + " values (:ps, 99, 'TEST extra', 'extra', 'text')",
+                "update upl_format_columns set name_in_file = 'TEST renamed' where id = :pc",
+                "update upl_format_columns set sheet_id = :ds where id = :pc",
+                "update upl_format_columns set sheet_id = :ps where id = :dc",
+                "delete from upl_format_columns where id = :pc");
+        for (String sql : forbidden) {
+            inRolledBackTx(() -> assertThatThrownBy(() -> jdbc.sql(sql).params(ids).update())
+                    .as(sql)
+                    .hasStackTraceContaining("upl_format_not_draft"));
+        }
+
+        inRolledBackTx(() -> {
+            assertThat(jdbc.sql("update upl_format_columns set name_in_file = 'TEST renamed' where id = :dc")
+                    .params(ids).update()).isEqualTo(1);
+            assertThat(jdbc.sql("update upl_format_sheets set sheet_name = 'TEST renamed' where id = :ds")
+                    .params(ids).update()).isEqualTo(1);
+            assertThat(jdbc.sql("delete from upl_format_columns where id = :dc").params(ids).update())
+                    .isEqualTo(1);
+            assertThat(jdbc.sql("delete from upl_format_sheets where id = :ds").params(ids).update())
+                    .isEqualTo(1);
+        });
+    }
+
+    /** Источник с опубликованной версией 1 и черновиком 2; у каждой — один лист с одной колонкой. */
+    private long publishedWithDraft(String code) {
+        long id = repo.insertSource(data(code, "TEST guard"), actors.system().name());
+        List<Sheet> sheets = List.of(new Sheet(null, 0, "TEST sheet", 1, null, List.of(
+                new Column(null, 0, null, "TEST text", "label", DataType.TEXT, false,
+                        null, null, null, null, null, null))));
+        int first = versioning.createDraft(UplPref.TABLE_FORMAT_VERSIONS, id, actors.system());
+        repo.replaceSheets(id, first, sheets);
+        versioning.publish(UplPref.TABLE_FORMAT_VERSIONS, id, first, LocalDate.of(2026, 1, 1), null, actors.system());
+        int second = versioning.createDraft(UplPref.TABLE_FORMAT_VERSIONS, id, actors.system());
+        repo.replaceSheets(id, second, sheets);
+        assertThat(List.of(first, second)).containsExactly(1, 2);
+        return id;
+    }
+
+    private long sheetId(long sourceId, int version) {
+        return jdbc.sql("select id from upl_format_sheets where source_id = :src and version = :v")
+                .param("src", sourceId).param("v", version).query(Long.class).single();
+    }
+
+    private long columnId(long sheetId) {
+        return jdbc.sql("select id from upl_format_columns where sheet_id = :s")
+                .param("s", sheetId).query(Long.class).single();
+    }
+
     private void inRolledBackTx(Runnable body) {
         tx.executeWithoutResult(st -> {
             st.setRollbackOnly();
