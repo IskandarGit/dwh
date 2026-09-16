@@ -34,6 +34,13 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             "notify.preferences:view", "notify.preferences:update",
             "platform.announcements:view");
 
+    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources). */
+    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view");
+
+    private static List<String> allAnalystPairs() {
+        return java.util.stream.Stream.concat(ANALYST_PAIRS.stream(), LATER_MODULE_ANALYST_PAIRS.stream()).toList();
+    }
+
     private static final String TEST_ANALYST_LOGIN = "test-analyst-a1";
 
     /** S-11/S-12 / AC-9, п.2 приёмки: ФИО узбекской кириллицей (Ў, Ҳ, Ғ, қ) и латинский апостроф — ловит перекос кодировки JDBC/БД и экранирование. */
@@ -112,7 +119,7 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
                 join md_roles r on r.id = p.role_id
                 where r.pcode = 'analyst'
                 """).query(String.class).list();
-        assertThat(analystPairs).containsExactlyInAnyOrderElementsOf(ANALYST_PAIRS);
+        assertThat(analystPairs).containsExactlyInAnyOrderElementsOf(allAnalystPairs());
     }
 
     @Test
@@ -158,7 +165,7 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
         // M-3: эффективные права материализованы каркасом при создании (scopeService.recalculateFor)
         List<String> effective = jdbc.sql("select form_code || ':' || action from md_effective_permissions where user_id = :id")
                 .param("id", user.id()).query(String.class).list();
-        assertThat(effective).containsExactlyInAnyOrderElementsOf(ANALYST_PAIRS);
+        assertThat(effective).containsExactlyInAnyOrderElementsOf(allAnalystPairs());
         assertThat(effective).noneMatch(p -> p.startsWith("iam.users:") || p.startsWith("rbac.") || p.startsWith("audit.log:")
                 || p.startsWith("platform.settings:") || p.startsWith("tasks."));
     }
@@ -202,7 +209,11 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             status.setRollbackOnly();
 
             // Частичное состояние (обрыв прошлого применения): роль есть, прав analyst нет
-            jdbc.sql("delete from md_role_permissions where role_id = (select id from md_roles where pcode = 'analyst')").update();
+            jdbc.sql("""
+                    delete from md_role_permissions
+                    where role_id = (select id from md_roles where pcode = 'analyst')
+                      and form_code || ':' || action in (:pairs)
+                    """).param("pairs", ANALYST_PAIRS).update();
             assertThat(count("md_role_permissions")).isEqualTo(permissionsBefore - ANALYST_PAIRS.size());
 
             jdbc.sql(script).update();
