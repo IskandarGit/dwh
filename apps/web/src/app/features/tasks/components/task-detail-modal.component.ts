@@ -9,6 +9,7 @@ import { UiFileUploadComponent } from '../../../shared/ui/ui-file-upload.compone
 import { CustomField } from '../../../core/models/custom-field.models';
 import { Task, Project, TaskStatus, TaskType, TaskMember, TaskComment, TaskFile } from '../../../core/models/task.models';
 import { safeNumericRecordId } from '../../../core/services/search-target';
+import { groupMembersByRole, GroupedTaskMembers } from '../tasks.models';
 
 @Component({
   selector: 'app-task-detail-modal',
@@ -250,13 +251,79 @@ import { safeNumericRecordId } from '../../../core/services/search-target';
             <!-- Members Card -->
             <div class="side-card" *ngIf="taskMembers.length > 0">
               <h5 class="side-card-title">{{ 'tasks.uchastniki' | t }}</h5>
-              <div class="members-stack">
-                <div *ngFor="let m of taskMembers" class="member-stack-item">
-                  <span class="member-role-badge" [attr.data-role]="m.involveKind || m.involvementKind">
-                    {{ getInvolveKindLabel(m.involveKind || m.involvementKind) }}
-                  </span>
-                  <span class="member-name">{{ m.userName }}</span>
-                  <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+
+              <!-- Responsible (R) -->
+              <div class="member-role-group" *ngIf="groupedMembers.responsible as resp">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">person</span>
+                  <span>{{ 'task.responsible' | t }}</span>
+                </div>
+                <div class="member-stack-item member-highlighted">
+                  <span class="avatar-mini">{{ getInitials(resp.userName) }}</span>
+                  <div class="member-info">
+                    <span class="member-name">{{ resp.userName }}</span>
+                    <span class="member-login text-muted">&#64;{{ resp.userLogin }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Executors (E) -->
+              <div class="member-role-group" *ngIf="groupedMembers.executors.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">group</span>
+                  <span>{{ 'tasks.soispolniteli' | t }} ({{ groupedMembers.executors.length }})</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.executors" class="member-stack-item">
+                    <span class="avatar-mini avatar-executor">{{ getInitials(m.userName) }}</span>
+                    <div class="member-info">
+                      <span class="member-name">{{ m.userName }}</span>
+                      <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Observers (O) -->
+              <div class="member-role-group" *ngIf="groupedMembers.observers.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">visibility</span>
+                  <span>{{ 'tasks.nablyudateli' | t }} ({{ groupedMembers.observers.length }})</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.observers" class="member-stack-item member-observer">
+                    <span class="avatar-mini avatar-observer">{{ getInitials(m.userName) }}</span>
+                    <div class="member-info">
+                      <span class="member-name">{{ m.userName }}</span>
+                      <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Author (A) -->
+              <div class="member-role-group member-author-group" *ngIf="groupedMembers.author as auth">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">edit_note</span>
+                  <span>{{ 'tasks.avtor' | t }}</span>
+                </div>
+                <div class="member-stack-item member-author">
+                  <span class="member-name">{{ auth.userName }}</span>
+                  <span class="member-login text-muted">&#64;{{ auth.userLogin }}</span>
+                </div>
+              </div>
+
+              <!-- Others (if any) -->
+              <div class="member-role-group" *ngIf="groupedMembers.others.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">person_outline</span>
+                  <span>{{ 'tasks.uchastnik' | t }}</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.others" class="member-stack-item">
+                    <span class="member-name">{{ m.userName }}</span>
+                    <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -342,6 +409,10 @@ export class TaskDetailModalComponent {
   @Output() submitComment = new EventEmitter<void>();
 
   constructor(private readonly i18n: I18nService) {}
+
+  get groupedMembers(): GroupedTaskMembers {
+    return groupMembersByRole(this.taskMembers);
+  }
 
   getInvolveKindLabel(kind: string | undefined): string {
     switch (kind) {

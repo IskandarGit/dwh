@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '../../../core/services/i18n.service';
 import { Project, TaskStatus } from '../../../core/models/task.models';
 
-export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
+export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | 'overdue';
 
 @Component({
   selector: 'app-task-filter-bar',
@@ -38,6 +38,26 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
           >
             <span class="material-symbols-outlined preset-icon" aria-hidden="true">person</span>
             <span>{{ 'tasks.filter_preset_my' | t }}</span>
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="activePreset === 'executor'"
+            [attr.aria-pressed]="activePreset === 'executor'"
+            (click)="onPresetClick('executor')"
+          >
+            <span class="material-symbols-outlined preset-icon" aria-hidden="true">group</span>
+            <span>{{ 'tasks.filter_preset_executor' | t }}</span>
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="activePreset === 'observer'"
+            [attr.aria-pressed]="activePreset === 'observer'"
+            (click)="onPresetClick('observer')"
+          >
+            <span class="material-symbols-outlined preset-icon" aria-hidden="true">visibility</span>
+            <span>{{ 'tasks.filter_preset_observer' | t }}</span>
           </button>
           <button
             type="button"

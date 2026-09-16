@@ -35,6 +35,14 @@ import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
         >
           {{ 'notifications.prochitat_vse' | t }}
         </ui-button>
+        <ui-button
+          variant="secondary"
+          icon="tune"
+          [ariaLabel]="'notifications.preferences_title' | t"
+          (onClick)="openPreferences.emit()"
+        >
+          {{ 'notifications.preferences_title' | t }}
+        </ui-button>
       </div>
     </div>
   `,
@@ -83,4 +91,5 @@ export class NotificationsHeaderComponent {
 
   readonly refresh = output<void>();
   readonly markAllRead = output<void>();
+  readonly openPreferences = output<void>();
 }

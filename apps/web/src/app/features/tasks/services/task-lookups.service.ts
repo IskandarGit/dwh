@@ -15,6 +15,7 @@ export class TaskLookupsService {
 
   readonly parentTaskOptions = signal<SelectOption[]>([]);
   readonly responsibleUsers = signal<User[]>([]);
+  readonly executorUsers = signal<User[]>([]);
   readonly observerUsers = signal<User[]>([]);
 
   readonly parentLookupLoading = signal(false);
@@ -25,32 +26,42 @@ export class TaskLookupsService {
   readonly responsibleLookupError = signal(false);
   readonly responsibleLookupHasMore = signal(false);
 
+  readonly executorLookupLoading = signal(false);
+  readonly executorLookupError = signal(false);
+  readonly executorLookupHasMore = signal(false);
+
   readonly observerLookupLoading = signal(false);
   readonly observerLookupError = signal(false);
   readonly observerLookupHasMore = signal(false);
 
   private parentLookupRequest?: Subscription;
   private responsibleLookupRequest?: Subscription;
+  private executorLookupRequest?: Subscription;
   private observerLookupRequest?: Subscription;
 
   private parentLookupRequestId = 0;
   private responsibleLookupRequestId = 0;
+  private executorLookupRequestId = 0;
   private observerLookupRequestId = 0;
 
   private parentSearchTimer?: ReturnType<typeof setTimeout>;
   private responsibleSearchTimer?: ReturnType<typeof setTimeout>;
+  private executorSearchTimer?: ReturnType<typeof setTimeout>;
   private observerSearchTimer?: ReturnType<typeof setTimeout>;
 
   private parentLookupQuery = '';
   private responsibleLookupQuery = '';
+  private executorLookupQuery = '';
   private observerLookupQuery = '';
 
   private parentLookupCursor: string | null = null;
   private responsibleLookupCursor: string | null = null;
+  private executorLookupCursor: string | null = null;
   private observerLookupCursor: string | null = null;
 
   private parentLastReset = true;
   private responsibleLastReset = true;
+  private executorLastReset = true;
   private observerLastReset = true;
 
   readonly retainedParentOptions = new Map<number, SelectOption>();
@@ -92,9 +103,10 @@ export class TaskLookupsService {
     this.parentTaskOptions.set(mergeOptions(this.parentTaskOptions(), [option]));
   }
 
-  syncSelectedUsers(responsibleId: number | null, observerIds: number[]): void {
+  syncSelectedUsers(responsibleId: number | null, executorIds: number[], observerIds: number[]): void {
     const selectedResp = responsibleId == null ? [] : [responsibleId];
     this.responsibleUsers.set(mergeUserResults(this.responsibleUsers(), [], selectedResp, this.retainedUsers));
+    this.executorUsers.set(mergeUserResults(this.executorUsers(), [], executorIds, this.retainedUsers));
     this.observerUsers.set(mergeUserResults(this.observerUsers(), [], observerIds, this.retainedUsers));
   }
 
@@ -212,6 +224,63 @@ export class TaskLookupsService {
     });
   }
 
+  onExecutorSearch(query: string, getSelectedExecutorIds: () => number[]): void {
+    this.executorLookupQuery = query.trim();
+    clearTimeout(this.executorSearchTimer);
+    this.executorLookupRequestId++;
+    this.executorLookupRequest?.unsubscribe();
+    this.executorLookupCursor = null;
+    this.executorLookupHasMore.set(false);
+    this.executorLookupLoading.set(true);
+    this.executorLookupError.set(false);
+    this.executorSearchTimer = setTimeout(() => this.loadExecutorUsers(true, getSelectedExecutorIds), 300);
+  }
+
+  loadMoreExecutors(getSelectedExecutorIds: () => number[]): void {
+    if (this.executorLookupCursor && !this.executorLookupLoading()) {
+      this.loadExecutorUsers(false, getSelectedExecutorIds);
+    }
+  }
+
+  retryExecutorLookup(getSelectedExecutorIds: () => number[]): void {
+    this.loadExecutorUsers(this.executorLastReset, getSelectedExecutorIds);
+  }
+
+  loadExecutorUsers(reset: boolean, getSelectedExecutorIds: () => number[]): void {
+    this.executorLastReset = reset;
+    if (reset) this.executorLookupCursor = null;
+    const requestId = ++this.executorLookupRequestId;
+    this.executorLookupRequest?.unsubscribe();
+    this.executorLookupLoading.set(true);
+    this.executorLookupError.set(false);
+
+    this.executorLookupRequest = this.api.get<KeysetPage<User>>('/iam/users', {
+      limit: 50,
+      cursor: this.executorLookupCursor || undefined,
+      search: this.executorLookupQuery || undefined,
+      state: 'A'
+    }).subscribe({
+      next: page => {
+        if (requestId !== this.executorLookupRequestId) return;
+        const selectedIds = getSelectedExecutorIds();
+        this.executorUsers.set(mergeUserResults(
+          reset ? [] : this.executorUsers(),
+          page.items || [],
+          selectedIds,
+          this.retainedUsers
+        ));
+        this.executorLookupCursor = page.nextCursor;
+        this.executorLookupHasMore.set(page.hasMore);
+        this.executorLookupLoading.set(false);
+      },
+      error: () => {
+        if (requestId !== this.executorLookupRequestId) return;
+        this.executorLookupLoading.set(false);
+        this.executorLookupError.set(true);
+      }
+    });
+  }
+
   onObserverSearch(query: string, getSelectedObserverIds: () => number[]): void {
     this.observerLookupQuery = query.trim();
     clearTimeout(this.observerSearchTimer);
@@ -272,12 +341,15 @@ export class TaskLookupsService {
   cleanup(): void {
     this.parentLookupRequestId++;
     this.responsibleLookupRequestId++;
+    this.executorLookupRequestId++;
     this.observerLookupRequestId++;
     clearTimeout(this.parentSearchTimer);
     clearTimeout(this.responsibleSearchTimer);
+    clearTimeout(this.executorSearchTimer);
     clearTimeout(this.observerSearchTimer);
     this.parentLookupRequest?.unsubscribe();
     this.responsibleLookupRequest?.unsubscribe();
+    this.executorLookupRequest?.unsubscribe();
     this.observerLookupRequest?.unsubscribe();
   }
 }

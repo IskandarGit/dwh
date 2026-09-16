@@ -160,6 +160,44 @@
     .prop-k { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
     .prop-v { font-weight: 500; text-align: right; word-break: break-all; }
     .members-stack { display: flex; flex-direction: column; gap: 4px; }
+    .member-role-group { display: flex; flex-direction: column; gap: 4px; }
+    .member-role-title {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+    .member-role-icon { font-size: 13px; }
+    .member-highlighted {
+      border-left: 2px solid var(--primary);
+      background-color: var(--bg-hover);
+    }
+    .member-info {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .avatar-executor { background-color: #3b82f6; }
+    .avatar-observer { background-color: #64748b; }
+    .member-observer { opacity: 0.85; }
+    .member-author-group {
+      border-top: 1px dashed var(--border-color);
+      padding-top: 4px;
+    }
+    .member-author {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
     .member-stack-item {
       display: flex;
       align-items: center;

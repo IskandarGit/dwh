@@ -18,6 +18,7 @@ export interface TaskCreateFormValue {
   priority: string;
   responsibleUserId: number | null;
   parentTaskId: number | null;
+  executorUserIds: number[];
   observerUserIds: number[];
   beginTime: string;
   endTime: string;
@@ -32,10 +33,46 @@ export interface TaskEditFormValue {
   priority: string;
   responsibleUserId: number | null;
   parentTaskId: number | null;
+  executorUserIds: number[];
   observerUserIds: number[];
   beginTime: string;
   endTime: string;
   attributes: Record<string, any>;
+}
+
+export interface GroupedTaskMembers {
+  responsible: TaskMember | null;
+  executors: TaskMember[];
+  observers: TaskMember[];
+  author: TaskMember | null;
+  others: TaskMember[];
+}
+
+export function groupMembersByRole(members: TaskMember[]): GroupedTaskMembers {
+  const result: GroupedTaskMembers = {
+    responsible: null,
+    executors: [],
+    observers: [],
+    author: null,
+    others: []
+  };
+
+  for (const m of members) {
+    const kind = m.involveKind || m.involvementKind;
+    if (kind === 'R') {
+      result.responsible = m;
+    } else if (kind === 'E') {
+      result.executors.push(m);
+    } else if (kind === 'O') {
+      result.observers.push(m);
+    } else if (kind === 'A') {
+      result.author = m;
+    } else {
+      result.others.push(m);
+    }
+  }
+
+  return result;
 }
 
 export function createDefaultTaskCreateForm(projectId: number | null = null, defaultType = 'task'): TaskCreateFormValue {
@@ -47,6 +84,7 @@ export function createDefaultTaskCreateForm(projectId: number | null = null, def
     priority: 'medium',
     responsibleUserId: null,
     parentTaskId: null,
+    executorUserIds: [],
     observerUserIds: [],
     beginTime: '',
     endTime: '',

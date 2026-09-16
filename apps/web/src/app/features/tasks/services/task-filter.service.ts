@@ -7,7 +7,7 @@ import { AuthService } from '../../../core/services/auth.service';
 export class TaskFilterService {
   private readonly authService = inject(AuthService, { optional: true });
 
-  activePreset: 'all' | 'my' | 'reported' | 'overdue' = 'all';
+  activePreset: 'all' | 'my' | 'executor' | 'observer' | 'reported' | 'overdue' = 'all';
   viewMode: 'table' | 'kanban' = 'table';
   searchQuery = '';
   selectedPriority = '';
@@ -31,7 +31,7 @@ export class TaskFilterService {
     onReload();
   }
 
-  setPreset(preset: 'all' | 'my' | 'reported' | 'overdue', onReload: () => void): void {
+  setPreset(preset: 'all' | 'my' | 'executor' | 'observer' | 'reported' | 'overdue', onReload: () => void): void {
     if (this.activePreset === preset) return;
     this.activePreset = preset;
     onReload();
@@ -75,13 +75,21 @@ export class TaskFilterService {
     }
 
     let assignedUserIdParam: number | undefined = undefined;
+    let memberRoleParam: string | undefined = undefined;
     let reporterIdParam: number | undefined = undefined;
     let overdueParam: boolean | undefined = undefined;
 
     const currentUserId = this.authService?.currentUser()?.id;
-    if (this.activePreset === 'my' && currentUserId) {
+    if (this.activePreset === 'my') {
       assignedUserIdParam = currentUserId;
-    } else if (this.activePreset === 'reported' && currentUserId) {
+      memberRoleParam = 'R';
+    } else if (this.activePreset === 'executor') {
+      assignedUserIdParam = currentUserId;
+      memberRoleParam = 'E';
+    } else if (this.activePreset === 'observer') {
+      assignedUserIdParam = currentUserId;
+      memberRoleParam = 'O';
+    } else if (this.activePreset === 'reported') {
       reporterIdParam = currentUserId;
     } else if (this.activePreset === 'overdue') {
       overdueParam = true;
@@ -96,6 +104,7 @@ export class TaskFilterService {
       status_id: statusIdParam,
       hide_terminal: hideTerminalParam,
       assigned_user_id: assignedUserIdParam,
+      member_role: memberRoleParam,
       reporter_id: reporterIdParam,
       overdue: overdueParam
     };

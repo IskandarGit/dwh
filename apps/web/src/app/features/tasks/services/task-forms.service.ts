@@ -39,7 +39,7 @@ export class TaskFormsService {
   editTargetId: number | null = null;
   editReturnTask: Task | null = null;
   editFormBaseline = '';
-  editAssignmentBaseline: { parentTaskId: number | null; responsibleUserId: number | null; observerUserIds: number[] } | null = null;
+  editAssignmentBaseline: { parentTaskId: number | null; responsibleUserId: number | null; executorUserIds: number[]; observerUserIds: number[] } | null = null;
 
   editForm: TaskEditFormValue = {
     title: '',
@@ -49,6 +49,7 @@ export class TaskFormsService {
     priority: 'medium',
     responsibleUserId: null,
     parentTaskId: null,
+    executorUserIds: [],
     observerUserIds: [],
     beginTime: '',
     endTime: '',
@@ -81,6 +82,7 @@ export class TaskFormsService {
       priority: parentTask.priority || 'medium',
       responsibleUserId: null,
       parentTaskId: parentTask.id,
+      executorUserIds: [],
       observerUserIds: [],
       beginTime: '',
       endTime: '',
@@ -115,6 +117,7 @@ export class TaskFormsService {
       priority: this.createForm.priority || 'medium',
       responsibleUserId: this.createForm.responsibleUserId ? Number(this.createForm.responsibleUserId) : null,
       parentTaskId: this.createForm.parentTaskId ? Number(this.createForm.parentTaskId) : null,
+      executorUserIds: this.createForm.executorUserIds,
       observerUserIds: this.createForm.observerUserIds,
       beginTime: toTaskInstant(this.createForm.beginTime),
       endTime: toTaskInstant(this.createForm.endTime),
@@ -142,7 +145,7 @@ export class TaskFormsService {
     closeDetailsIfMatches: () => Task | null,
     onRetainMember: (m: TaskMember) => void,
     onRetainParent: (id: number, title: string) => void,
-    onSyncUsers: (responsibleId: number | null, observerIds: number[]) => void
+    onSyncUsers: (responsibleId: number | null, executorIds: number[], observerIds: number[]) => void
   ): void {
     if (!safeNumericRecordId(task.id)) return;
     if (this.isSubmitting() || this.isEditModalOpen()) return;
@@ -161,7 +164,7 @@ export class TaskFormsService {
     taskId: number,
     onRetainMember: (m: TaskMember) => void,
     onRetainParent: (id: number, title: string) => void,
-    onSyncUsers: (responsibleId: number | null, observerIds: number[]) => void
+    onSyncUsers: (responsibleId: number | null, executorIds: number[], observerIds: number[]) => void
   ): void {
     const requestId = ++this.editRequestId;
     this.editRequest?.unsubscribe();
@@ -178,6 +181,9 @@ export class TaskFormsService {
           return;
         }
         const freshTask = res.task;
+        const execIds = res.members
+          .filter(m => (m.involveKind || m.involvementKind) === 'E')
+          .map(m => m.userId);
         const obsIds = res.members
           .filter(m => (m.involveKind || m.involvementKind) === 'O')
           .map(m => m.userId);
@@ -198,6 +204,7 @@ export class TaskFormsService {
           priority: freshTask.priority || 'medium',
           responsibleUserId: respMember ? respMember.userId : null,
           parentTaskId: freshTask.parentTaskId ?? null,
+          executorUserIds: execIds,
           observerUserIds: obsIds,
           beginTime: toLocalDateTime(freshTask.beginTime),
           endTime: toLocalDateTime(freshTask.endTime),
@@ -207,9 +214,10 @@ export class TaskFormsService {
         this.editAssignmentBaseline = {
           parentTaskId: this.editForm.parentTaskId,
           responsibleUserId: this.editForm.responsibleUserId,
+          executorUserIds: [...this.editForm.executorUserIds],
           observerUserIds: [...this.editForm.observerUserIds]
         };
-        onSyncUsers(this.editForm.responsibleUserId, this.editForm.observerUserIds);
+        onSyncUsers(this.editForm.responsibleUserId, this.editForm.executorUserIds, this.editForm.observerUserIds);
         this.editLoading.set(false);
       },
       error: () => {
@@ -223,7 +231,7 @@ export class TaskFormsService {
   retryEditLoad(
     onRetainMember: (m: TaskMember) => void,
     onRetainParent: (id: number, title: string) => void,
-    onSyncUsers: (responsibleId: number | null, observerIds: number[]) => void
+    onSyncUsers: (responsibleId: number | null, executorIds: number[], observerIds: number[]) => void
   ): void {
     if (this.editTargetId != null && !this.isSubmitting()) {
       this.loadEditDetails(this.editTargetId, onRetainMember, onRetainParent, onSyncUsers);
@@ -314,6 +322,7 @@ export class TaskFormsService {
     const currentAssignments = {
       parentTaskId: this.editForm.parentTaskId == null ? null : Number(this.editForm.parentTaskId),
       responsibleUserId: this.editForm.responsibleUserId == null ? null : Number(this.editForm.responsibleUserId),
+      executorUserIds: [...this.editForm.executorUserIds],
       observerUserIds: [...this.editForm.observerUserIds]
     };
     if (!this.editAssignmentBaseline || currentAssignments.parentTaskId !== this.editAssignmentBaseline.parentTaskId) {
@@ -321,6 +330,9 @@ export class TaskFormsService {
     }
     if (!this.editAssignmentBaseline || currentAssignments.responsibleUserId !== this.editAssignmentBaseline.responsibleUserId) {
       payload['responsibleUserId'] = currentAssignments.responsibleUserId;
+    }
+    if (!this.editAssignmentBaseline || !sameIdSet(currentAssignments.executorUserIds, this.editAssignmentBaseline.executorUserIds)) {
+      payload['executorUserIds'] = currentAssignments.executorUserIds;
     }
     if (!this.editAssignmentBaseline || !sameIdSet(currentAssignments.observerUserIds, this.editAssignmentBaseline.observerUserIds)) {
       payload['observerUserIds'] = currentAssignments.observerUserIds;

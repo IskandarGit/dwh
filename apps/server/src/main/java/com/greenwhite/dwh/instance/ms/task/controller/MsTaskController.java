@@ -44,12 +44,13 @@ public class MsTaskController {
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "hide_terminal", required = false) Boolean hideTerminal,
             @RequestParam(name = "assigned_user_id", required = false) Long assignedUserId,
+            @RequestParam(name = "member_role", required = false) String memberRole,
             @RequestParam(name = "reporter_id", required = false) Long reporterId,
             @RequestParam(name = "overdue", required = false) Boolean overdue) {
 
         return ResponseEntity.ok(taskService.listTasks(
                 limit, cursor, projectId, statusId, priority, search, hideTerminal,
-                assignedUserId, reporterId, overdue, SecurityContext.getCurrentUserId()));
+                assignedUserId, reporterId, overdue, memberRole, SecurityContext.getCurrentUserId()));
     }
 
     // =========================================================================

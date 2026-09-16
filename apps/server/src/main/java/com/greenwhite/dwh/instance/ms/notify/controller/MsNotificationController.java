@@ -63,4 +63,24 @@ public class MsNotificationController {
         notificationService.markAllAsRead(userId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/preferences")
+    @RequiresPermission(form = MsNotifyPref.FORM_INBOX, action = "view")
+    public ResponseEntity<List<com.greenwhite.dwh.instance.ms.notify.repository.MsNotificationPrefRepository.NotificationPrefRecord>> getPreferences() {
+        Long userId = SecurityContext.getCurrentUserId();
+        if (userId == null) throw ApiException.unauthorized("Пользователь не авторизован");
+
+        return ResponseEntity.ok(notificationService.getUserPreferences(userId));
+    }
+
+    @PutMapping("/preferences")
+    @RequiresPermission(form = MsNotifyPref.FORM_INBOX, action = "view")
+    public ResponseEntity<Void> updatePreferences(
+            @RequestBody List<MsNotificationService.PrefUpdateDto> updates) {
+        Long userId = SecurityContext.getCurrentUserId();
+        if (userId == null) throw ApiException.unauthorized("Пользователь не авторизован");
+
+        notificationService.updateUserPreferences(userId, updates);
+        return ResponseEntity.noContent().build();
+    }
 }

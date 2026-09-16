@@ -123,6 +123,7 @@ export class TasksComponent implements OnInit, OnDestroy {
   // Delegated signals from Lookups Service
   readonly parentTaskOptions = this.lookupsService.parentTaskOptions;
   readonly responsibleUsers = this.lookupsService.responsibleUsers;
+  readonly executorUsers = this.lookupsService.executorUsers;
   readonly observerUsers = this.lookupsService.observerUsers;
   readonly parentLookupLoading = this.lookupsService.parentLookupLoading;
   readonly parentLookupError = this.lookupsService.parentLookupError;
@@ -130,6 +131,9 @@ export class TasksComponent implements OnInit, OnDestroy {
   readonly responsibleLookupLoading = this.lookupsService.responsibleLookupLoading;
   readonly responsibleLookupError = this.lookupsService.responsibleLookupError;
   readonly responsibleLookupHasMore = this.lookupsService.responsibleLookupHasMore;
+  readonly executorLookupLoading = this.lookupsService.executorLookupLoading;
+  readonly executorLookupError = this.lookupsService.executorLookupError;
+  readonly executorLookupHasMore = this.lookupsService.executorLookupHasMore;
   readonly observerLookupLoading = this.lookupsService.observerLookupLoading;
   readonly observerLookupError = this.lookupsService.observerLookupError;
   readonly observerLookupHasMore = this.lookupsService.observerLookupHasMore;
@@ -316,7 +320,7 @@ export class TasksComponent implements OnInit, OnDestroy {
   paginatedTasks(): Task[] { return this.tasks(); }
   hasActiveFilters(): boolean { return this.filterService.hasActiveFilters(); }
   clearSearch() { this.cancelListRequestForFilterChange(); this.filterService.clearSearch(() => this.loadTasks(true)); }
-  setPreset(preset: 'all' | 'my' | 'reported' | 'overdue') { this.filterService.setPreset(preset, () => this.loadTasks(true)); }
+  setPreset(preset: 'all' | 'my' | 'executor' | 'observer' | 'reported' | 'overdue') { this.filterService.setPreset(preset, () => this.loadTasks(true)); }
   setStatusFilterMode(mode: 'active' | 'all' | number) { this.filterService.setStatusFilterMode(mode, () => this.loadTasks(true)); }
   onProjectFilterChange(projectId: number | null) { this.filterService.onProjectFilterChange(projectId, () => this.loadTasks(true)); }
   onPriorityFilterChange(priority: string) { this.filterService.onPriorityFilterChange(priority, () => this.loadTasks(true)); }
@@ -373,6 +377,7 @@ export class TasksComponent implements OnInit, OnDestroy {
   getAvailableParentTaskOptions(taskId: number): SelectOption[] { return this.lookupsService.getAvailableParentTaskOptions(taskId); }
   private getSelectedParentId(): number | null { return this.isEditModalOpen() ? this.editForm.parentTaskId : this.createForm.parentTaskId; }
   private getSelectedUserId(): number | null { return this.isEditModalOpen() ? this.editForm.responsibleUserId : this.createForm.responsibleUserId; }
+  private getSelectedExecutorIds(): number[] { return this.isEditModalOpen() ? this.editForm.executorUserIds : this.createForm.executorUserIds; }
   private getSelectedObserverIds(): number[] { return this.isEditModalOpen() ? this.editForm.observerUserIds : this.createForm.observerUserIds; }
 
   onParentSearch(query: string) { this.lookupsService.onParentSearch(query, () => this.getSelectedParentId()); }
@@ -381,6 +386,9 @@ export class TasksComponent implements OnInit, OnDestroy {
   onResponsibleSearch(query: string) { this.lookupsService.onResponsibleSearch(query, () => this.getSelectedUserId()); }
   loadMoreResponsibleUsers() { this.lookupsService.loadMoreResponsibleUsers(() => this.getSelectedUserId()); }
   retryResponsibleLookup() { this.lookupsService.retryResponsibleLookup(() => this.getSelectedUserId()); }
+  onExecutorSearch(query: string) { this.lookupsService.onExecutorSearch(query, () => this.getSelectedExecutorIds()); }
+  loadMoreExecutors() { this.lookupsService.loadMoreExecutors(() => this.getSelectedExecutorIds()); }
+  retryExecutorLookup() { this.lookupsService.retryExecutorLookup(() => this.getSelectedExecutorIds()); }
   onObserverSearch(query: string) { this.lookupsService.onObserverSearch(query, () => this.getSelectedObserverIds()); }
   loadMoreObservers() { this.lookupsService.loadMoreObservers(() => this.getSelectedObserverIds()); }
   retryObserverLookup() { this.lookupsService.retryObserverLookup(() => this.getSelectedObserverIds()); }
@@ -430,11 +438,15 @@ export class TasksComponent implements OnInit, OnDestroy {
       },
       (m) => this.lookupsService.retainTaskMember(m),
       (id, title) => this.lookupsService.retainParentOption(id, title),
-      (respId, obsIds) => this.lookupsService.syncSelectedUsers(respId, obsIds)
+      (respId, execIds, obsIds) => this.lookupsService.syncSelectedUsers(respId, execIds, obsIds)
     );
   }
   retryEditLoad() {
-    this.formsService.retryEditLoad((m) => this.lookupsService.retainTaskMember(m), (id, title) => this.lookupsService.retainParentOption(id, title), (respId, obsIds) => this.lookupsService.syncSelectedUsers(respId, obsIds));
+    this.formsService.retryEditLoad(
+      (m) => this.lookupsService.retainTaskMember(m),
+      (id, title) => this.lookupsService.retainParentOption(id, title),
+      (respId, execIds, obsIds) => this.lookupsService.syncSelectedUsers(respId, execIds, obsIds)
+    );
   }
   requestCloseEdit() { this.formsService.requestCloseEdit((t) => this.openTaskDetails(t)); }
   confirmDiscardEdit() { this.formsService.confirmDiscardEdit((t) => this.openTaskDetails(t)); }

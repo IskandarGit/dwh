@@ -12,6 +12,8 @@ import { NotificationFilterTab, resolveNotificationIcon } from './notifications.
 import { NotificationsHeaderComponent } from './components/notifications-header.component';
 import { NotificationsTabsComponent } from './components/notifications-tabs.component';
 import { NotificationsListComponent } from './components/notifications-list.component';
+import { NotificationPreferencesModalComponent } from './components/notification-preferences-modal.component';
+import { NotificationPrefItem } from '../../core/models/notification.models';
 
 export type { NotificationFilterTab };
 export { resolveNotificationIcon };
@@ -23,7 +25,8 @@ export { resolveNotificationIcon };
     CommonModule,
     NotificationsHeaderComponent,
     NotificationsTabsComponent,
-    NotificationsListComponent
+    NotificationsListComponent,
+    NotificationPreferencesModalComponent
   ],
   template: `
     <div class="notifications-container">
@@ -35,6 +38,7 @@ export { resolveNotificationIcon };
         [isMarkingAll]="isMarkingAll()"
         (refresh)="loadNotifications()"
         (markAllRead)="markAllAsRead()"
+        (openPreferences)="openPreferencesModal()"
       />
 
       <div class="card notif-card">
@@ -64,6 +68,14 @@ export { resolveNotificationIcon };
           (pageSizeChange)="pageSize = $event; currentPage = 1"
         />
       </div>
+
+      <app-notification-preferences-modal
+        *ngIf="isPreferencesOpen()"
+        [initialPreferences]="preferences()"
+        [isSaving]="isSavingPreferences()"
+        (close)="isPreferencesOpen.set(false)"
+        (save)="savePreferences($event)"
+      />
     </div>
   `,
   styles: [`
@@ -95,6 +107,9 @@ export class NotificationsComponent implements OnInit {
   readonly filterTab = signal<NotificationFilterTab>('all');
   readonly isMarkingAll = signal(false);
   readonly pendingReads = signal<Set<number>>(new Set());
+  readonly isPreferencesOpen = signal(false);
+  readonly isSavingPreferences = signal(false);
+  readonly preferences = signal<NotificationPrefItem[]>([]);
 
   private listRequest?: Subscription;
   private countRequest?: Subscription;
@@ -214,5 +229,36 @@ export class NotificationsComponent implements OnInit {
     this.countRequest = this.notifService.fetchUnreadCount().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({ error: () => {} });
+  }
+
+  openPreferencesModal(): void {
+    this.notifService.fetchPreferences().pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      next: prefs => {
+        this.preferences.set(prefs);
+        this.isPreferencesOpen.set(true);
+      },
+      error: () => {
+        this.preferences.set([]);
+        this.isPreferencesOpen.set(true);
+      }
+    });
+  }
+
+  savePreferences(prefs: NotificationPrefItem[]): void {
+    this.isSavingPreferences.set(true);
+    this.notifService.updatePreferences(prefs).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.isSavingPreferences.set(false))
+    ).subscribe({
+      next: () => {
+        this.isPreferencesOpen.set(false);
+        this.toast.success(this.uiI18n.translate('notifications.preferences_saved'));
+      },
+      error: () => {
+        this.toast.error(this.uiI18n.translate('notifications.preferences_error'));
+      }
+    });
   }
 }

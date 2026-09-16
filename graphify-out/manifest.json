@@ -1452,15 +1452,15 @@
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/controller/MsNotificationController.java": {
-    "mtime": 1788411226.7968,
-    "seen": 1788856915.156746,
-    "ast_hash": "1122ed8a721c305e370d569bc60ba288",
+    "mtime": 1789557565.793327,
+    "seen": 1789558012.469238,
+    "ast_hash": "17014c02ae32f3ec791633128cc01460",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/listener/MsTaskNotificationListener.java": {
-    "mtime": 1788411226.7968,
-    "seen": 1788856915.156746,
-    "ast_hash": "333f8a2a6b53af443483dc3259650996",
+    "mtime": 1789557572.596473,
+    "seen": 1789558012.469238,
+    "ast_hash": "341bc9474d7a129dda854f077c431761",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/model/AnnouncementDraftRequest.java": {
@@ -1536,9 +1536,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/service/MsNotificationService.java": {
-    "mtime": 1788887682.279559,
-    "seen": 1788889315.3065078,
-    "ast_hash": "d734d3603bf9c77112b17baba8d62c70",
+    "mtime": 1789557560.5406234,
+    "seen": 1789558012.469238,
+    "ast_hash": "a4eb55a7f19fe799c5ad557ce1e67cd9",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/sse/MsNotificationCreatedEvent.java": {
@@ -1584,15 +1584,15 @@
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/controller/MsTaskController.java": {
-    "mtime": 1788924725.9113355,
-    "seen": 1788925099.0751274,
-    "ast_hash": "b1d6291c5a460e15a0c63dfa523488ae",
+    "mtime": 1789557500.3713715,
+    "seen": 1789558012.469238,
+    "ast_hash": "7e71139f3743963dccdc454d99c18dcb",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/event/MsTaskEvents.java": {
-    "mtime": 1788411226.8022976,
-    "seen": 1788856915.156746,
-    "ast_hash": "379b09577746eaa424392a4e4ab93d09",
+    "mtime": 1789555888.0086186,
+    "seen": 1789556461.848434,
+    "ast_hash": "a348583ffaaca0fc238c490b832dcf4a",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/pref/MsTaskPref.java": {
@@ -1620,9 +1620,9 @@
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/repository/MsTaskRepository.java": {
-    "mtime": 1788924680.2026222,
-    "seen": 1788925099.0751274,
-    "ast_hash": "ee36ed65c1a64d5fa3baab294899f5b0",
+    "mtime": 1789557489.8909173,
+    "seen": 1789558012.469238,
+    "ast_hash": "d0d777bce25518ddbeab4def64055640",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/repository/MsTaskStatusRepository.java": {
@@ -1650,15 +1650,15 @@
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/service/MsTaskService.java": {
-    "mtime": 1789012802.4917412,
-    "seen": 1789012859.7479575,
-    "ast_hash": "c1c6e8cc567ec724284fded2a672f9eb",
+    "mtime": 1789557495.6914935,
+    "seen": 1789558012.469238,
+    "ast_hash": "dd0cf633f538259877b6c4d5d834d8c6",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/task/worker/TaskDeadlineReminderWorker.java": {
-    "mtime": 1788887727.3549528,
-    "seen": 1788889315.3065078,
-    "ast_hash": "8576facb971f2f657e04844fa932e580",
+    "mtime": 1789557595.5285666,
+    "seen": 1789558012.469238,
+    "ast_hash": "03e10b9f29830c4137e1d0317e267a32",
     "semantic_hash": ""
   },
   "apps/server/src/main/java/com/greenwhite/dwh/instance/report/controller/ReportController.java": {
@@ -2178,9 +2178,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/core/models/notification.models.ts": {
-    "mtime": 1788749909.7614312,
-    "seen": 1788856915.157246,
-    "ast_hash": "c0b2eea0dbe6c36bdf8d0d9e8e530feb",
+    "mtime": 1789557663.412395,
+    "seen": 1789558012.469238,
+    "ast_hash": "a84863e2cbc823eb0ac5dd145d79f5f9",
     "semantic_hash": ""
   },
   "apps/web/src/app/core/models/rbac.models.ts": {
@@ -2232,9 +2232,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/core/services/notification.service.ts": {
-    "mtime": 1788751782.2278142,
-    "seen": 1788856915.157246,
-    "ast_hash": "04e428db9512beab01099b4017d62dc9",
+    "mtime": 1789557765.2254207,
+    "seen": 1789558012.4697368,
+    "ast_hash": "39a91693c2485fe146b037ebf8ffa465",
     "semantic_hash": ""
   },
   "apps/web/src/app/core/services/permission.service.ts": {
@@ -2358,15 +2358,15 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/notifications/notifications.component.spec.ts": {
-    "mtime": 1788977387.8286822,
-    "seen": 1788977606.7656481,
-    "ast_hash": "24e04f022246dfbabfc823dd5f3dee8f",
+    "mtime": 1789557886.0916655,
+    "seen": 1789558012.4697368,
+    "ast_hash": "93d16c0db5b4dd7ca4276f4ebf4f6b00",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/notifications/notifications.component.ts": {
-    "mtime": 1789071739.9495375,
-    "seen": 1789071811.4287758,
-    "ast_hash": "4f735250e35f9ab8de180bd37058d91c",
+    "mtime": 1789557810.4474378,
+    "seen": 1789558012.4697368,
+    "ast_hash": "ae6e98cb5840e1b439dab2a41d2c3d1f",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/settings/settings.component.spec.ts": {
@@ -2406,15 +2406,15 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/tasks.component.spec.ts": {
-    "mtime": 1788924966.1246493,
-    "seen": 1788925099.0751274,
-    "ast_hash": "123ae644aaf71538c7aaff6d12a14a1a",
+    "mtime": 1789557875.5891492,
+    "seen": 1789558012.4697368,
+    "ast_hash": "9e922033e62c299240bf5495b3da4be8",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/tasks.component.ts": {
-    "mtime": 1789074682.683436,
-    "seen": 1789074773.380665,
-    "ast_hash": "e371dc3bfb3ae4330b22d3e376900c76",
+    "mtime": 1789557844.3101714,
+    "seen": 1789558012.4697368,
+    "ast_hash": "71f9293d2909ff344a338cf4bdf2ac78",
     "semantic_hash": ""
   },
   "apps/web/src/app/layout/app-shell/app-shell.component.spec.ts": {
@@ -3144,9 +3144,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/core/i18n/packaged-russian.ts": {
-    "mtime": 1789103101.1314907,
-    "seen": 1789103386.2364104,
-    "ast_hash": "8bc3a6b3ae8cd6e34cf2994bba4c0f78",
+    "mtime": 1789557819.4250605,
+    "seen": 1789558012.469238,
+    "ast_hash": "6bd85dd23ef736d737632caf1475b990",
     "semantic_hash": ""
   },
   "apps/web/src/app/core/models/i18n.models.ts": {
@@ -4566,27 +4566,27 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/components/task-filter-bar.component.ts": {
-    "mtime": 1789024996.4410195,
-    "seen": 1789025091.540201,
-    "ast_hash": "c6e4a90803465a0a01c433b812646fe6",
+    "mtime": 1789557531.959596,
+    "seen": 1789558012.4697368,
+    "ast_hash": "2bd0625399381e4e90c6f8ee00172521",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/components/task-detail-modal.component.ts": {
-    "mtime": 1789073095.502303,
-    "seen": 1789073170.2584217,
-    "ast_hash": "fc924aacec36908b62bd6c611580b9e1",
+    "mtime": 1789556080.274963,
+    "seen": 1789556461.8489332,
+    "ast_hash": "e4573fdcfbebbebc99406f1e0f47115c",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/components/task-create-modal.component.ts": {
-    "mtime": 1789025839.6346004,
-    "seen": 1789025914.515444,
-    "ast_hash": "7eeabc8aac1c5a75b74ab00a059904ef",
+    "mtime": 1789555667.2644043,
+    "seen": 1789556461.8489332,
+    "ast_hash": "2282108c7a912df9ce9dfdcb3b27d75a",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/components/task-edit-modal.component.ts": {
-    "mtime": 1789025959.643428,
-    "seen": 1789026161.1011875,
-    "ast_hash": "c0a5c66594fe9d59c4a91a1a131d9109",
+    "mtime": 1789555681.579273,
+    "seen": 1789556461.8489332,
+    "ast_hash": "c233a35b78add31912d8ea068ba8a25b",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/iam/users/components/user-filter-bar.component.ts": {
@@ -4986,9 +4986,9 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/notifications/components/notifications-header.component.ts": {
-    "mtime": 1789071708.8986213,
-    "seen": 1789071811.4287758,
-    "ast_hash": "4e11e89e7a484362551092de7004bcfa",
+    "mtime": 1789557784.0602784,
+    "seen": 1789558012.4697368,
+    "ast_hash": "703c5ad5746e778fbb0974d4eb0832a7",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/notifications/components/notifications-list.component.ts": {
@@ -5124,15 +5124,15 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/services/task-filter.service.ts": {
-    "mtime": 1789074487.3249319,
-    "seen": 1789074773.380665,
-    "ast_hash": "1a301b4c820fb9c9747ff961286aede7",
+    "mtime": 1789557940.1150684,
+    "seen": 1789558012.4697368,
+    "ast_hash": "107b17d7235e82fc5f5bae0cdcbcd6c7",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/services/task-forms.service.ts": {
-    "mtime": 1789074787.1032186,
-    "seen": 1789074811.6468878,
-    "ast_hash": "bc62d3609b6a2adc26cca033bf73c3aa",
+    "mtime": 1789555650.9722338,
+    "seen": 1789556461.8489332,
+    "ast_hash": "a02bfd671858853f0a32644e0ce748f9",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/services/task-kanban.service.ts": {
@@ -5142,27 +5142,57 @@
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/services/task-lookups.service.ts": {
-    "mtime": 1789074494.7929535,
-    "seen": 1789074773.380665,
-    "ast_hash": "df5ed2f99c6d8a711bec41fbaf179a07",
+    "mtime": 1789555608.4568315,
+    "seen": 1789556461.8489332,
+    "ast_hash": "c06352b08a9c1ce55236c33a32d4c692",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/tasks.models.ts": {
-    "mtime": 1789074456.9228272,
-    "seen": 1789074773.380665,
-    "ast_hash": "52f3c057016307594b21fdb22bfcb075",
+    "mtime": 1789555576.0395663,
+    "seen": 1789556461.8489332,
+    "ast_hash": "bfe39a32b8379b2f84205e3bb8df0393",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/tasks/tasks.component.html": {
-    "mtime": 1789074292.699078,
-    "seen": 1789074773.380665,
-    "ast_hash": "5066d7ecd143b8c033a21a2303a8c659",
+    "mtime": 1789555706.8109145,
+    "seen": 1789556461.8489332,
+    "ast_hash": "97d5bb1ba048c669c0bb448301ff6479",
     "semantic_hash": ""
   },
   "apps/web/src/app/features/iam/custom-fields/services/custom-fields-form.service.ts": {
     "mtime": 1789102888.8625011,
     "seen": 1789103386.2364104,
     "ast_hash": "548ff3581ad2ad16f8abeb53af07e1e2",
+    "semantic_hash": ""
+  },
+  "apps/server/src/test/java/com/greenwhite/dwh/instance/ms/notify/listener/MsTaskNotificationListenerTest.java": {
+    "mtime": 1789557639.4831111,
+    "seen": 1789558012.469238,
+    "ast_hash": "8d30ee43dd74dd91ef0620c541843852",
+    "semantic_hash": ""
+  },
+  "apps/server/src/test/java/com/greenwhite/dwh/instance/ms/notify/worker/MsOutboxWorkerTest.java": {
+    "mtime": 1789556350.0880418,
+    "seen": 1789556461.848434,
+    "ast_hash": "88d41297d8f37ea7f859163af1af75b0",
+    "semantic_hash": ""
+  },
+  "apps/server/src/main/java/com/greenwhite/dwh/instance/ms/notify/repository/MsNotificationPrefRepository.java": {
+    "mtime": 1789557554.7447608,
+    "seen": 1789558012.469238,
+    "ast_hash": "de8a2ed33f4616040f3250fa3bec16e7",
+    "semantic_hash": ""
+  },
+  "apps/server/src/test/java/com/greenwhite/dwh/instance/ms/task/worker/TaskDeadlineReminderWorkerTest.java": {
+    "mtime": 1789557600.5726328,
+    "seen": 1789558012.469238,
+    "ast_hash": "b3543b66703057eed101a7239f11a931",
+    "semantic_hash": ""
+  },
+  "apps/web/src/app/features/notifications/components/notification-preferences-modal.component.ts": {
+    "mtime": 1789557839.0496728,
+    "seen": 1789558012.4697368,
+    "ast_hash": "1f8b122461b4e7b5ecc9a99cb99054e9",
     "semantic_hash": ""
   }
 }

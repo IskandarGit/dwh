@@ -84,6 +84,14 @@ public class MsTaskRepository {
     public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
                                       String priority, String search, Boolean hideTerminal,
                                       Long assignedUserId, Long reporterId, Boolean overdue, ScopeFilter scope) {
+        return listTasks(limit, afterId, projectId, statusId, priority, search, hideTerminal,
+                assignedUserId, reporterId, overdue, null, scope);
+    }
+
+    public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
+                                      String priority, String search, Boolean hideTerminal,
+                                      Long assignedUserId, Long reporterId, Boolean overdue,
+                                      String memberRole, ScopeFilter scope) {
         StringBuilder sql = new StringBuilder("""
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
@@ -112,7 +120,15 @@ public class MsTaskRepository {
             sql.append(" and (t.title ilike :search or t.description_markdown ilike :search)");
         }
         if (assignedUserId != null) {
-            sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind in ('R', 'E'))");
+            if ("R".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'R')");
+            } else if ("E".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'E')");
+            } else if ("O".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'O')");
+            } else {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind in ('R', 'E'))");
+            }
         }
         if (reporterId != null) {
             sql.append(" and (t.reporter_id = :reporterId or t.created_by = :reporterId)");
@@ -451,7 +467,7 @@ public class MsTaskRepository {
                 select distinct t.id as task_id, t.title, tm.user_id
                 from ms_tasks t
                 join ms_task_statuses s on s.id = t.status_id and s.is_terminal = false
-                join ms_task_members tm on tm.task_id = t.id
+                join ms_task_members tm on tm.task_id = t.id and tm.involve_kind in ('R', 'E')
                 where t.end_time is not null
                   and t.end_time > now()
                   and t.end_time <= now() + cast(:windowSeconds || ' seconds' as interval)
