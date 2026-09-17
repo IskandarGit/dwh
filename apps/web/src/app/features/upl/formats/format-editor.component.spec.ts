@@ -4,6 +4,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PACKAGED_RUSSIAN } from '../../../core/i18n/packaged-russian';
 import { UplApiService, UplFormatDraftRequest, UplFormatVersion, UplSource, UplUnit, UplVersionItem } from '../upl-api';
 import { FormatEditorComponent } from './format-editor.component';
 
@@ -97,6 +98,7 @@ interface FixtureOptions {
   source?: UplSource;
   actions?: string[];
   saveError?: unknown;
+  loadError?: unknown;
   publishError?: unknown;
 }
 
@@ -112,7 +114,7 @@ async function createFixture(options: FixtureOptions = {}) {
   const actions = options.actions ?? ['view', 'edit', 'publish'];
   const api = {
     getSource: vi.fn(() => of(structuredClone(source))),
-    getVersion: vi.fn(() => of(structuredClone(version))),
+    getVersion: vi.fn(() => options.loadError ? throwError(() => options.loadError) : of(structuredClone(version))),
     listVersions: vi.fn(() => of(structuredClone(VERSION_ITEMS))),
     listUnits: vi.fn(() => of(structuredClone(UNITS))),
     saveDraft: vi.fn((_id: string, _v: string, body: UplFormatDraftRequest) => options.saveError
@@ -168,6 +170,15 @@ function selectOption(element: HTMLElement | null, match: (option: HTMLOptionEle
   }
   element.value = option.value;
   element.dispatchEvent(new Event('change'));
+}
+
+function twoSheetVersion(): UplFormatVersion {
+  const base = draftVersion();
+  const second = structuredClone(base.sheets[0]);
+  second.id = 12;
+  second.ordinal = 2;
+  second.sheetName = 'Sheet2';
+  return { ...base, sheets: [base.sheets[0], second] };
 }
 
 describe('FormatEditorComponent', () => {
@@ -386,5 +397,192 @@ describe('FormatEditorComponent', () => {
 
     click(one(fixture, 'upl-leave-confirm'));
     expect(allowed).toBe(true);
+  });
+
+  it('shows not found with a link to the list on 404', async () => {
+    const { fixture } = await createFixture({ loadError: { status: 404, code: 'not_found', detail: 'UPL_FORMAT_NOT_FOUND' } });
+
+    const notFound = one(fixture, 'upl-not-found');
+    expect(notFound).not.toBeNull();
+    expect(notFound!.querySelector('a')!.getAttribute('href')).toBe('/upl/sources');
+    expect(one(fixture, 'upl-load-error')).toBeNull();
+    expect(one(fixture, 'upl-actions')).toBeNull();
+  });
+
+  it('shows a load error instead of not found on a server failure', async () => {
+    const { fixture } = await createFixture({ loadError: { status: 503 } });
+
+    expect(one(fixture, 'upl-load-error')).not.toBeNull();
+    expect(one(fixture, 'upl-not-found')).toBeNull();
+  });
+
+  it('shows a superseded version as read only without edit controls', async () => {
+    const superseded: UplFormatVersion = {
+      ...draftVersion(),
+      status: 'superseded',
+      validFrom: '2026-01-01',
+      validTo: '2026-03-31'
+    };
+    const { fixture } = await createFixture({ version: superseded, source: { ...SOURCE, hasDraft: false } });
+
+    expect(one(fixture, 'upl-readonly-note')).not.toBeNull();
+    for (const testId of ['upl-actions', 'upl-add-column', 'upl-add-sheet', 'upl-remove-sheet', 'upl-column-remove']) {
+      expect(one(fixture, testId)).toBeNull();
+    }
+    expect((many(fixture, 'upl-cell-name-in-file')[0] as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('offers a new draft from a read only version only with edit right and without a draft', async () => {
+    const published: UplFormatVersion = { ...draftVersion(), status: 'published', validFrom: '2026-01-01' };
+
+    const editor = await createFixture({ version: published, source: { ...SOURCE, hasDraft: false } });
+    expect(one(editor.fixture, 'upl-readonly-note')!.querySelector('a')).not.toBeNull();
+
+    const withDraft = await createFixture({ version: published, source: { ...SOURCE, hasDraft: true } });
+    expect(one(withDraft.fixture, 'upl-readonly-note')!.querySelector('a')).toBeNull();
+
+    const viewer = await createFixture({
+      version: published,
+      source: { ...SOURCE, hasDraft: false },
+      actions: ['view']
+    });
+    expect(one(viewer.fixture, 'upl-readonly-note')!.querySelector('a')).toBeNull();
+  });
+
+  it('shows a draft to a viewer without any edit controls', async () => {
+    const { fixture } = await createFixture({ actions: ['view'] });
+
+    const hidden = [
+      'upl-save',
+      'upl-publish',
+      'upl-revert',
+      'upl-add-column',
+      'upl-add-sheet',
+      'upl-remove-sheet',
+      'upl-column-remove',
+      'upl-column-up'
+    ];
+    for (const testId of hidden) {
+      expect(one(fixture, testId)).toBeNull();
+    }
+    expect((many(fixture, 'upl-cell-name-in-file')[0] as HTMLInputElement).disabled).toBe(true);
+    expect((many(fixture, 'upl-cell-type')[0] as HTMLSelectElement).disabled).toBe(true);
+    expect((one(fixture, 'upl-file-kind') as HTMLSelectElement).disabled).toBe(true);
+    expect(many(fixture, 'upl-column-row').length).toBe(2);
+  });
+
+  it('shows permission denied of saving as text and keeps edits', async () => {
+    const { fixture, component } = await createFixture({
+      saveError: { status: 403, code: 'permission_denied', detail: 'PERMISSION_DENIED' }
+    });
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-action-error')!.textContent).toContain(PACKAGED_RUSSIAN['upl.err.PERMISSION_DENIED']);
+    expect(component.model.sheets[0].columns.length).toBe(3);
+    expect(one(fixture, 'upl-errors-summary')).toBeNull();
+    expect(one(fixture, 'upl-conflict')).toBeNull();
+  });
+
+  it('does not hide an unknown server error', async () => {
+    const { fixture } = await createFixture({
+      saveError: { status: 400, code: 'bad_request', detail: 'UPL_SOMETHING_NEW' }
+    });
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-action-error')!.textContent).toContain('UPL_SOMETHING_NEW (bad_request)');
+  });
+
+  it('shows all server errors at once including a sheet level address', async () => {
+    const { fixture } = await createFixture({
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [
+          { field: 'sheets[0].headerRow', code: 'UPL_HEADER_ROW_INVALID', message: 'x' },
+          { field: 'sheets[0].columns[0].keyMask', code: 'UPL_KEY_MASK_INVALID', message: 'x' },
+          { field: 'sheets[0].columns[1].sourceUnit', code: 'UPL_UNIT_UNKNOWN', message: 'x' }
+        ]
+      }
+    });
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-errors-summary')!.querySelectorAll('li').length).toBe(3);
+    expect(fixture.nativeElement.querySelector('#upl-header-row').classList.contains('upl-cell-error')).toBe(true);
+    expect(many(fixture, 'upl-tab-error').length).toBe(1);
+  });
+
+  it('opens the sheet that has the first addressed error', async () => {
+    const { fixture, component } = await createFixture({
+      version: twoSheetVersion(),
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets[1].columns[0].targetField', code: 'UPL_TARGET_FIELD_DUPLICATE', message: 'x' }]
+      }
+    });
+
+    expect(component.activeSheet()).toBe(0);
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(component.activeSheet()).toBe(1);
+    expect(many(fixture, 'upl-sheet-tab').length).toBe(2);
+    expect(many(fixture, 'upl-tab-error').length).toBe(1);
+  });
+
+  it('reloads and drops edits when the stale version alert is confirmed', async () => {
+    const { fixture, api, component } = await createFixture({
+      saveError: { status: 409, code: 'CONFLICT', detail: 'STALE_VERSION' }
+    });
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+    expect(one(fixture, 'upl-conflict')).not.toBeNull();
+
+    click(one(fixture, 'upl-conflict'));
+    fixture.detectChanges();
+
+    expect(api.getVersion).toHaveBeenCalledTimes(2);
+    expect(one(fixture, 'upl-conflict')).toBeNull();
+    expect(component.model.sheets[0].columns.length).toBe(2);
+  });
+
+  it('shows csv fields and the file position column only when they apply', async () => {
+    const xlsx = await createFixture();
+    expect(one(xlsx.fixture, 'upl-encoding')).toBeNull();
+    expect(one(xlsx.fixture, 'upl-sheet-name')).not.toBeNull();
+    expect(many(xlsx.fixture, 'upl-cell-file-position').length).toBe(0);
+
+    const csv = await createFixture({
+      version: {
+        ...draftVersion(),
+        fileKind: 'csv',
+        encoding: 'utf-8',
+        delimiter: ';',
+        matchColumnsBy: 'position'
+      }
+    });
+    expect(one(csv.fixture, 'upl-encoding')).not.toBeNull();
+    expect(one(csv.fixture, 'upl-sheet-name')).toBeNull();
+    expect(many(csv.fixture, 'upl-cell-file-position').length).toBe(2);
   });
 });

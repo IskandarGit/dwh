@@ -1,11 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Router, provideRouter } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { KeysetPage, ProblemDetail } from '../../../core/models/common.models';
 import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PACKAGED_RUSSIAN } from '../../../core/i18n/packaged-russian';
 import { UplApiService, UplSource, UplSourceItem } from '../upl-api';
 import { SourcesListComponent } from './sources-list.component';
 
@@ -197,5 +198,70 @@ describe('SourcesListComponent', () => {
 
     expect(testId(fixture, 'upl-err-name')).toHaveLength(1);
     expect(testId(fixture, 'upl-create-error')).toHaveLength(1);
+  });
+
+  it('пока список грузится, показывает пять строк-заглушек', async () => {
+    const { fixture } = await createFixture({ pages: [NEVER] });
+
+    expect(testId(fixture, 'upl-skeleton')).toHaveLength(5);
+    expect(testId(fixture, 'upl-empty')).toHaveLength(0);
+    expect(testId(fixture, 'upl-source-row')).toHaveLength(0);
+  });
+
+  it('в пустом списке без права create нет кнопки «Новый источник»', async () => {
+    const withoutRight = await createFixture({ pages: [of(page([]))], canCreate: false });
+
+    expect(testId(withoutRight.fixture, 'upl-empty')).toHaveLength(1);
+    expect(testId(withoutRight.fixture, 'upl-empty-new')).toHaveLength(0);
+    expect(testId(withoutRight.fixture, 'upl-new-source')).toHaveLength(0);
+
+    TestBed.resetTestingModule();
+    const withRight = await createFixture({ pages: [of(page([]))], canCreate: true });
+
+    expect(testId(withRight.fixture, 'upl-empty-new')).toHaveLength(1);
+  });
+
+  it('отказ в праве при создании показывает текстом, окно остаётся открытым', async () => {
+    const problem: ProblemDetail = {
+      title: 'Forbidden',
+      status: 403,
+      code: 'permission_denied',
+      detail: 'PERMISSION_DENIED'
+    };
+    const { fixture, navigate } = await createFixture({ createResult: throwError(() => problem) });
+
+    await openCreateForm(fixture, { code: 'cement.output', name: 'Vypusk', ownerOrg: 'Org' });
+
+    const errors = testId(fixture, 'upl-create-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].textContent).toContain(PACKAGED_RUSSIAN['upl.err.PERMISSION_DENIED']);
+    expect(fixture.componentInstance.isCreateOpen()).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('неизвестную ошибку сервера не прячет', async () => {
+    const problem: ProblemDetail = {
+      title: 'Bad Request',
+      status: 400,
+      code: 'bad_request',
+      detail: 'UPL_SOMETHING_NEW'
+    };
+    const { fixture, navigate } = await createFixture({ createResult: throwError(() => problem) });
+
+    await openCreateForm(fixture, { code: 'cement.output', name: 'Vypusk', ownerOrg: 'Org' });
+
+    const errors = testId(fixture, 'upl-create-error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0].textContent).toContain('UPL_SOMETHING_NEW (bad_request)');
+    expect(fixture.componentInstance.isCreateOpen()).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('не показывает ошибку загрузки вместе с таблицей', async () => {
+    const { fixture } = await createFixture();
+
+    expect(testId(fixture, 'upl-load-error')).toHaveLength(0);
+    expect(testId(fixture, 'upl-skeleton')).toHaveLength(0);
+    expect(testId(fixture, 'upl-source-row')).toHaveLength(2);
   });
 });

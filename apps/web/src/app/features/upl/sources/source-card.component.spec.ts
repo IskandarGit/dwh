@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from '../../../core/services/api.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PACKAGED_RUSSIAN } from '../../../core/i18n/packaged-russian';
 import { UplApiService, UplFormatVersion, UplSource, UplVersionItem } from '../upl-api';
 import { SourceCardComponent } from './source-card.component';
 
@@ -206,5 +207,73 @@ describe('SourceCardComponent', () => {
   it('opens the new draft dialog when newDraft=1 is in the query', async () => {
     const { fixture } = await createFixture({ query: { newDraft: '1' } });
     expect(fixture.componentInstance.isDraftOpen()).toBe(true);
+  });
+
+  it('shows load error instead of not found on a server failure', async () => {
+    const { fixture } = await createFixture({ loadError: { status: 503 } });
+    expect(el(fixture, 'upl-load-error')).not.toBeNull();
+    expect(el(fixture, 'upl-not-found')).toBeNull();
+  });
+
+  it('shows the empty versions note and offers the first draft', async () => {
+    const { fixture } = await createFixture({ versions: [] });
+    expect(el(fixture, 'upl-versions-empty')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="upl-version-row"]').length).toBe(0);
+    expect(el(fixture, 'upl-new-draft')).not.toBeNull();
+  });
+
+  it('shows the empty versions note to a viewer without the new draft button', async () => {
+    const { fixture } = await createFixture({ versions: [], canEdit: false });
+    expect(el(fixture, 'upl-versions-empty')).not.toBeNull();
+    expect(el(fixture, 'upl-new-draft')).toBeNull();
+  });
+
+  it('lets a viewer open the draft but not create one', async () => {
+    const { fixture } = await createFixture({ versions: [...publishedVersions, draftVersion], canEdit: false });
+    const openDraft = el(fixture, 'upl-open-draft');
+    expect(openDraft).not.toBeNull();
+    expect(openDraft!.getAttribute('href')).toBe('/upl/sources/7/formats/3');
+    expect(el(fixture, 'upl-new-draft')).toBeNull();
+    expect(el(fixture, 'upl-save-source')).toBeNull();
+  });
+
+  it('ignores newDraft=1 without the edit right', async () => {
+    const { fixture } = await createFixture({ query: { newDraft: '1' }, canEdit: false });
+    expect(fixture.componentInstance.isDraftOpen()).toBe(false);
+  });
+
+  it('puts 422 errors under the fields and keeps the input', async () => {
+    const { fixture } = await createFixture({
+      updateError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'VALIDATION_FAILED: name',
+        invalid_params: [{ name: 'name', reason: 'x' }]
+      }
+    });
+    setInput(fixture, 'upl-field-name', 'Edited TEST');
+    clickUiButton(fixture, 'upl-save-source');
+    expect(el(fixture, 'upl-err-name')).not.toBeNull();
+    expect(el(fixture, 'upl-save-error')?.textContent).toContain(PACKAGED_RUSSIAN['upl.err.VALIDATION_FAILED']);
+    expect((el(fixture, 'upl-field-name') as HTMLInputElement).value).toBe('Edited TEST');
+    expect(el(fixture, 'upl-conflict')).toBeNull();
+  });
+
+  it('shows permission denied and an unknown error as text', async () => {
+    const denied = await createFixture({
+      updateError: { status: 403, code: 'permission_denied', detail: 'PERMISSION_DENIED' }
+    });
+    setInput(denied.fixture, 'upl-field-name', 'Edited TEST');
+    clickUiButton(denied.fixture, 'upl-save-source');
+    expect(el(denied.fixture, 'upl-save-error')?.textContent).toContain(PACKAGED_RUSSIAN['upl.err.PERMISSION_DENIED']);
+    expect(denied.toast.success).not.toHaveBeenCalled();
+
+    TestBed.resetTestingModule();
+    const unknown = await createFixture({
+      updateError: { status: 400, code: 'bad_request', detail: 'UPL_SOMETHING_NEW' }
+    });
+    setInput(unknown.fixture, 'upl-field-name', 'Edited TEST');
+    clickUiButton(unknown.fixture, 'upl-save-source');
+    expect(el(unknown.fixture, 'upl-save-error')?.textContent).toContain('UPL_SOMETHING_NEW (bad_request)');
   });
 });
