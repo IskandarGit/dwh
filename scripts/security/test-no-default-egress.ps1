@@ -143,8 +143,11 @@ try {
     Write-Host "No external runtime traffic was observed; all default providers remain local." -ForegroundColor Green
 }
 finally {
-    & docker rm -f $monitorName *> $null
-    & docker @composeProject down --volumes --remove-orphans *> $null
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'SilentlyContinue'
+    & docker rm -f $monitorName 2>&1 | Out-Null
+    & docker @composeProject down --volumes --remove-orphans 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEap
 
     foreach ($name in $environmentNames) {
         [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], "Process")
