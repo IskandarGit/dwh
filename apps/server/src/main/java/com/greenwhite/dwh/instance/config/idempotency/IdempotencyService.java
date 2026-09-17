@@ -1,11 +1,14 @@
 package com.greenwhite.dwh.instance.config.idempotency;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -14,6 +17,8 @@ import java.util.UUID;
 
 @Service
 public class IdempotencyService {
+
+    public static final Duration DEFAULT_LEASE_DURATION = Duration.ofMinutes(2);
 
     public enum ClaimState {
         ACQUIRED,
@@ -29,15 +34,28 @@ public class IdempotencyService {
     ) {}
 
     private final IdempotencyRepository idempotencyRepository;
+    private final Duration leaseDuration;
+
+    @Autowired
+    public IdempotencyService(IdempotencyRepository idempotencyRepository,
+                              @Value("${dwh.idempotency.lease-seconds:120}") int leaseSeconds) {
+        this(idempotencyRepository, Duration.ofSeconds(leaseSeconds));
+    }
+
+    public IdempotencyService(IdempotencyRepository idempotencyRepository, Duration leaseDuration) {
+        this.idempotencyRepository = idempotencyRepository;
+        this.leaseDuration = (leaseDuration != null) ? leaseDuration : DEFAULT_LEASE_DURATION;
+    }
 
     public IdempotencyService(IdempotencyRepository idempotencyRepository) {
-        this.idempotencyRepository = idempotencyRepository;
+        this(idempotencyRepository, DEFAULT_LEASE_DURATION);
     }
 
     @Transactional
     public Claim claim(UUID key, Long userId, String requestHash) {
         UUID reservationToken = UUID.randomUUID();
-        if (idempotencyRepository.tryReserve(key, userId, requestHash, reservationToken)) {
+        Instant expiredCutoff = Instant.now().minus(leaseDuration);
+        if (idempotencyRepository.tryReserve(key, userId, requestHash, reservationToken, expiredCutoff)) {
             return new Claim(ClaimState.ACQUIRED, reservationToken, null);
         }
 
@@ -71,9 +89,9 @@ public class IdempotencyService {
     }
 
     @Transactional
-    public void cleanupOldKeys(int days) {
+    public int cleanupOldKeys(int days) {
         Instant cutoff = Instant.now().minusSeconds((long) days * 86400);
-        idempotencyRepository.deleteOlderThan(cutoff);
+        return idempotencyRepository.deleteOlderThan(cutoff);
     }
 
     /**

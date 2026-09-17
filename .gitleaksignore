@@ -10,3 +10,11 @@
 # following empty secret-key line by the generic multiline rule.
 1a53d4908a15974641311b617c5ed494d0f22a78:.env.example:generic-api-key:32
 e13a296a81b85cc81b8a1b477655c887c2b1fa82:deploy/compose/.env.example:generic-api-key:29
+
+# Test fixture lambda parameter callback in AuthenticationGenerationFixture.
+f57eb6c334e1117d546c6a7ed066a3654221c05d:apps/server/src/test/java/com/greenwhite/dwh/instance/kauth/AuthenticationGenerationFixture.java:generic-api-key:167
+
+# UI expiration duration select option label keys in IAM profile component.
+8a5a4315716e2b2aedd1b8ca889685b99e658d30:apps/web/src/app/features/iam/profile/profile.component.ts:generic-api-key:1156
+8a5a4315716e2b2aedd1b8ca889685b99e658d30:apps/web/src/app/features/iam/profile/profile.component.ts:generic-api-key:1157
+8a5a4315716e2b2aedd1b8ca889685b99e658d30:apps/web/src/app/features/iam/profile/profile.component.ts:generic-api-key:1158

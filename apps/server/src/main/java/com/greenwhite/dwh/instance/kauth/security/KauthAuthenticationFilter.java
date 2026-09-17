@@ -12,6 +12,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -70,6 +71,8 @@ public class KauthAuthenticationFilter extends OncePerRequestFilter {
                                     user.id(), user.login(), user.email(), null, true, permissions, version, user.forcePasswordChange(), token.authenticationVersion(), token.id()
                             ));
                         }
+                    } catch (DataAccessException e) {
+                        throw e;
                     } catch (Exception ignored) {}
                 }
             }
@@ -91,6 +94,8 @@ public class KauthAuthenticationFilter extends OncePerRequestFilter {
                                         user.id(), user.login(), user.email(), session.id(), false, permissions, version, user.forcePasswordChange(), session.authenticationVersion(), null
                                 ));
                             }
+                        } catch (DataAccessException e) {
+                            throw e;
                         } catch (Exception ignored) {}
                     }
                 }

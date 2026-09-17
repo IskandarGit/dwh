@@ -130,4 +130,30 @@ class AuditPartitionRepositoryIntegrationTest {
 
         assertThat(countInTable(archived, "retention_probe")).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Создание новой партиции через функцию успешно привязывает её к audit_log")
+    void createPartitionSuccessfullyCreatesAndAllowsInserts() {
+        YearMonth futureMonth = YearMonth.of(2028, 5);
+        assertThat(repository.exists(futureMonth)).isFalse();
+
+        repository.create(futureMonth);
+        assertThat(repository.exists(futureMonth)).isTrue();
+
+        // Проверяем, что в созданную партицию можно писать
+        jdbc.sql("""
+                        insert into audit_log (table_name, row_pk, event, changed_at)
+                        values ('future_probe', '42', 'I', timestamptz '2028-05-15 12:00:00+00')
+                        """)
+                .update();
+
+        assertThat(countInLog("future_probe")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Некорректный год или месяц отклоняются с исключением")
+    void invalidYearOrMonthThrowsException() {
+        assertThatThrownBy(() -> repository.create(YearMonth.of(1999, 1)))
+                .hasMessageContaining("Invalid year");
+    }
 }

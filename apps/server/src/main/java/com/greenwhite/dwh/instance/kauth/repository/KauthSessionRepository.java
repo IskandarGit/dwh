@@ -77,7 +77,9 @@ public class KauthSessionRepository {
         jdbcClient.sql("""
                 update kauth_sessions
                 set last_seen_at = now()
-                where id = :sessionId and closed_at is null
+                where id = :sessionId
+                  and closed_at is null
+                  and (last_seen_at is null or last_seen_at < now() - interval '60 seconds')
                 """)
                 .param("sessionId", sessionId)
                 .update();

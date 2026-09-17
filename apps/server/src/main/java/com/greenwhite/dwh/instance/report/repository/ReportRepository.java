@@ -27,7 +27,14 @@ public class ReportRepository {
             String reporterName
     ) {}
 
+    public static final int DEFAULT_MAX_EXPORT_ROWS = 50_000;
+
     public void streamScopedTasks(ScopeFilter scope, Consumer<TaskExportRow> consumer) {
+        streamScopedTasks(scope, DEFAULT_MAX_EXPORT_ROWS, consumer);
+    }
+
+    public void streamScopedTasks(ScopeFilter scope, int maxRows, Consumer<TaskExportRow> consumer) {
+        int effectiveLimit = maxRows > 0 ? maxRows : DEFAULT_MAX_EXPORT_ROWS;
         var query = jdbcClient.sql("""
                 select
                     t.id,
@@ -43,11 +50,12 @@ public class ReportRepository {
                 left join ms_task_statuses s on s.id = t.status_id
                 left join md_users u on u.id = t.reporter_id
                 where 1=1
-                """ + scope.sql() + " order by t.id desc");
+                """ + scope.sql() + " order by t.id desc limit :maxExportRows");
 
         if (scope.bindsUserId()) {
             query = query.param("scopeUserId", scope.userId());
         }
+        query = query.param("maxExportRows", effectiveLimit);
 
         query.query(rs -> {
             var endTime = rs.getTimestamp("end_time");

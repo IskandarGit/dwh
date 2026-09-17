@@ -1,6 +1,7 @@
 package com.greenwhite.dwh.instance.ms.task.service;
 
 import com.greenwhite.dwh.core.error.ErrorCode;
+import com.greenwhite.dwh.instance.audit.service.AuditLogService;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskStatusRepository;
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskTypeRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Выделенный сервис для управления динамическими статусами и типами задач (SRP).
@@ -21,14 +23,24 @@ public class MsTaskStatusService {
     private final MsTaskStatusRepository statusRepository;
     private final MsTaskTypeRepository typeRepository;
     private final SearchChangePublisher searchChangePublisher;
+    private final AuditLogService auditLogService;
+
+    public MsTaskStatusService(
+            MsTaskStatusRepository statusRepository,
+            MsTaskTypeRepository typeRepository,
+            SearchChangePublisher searchChangePublisher,
+            AuditLogService auditLogService) {
+        this.statusRepository = statusRepository;
+        this.typeRepository = typeRepository;
+        this.searchChangePublisher = searchChangePublisher;
+        this.auditLogService = auditLogService;
+    }
 
     public MsTaskStatusService(
             MsTaskStatusRepository statusRepository,
             MsTaskTypeRepository typeRepository,
             SearchChangePublisher searchChangePublisher) {
-        this.statusRepository = statusRepository;
-        this.typeRepository = typeRepository;
-        this.searchChangePublisher = searchChangePublisher;
+        this(statusRepository, typeRepository, searchChangePublisher, null);
     }
 
     // =========================================================================
@@ -47,7 +59,13 @@ public class MsTaskStatusService {
         if (name == null || name.isBlank()) {
             throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Название статуса обязательно");
         }
-        return statusRepository.create(pcode, name, color, orderNo, isTerminal);
+        var record = statusRepository.create(pcode, name, color, orderNo, isTerminal);
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_statuses", String.valueOf(record.id()), "I",
+                    List.of("pcode", "name", "color", "order_no", "is_terminal"),
+                    null, Map.of("name", name, "order_no", orderNo, "is_terminal", isTerminal));
+        }
+        return record;
     }
 
     @Transactional
@@ -57,6 +75,11 @@ public class MsTaskStatusService {
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Статус не найден"));
         statusRepository.update(id, name, color, orderNo, isTerminal);
         if (name != null) searchChangePublisher.statusChanged(id);
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_statuses", String.valueOf(id), "U",
+                    List.of("name", "color", "order_no", "is_terminal"),
+                    null, Map.of("name", name != null ? name : ""));
+        }
     }
 
     @Transactional
@@ -70,6 +93,10 @@ public class MsTaskStatusService {
         boolean deleted = statusRepository.delete(id);
         if (!deleted) {
             throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Нельзя удалить статус, который используется в задачах");
+        }
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_statuses", String.valueOf(id), "D",
+                    List.of("id"), null, null);
         }
     }
 
@@ -99,7 +126,13 @@ public class MsTaskStatusService {
         if (typeRepository.findByCode(cleanCode).isPresent()) {
             throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Тип с таким кодом уже существует");
         }
-        return typeRepository.create(cleanCode, name, icon, color, orderNo);
+        var record = typeRepository.create(cleanCode, name, icon, color, orderNo);
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_types", String.valueOf(record.id()), "I",
+                    List.of("code", "name", "icon", "color", "order_no"),
+                    null, Map.of("code", cleanCode, "name", name));
+        }
+        return record;
     }
 
     @Transactional
@@ -108,6 +141,11 @@ public class MsTaskStatusService {
         typeRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Тип задачи не найден"));
         typeRepository.update(id, name, icon, color, orderNo);
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_types", String.valueOf(id), "U",
+                    List.of("name", "icon", "color", "order_no"),
+                    null, Map.of("name", name != null ? name : ""));
+        }
     }
 
     @Transactional
@@ -119,6 +157,10 @@ public class MsTaskStatusService {
             throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Нельзя удалить системный тип задачи");
         }
         typeRepository.delete(id);
+        if (auditLogService != null) {
+            auditLogService.logChange("ms_task_types", String.valueOf(id), "D",
+                    List.of("id"), null, null);
+        }
     }
 
     @Transactional

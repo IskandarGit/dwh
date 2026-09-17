@@ -2,7 +2,7 @@
 
 **Version:** 2.0
 
-**Updated:** 2026-09-05
+**Updated:** 2026-09-18
 
 Every unchecked blocking item means **NO-GO** for that installation. Evidence
 must identify the release tag, environment, UTC time, command/check, result, and
@@ -26,6 +26,11 @@ owner. A commercial SLA cannot override a failed safety gate.
 
 - [ ] Production Compose renders successfully with no default or blank required
       credential and no `latest` tag.
+- [ ] Explicit container CPU and RAM limits and reservations (`deploy.resources.limits`)
+      are configured for all services (`server`, `postgres`, `typesense`, `clamav`,
+      `web`, `backup`), and `/tmp` tmpfs is bounded (`size=1024m`).
+- [ ] Trusted proxy CIDRs (`DWH_SECURITY_TRUSTED_PROXIES`) are explicitly configured
+      for the ingress topology; spoofed `X-Forwarded-For` headers cannot bypass rate limiting.
 - [ ] Only the web origin is published; PostgreSQL, Typesense, server, management
       endpoints, secret files, and Docker socket are unreachable externally.
 - [ ] HTTPS, certificate renewal, security headers, upload limits, and edge rate
@@ -39,19 +44,21 @@ owner. A commercial SLA cannot override a failed safety gate.
 ## Data and recovery
 
 - [ ] Flyway migration succeeds from the oldest supported release and from an
-      empty database.
+      empty database using `smartupcms_migrator`.
+- [ ] Runtime user `smartupcms` is verified to lack DDL, TRUNCATE, and superuser
+      privileges. Monthly partition runway is established via `V033` functions.
 - [ ] Upgrade stops before migration when the mandatory encrypted backup fails.
 - [ ] A fresh encrypted database archive passes checksum and isolated restore.
 - [ ] The age identity is recoverable by authorized operators if the application
       host is lost and is not stored only with the encrypted backup.
 - [ ] Uploaded-object recovery is tested for the selected local or S3-compatible
       provider; database restore alone is not accepted.
-- [ ] Combined restore evidence reports matching database/object inventories,
+- [ ] Combined restore evidence (`restore-combined.ps1`) reports matching database/object inventories,
       zero missing/orphan objects, successful sample downloads, row counts,
       and RPO/RTO inside approved limits.
 - [ ] Measured RPO/RTO and retention are documented and fit the customer/SLA.
-- [ ] Restore and rollback drills have named evidence and an operator who can
-      execute them without repository authors.
+- [ ] Restore and rollback drills (`rollback.sh` / `rollback.ps1`) have named evidence
+      and an operator who can execute them without repository authors.
 
 ## Security and access
 
@@ -62,12 +69,16 @@ owner. A commercial SLA cannot override a failed safety gate.
 - [ ] Configured `ALL/SUBTREE/UNITS/SELF` roles pass cross-branch task, comment,
       file metadata/download/delete and direct-ID negative tests; unexpected
       identifiers return `404`, not entity metadata.
+- [ ] Idempotency filter strictly ignores secret-bearing endpoints (auth login, password reset)
+      and enforces 24-hour retention with hourly background cleanup.
+- [ ] File upload admission control is active (`DWH_FILES_MAX_CONCURRENT_UPLOADS: 10`)
+      and task export streaming bounds (`LIMIT :maxExportRows`) are enforced.
 - [ ] Session revocation, password recovery, CSRF, rate limits, and audit events
       pass the release test suite.
 - [ ] Real delivery-provider and object-storage credentials are least-privilege,
       scoped to this installation, and successfully rotated in a drill.
-- [ ] A minimal threat model and personal-data inventory identify trust
-      boundaries, owners, retention, log masking, and incident actions.
+- [ ] Named operational roles (Privacy Owner, Incident Response Lead, Backup Operator,
+      Release Manager) are designated according to [privacy and retention annex](privacy-and-retention-annex.md).
 - [ ] Private vulnerability reporting and the security response owner are live.
 
 ## Product workflows and UX

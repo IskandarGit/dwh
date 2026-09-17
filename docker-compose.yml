@@ -53,21 +53,27 @@ x-server-environment: &server-environment
 services:
   postgres:
     build:
-      context: .
-      dockerfile: deploy/images/postgres/Dockerfile
+      context: deploy/images/postgres
+      dockerfile: Dockerfile
     image: ${POSTGRES_IMAGE:-smartupcms/postgres:18-alpine-hardened}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-smartupcms}
-      POSTGRES_USER: ${DB_USER:-smartupcms}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-smartupcms_local_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
       POSTGRES_INITDB_ARGS: "--data-checksums"
+      MIGRATE_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      MIGRATE_DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
+      APP_DB_USER: ${DB_USER:-smartupcms}
+      APP_DB_PASSWORD: ${DB_PASSWORD:-smartupcms_local_dev}
+      BACKUP_DB_USER: ${BACKUP_DB_USER:-smartupcms_backup}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-smartupcms} -d ${DB_NAME:-smartupcms}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${DB_NAME:-smartupcms}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,7 +85,10 @@ services:
     profiles: [tools]
     restart: "no"
     command: ["--spring.profiles.active=migrate"]
-    environment: *server-environment
+    environment:
+      <<: *server-environment
+      DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
     depends_on:
       postgres: {condition: service_healthy}
 

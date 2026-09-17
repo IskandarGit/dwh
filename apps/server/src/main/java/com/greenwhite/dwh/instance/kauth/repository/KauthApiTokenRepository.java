@@ -86,6 +86,7 @@ public class KauthApiTokenRepository {
                 update kauth_api_tokens
                 set last_used_at = now()
                 where id = :tokenId
+                  and (last_used_at is null or last_used_at < now() - interval '60 seconds')
                 """)
                 .param("tokenId", tokenId)
                 .update();

@@ -33,9 +33,32 @@ function Invoke-Aws([string[]]$Arguments) {
 }
 
 if ($AgeRecipient -notmatch '^age1[0-9a-z]{50,}$') { throw 'A valid age recipient is required.' }
-$agePath = Require-Command 'age'
+$ageCommand = Get-Command 'age' -ErrorAction SilentlyContinue
+$script:hasHostAge = $null -ne $ageCommand
+$agePath = if ($script:hasHostAge) { $ageCommand.Source } else { $null }
 $tarPath = Require-Command 'tar'
 $script:awsPath = if ($Provider -eq 's3' -or $RecoveryS3Bucket) { Require-Command 'aws' } else { $null }
+
+function Invoke-AgeEncrypt([string]$Recipient, [string]$InputFile, [string]$OutputFile) {
+    if ($script:hasHostAge) {
+        & $script:agePath --encrypt --recipient $Recipient --output $OutputFile $InputFile
+        if ($LASTEXITCODE -ne 0) { throw 'Object backup age encryption failed.' }
+    }
+    else {
+        $resolvedIn = (Resolve-Path -LiteralPath $InputFile).Path
+        $inDir = Split-Path -Parent $resolvedIn
+        $inLeaf = Split-Path -Leaf $resolvedIn
+        $resolvedOut = [System.IO.Path]::GetFullPath($OutputFile)
+        $outDir = Split-Path -Parent $resolvedOut
+        $outLeaf = Split-Path -Leaf $resolvedOut
+        & docker run --rm --entrypoint age `
+            -v "${inDir}:/in:ro" `
+            -v "${outDir}:/out" `
+            smartupcms/backup:release-config-test `
+            --encrypt --recipient $Recipient --output "/out/$outLeaf" "/in/$inLeaf"
+        if ($LASTEXITCODE -ne 0) { throw 'Containerized age encryption failed.' }
+    }
+}
 
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
@@ -110,16 +133,18 @@ try {
     }
 
     $capturedAt = (Get-Date).ToUniversalTime()
+    $totalBytes = 0L
+    foreach ($m in $manifestObjects) { $totalBytes += [long]$m.sizeBytes }
     $manifest = [ordered]@{
         schemaVersion = 1
         capturedAt = $capturedAt.ToString('o')
         provider = $Provider
         sourceBucket = if ($Provider -eq 's3') { $S3Bucket } else { 'local' }
         objectCount = $manifestObjects.Count
-        totalBytes = [long](($manifestObjects | Measure-Object -Property sizeBytes -Sum).Sum)
+        totalBytes = $totalBytes
         objects = $manifestObjects
     }
-    $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $payloadRoot 'manifest.json') -Encoding utf8NoBOM
+    [System.IO.File]::WriteAllText((Join-Path $payloadRoot 'manifest.json'), ($manifest | ConvertTo-Json -Depth 6), [System.Text.UTF8Encoding]::new($false))
 
     $timestamp = $capturedAt.ToString('yyyyMMddTHHmmssZ')
     $tarFile = Join-Path $workingRoot "smartupcms-objects-$timestamp.tar"
@@ -128,8 +153,7 @@ try {
 
     $archivePath = Join-Path $outputRoot "smartupcms-objects-$timestamp.tar.age"
     $partialArchive = "$archivePath.partial"
-    & $agePath --encrypt --recipient $AgeRecipient --output $partialArchive $tarFile
-    if ($LASTEXITCODE -ne 0) { throw 'Object backup age encryption failed.' }
+    Invoke-AgeEncrypt -Recipient $AgeRecipient -InputFile $tarFile -OutputFile $partialArchive
     Move-Item -LiteralPath $partialArchive -Destination $archivePath
     $checksumPath = "$archivePath.sha256"
     $checksumPartial = "$checksumPath.partial"

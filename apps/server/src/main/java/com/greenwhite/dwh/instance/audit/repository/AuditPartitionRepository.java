@@ -39,17 +39,15 @@ public class AuditPartitionRepository {
     }
 
     /**
-     * Создаёт партицию за месяц. Имя и границы подставляются в DDL строкой —
-     * параметризовать имя объекта SQL не позволяет; значения детерминированы
-     * и берутся из {@link YearMonth}, а не из запроса.
+     * Создаёт партицию за месяц через SECURITY DEFINER функцию (I-02 / FR-AUD-2).
+     * Приложение не требует DDL-прав или владения audit_log.
      */
     public void create(YearMonth month) {
-        String name = partitionName(month);
-        String from = month.atDay(1) + " 00:00:00+00";
-        String to = month.plusMonths(1).atDay(1) + " 00:00:00+00";
-        jdbc.sql("create table if not exists " + name
-                + " partition of audit_log for values from ('" + from + "') to ('" + to + "')")
-                .update();
+        jdbc.sql("select audit_log_create_partition(:year, :month)")
+                .param("year", month.getYear())
+                .param("month", month.getMonthValue())
+                .query(String.class)
+                .single();
     }
 
     /**
@@ -80,7 +78,8 @@ public class AuditPartitionRepository {
     }
 
     /**
-     * Отцепляет партицию и переименовывает её в {@code audit_log_archived_YYYY_MM}.
+     * Отцепляет партицию и переименовывает её в {@code audit_log_archived_YYYY_MM}
+     * через SECURITY DEFINER функцию (I-02 / FR-AUD-2).
      *
      * Данные НЕ удаляются: срок хранения кончился для оперативного журнала, а не
      * для самих записей — что с ними делать дальше, решает эксплуатация
@@ -88,12 +87,11 @@ public class AuditPartitionRepository {
      * удаление аудита — необратимая операция, её нельзя прятать в ночной воркер.
      */
     public String detachAndArchive(YearMonth month) {
-        String name = partitionName(month);
-        String archived = "audit_log_archived_" + month.format(SUFFIX);
-
-        jdbc.sql("alter table audit_log detach partition " + name).update();
-        jdbc.sql("alter table " + name + " rename to " + archived).update();
-        return archived;
+        return jdbc.sql("select audit_log_detach_partition(:year, :month)")
+                .param("year", month.getYear())
+                .param("month", month.getMonthValue())
+                .query(String.class)
+                .single();
     }
 
     /** Строки в аварийном приёмнике: их наличие блокирует создание партиции за тот же месяц. */

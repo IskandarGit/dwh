@@ -69,6 +69,7 @@ as coverage in Settings.
 - [Maintenance, backup, and restore](ops/maintenance-guide.md)
 - [Search and index maintenance](ops/search-and-index-maintenance.md)
 - [Operations runbook](ops/operations-runbook.md)
+- [Privacy, data protection, and retention annex](ops/privacy-and-retention-annex.md)
 - [Production launch checklist](ops/production-launch-checklist.md)
 - [Smartup-managed infrastructure acceptance](ops/managed-infrastructure-acceptance.md)
 - [Rollback and recovery](ops/rollback.md)

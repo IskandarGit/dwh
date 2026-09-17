@@ -59,5 +59,19 @@ export default function () {
     }, 201, 'task-create');
   }
 
+  if (__ITER % 20 === 0) {
+    const exportResponse = http.get(`${baseUrl}/api/v1/reports/tasks/export?format=csv`, {
+      headers: authHeaders({ Accept: 'text/csv' }),
+      tags: { name: 'tasks-export-csv' },
+    });
+    expectStatus(exportResponse, 200, 'tasks-export-csv');
+
+    const auditStats = http.get(`${baseUrl}/api/v1/audit/stats`, {
+      headers: authHeaders(),
+      tags: { name: 'audit-stats' },
+    });
+    expectStatus(auditStats, 200, 'audit-stats');
+  }
+
   sleep(1);
 }

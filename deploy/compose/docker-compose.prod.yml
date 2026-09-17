@@ -50,8 +50,15 @@ x-server-common: &server-common
   # JNA extracts Argon2's native library at startup. Keep generic /tmp noexec,
   # but provide one private executable tmpfs for that library only.
   tmpfs:
-    - /tmp:rw,nosuid,nodev,noexec
+    - /tmp:rw,nosuid,nodev,noexec,size=1024m
     - /opt/smartupcms/jna:rw,nosuid,nodev,exec,size=16m,uid=10001,gid=10001,mode=0700
+  deploy:
+    resources:
+      limits:
+        cpus: "2.0"
+        memory: 1536M
+      reservations:
+        memory: 512M
   logging:
     driver: json-file
     options: {max-size: "50m", max-file: "5"}
@@ -62,14 +69,20 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-smartupcms}
-      POSTGRES_USER: ${DB_USER:?DB_USER is required}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
       POSTGRES_INITDB_ARGS: "--data-checksums"
+      MIGRATE_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      MIGRATE_DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
+      APP_DB_USER: ${DB_USER:-smartupcms}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      BACKUP_DB_USER: ${BACKUP_DB_USER:-smartupcms_backup}
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
     volumes:
       - postgres-data:/var/lib/postgresql
     networks: [backend]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME:-smartupcms}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${DB_NAME:-smartupcms}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -77,6 +90,13 @@ services:
     stop_grace_period: 1m
     shm_size: 256mb
     security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+        reservations:
+          memory: 512M
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "5"}
@@ -84,6 +104,9 @@ services:
   migrate:
     <<: *server-common
     profiles: [tools]
+    environment:
+      DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
     command: ["--spring.profiles.active=migrate"]
     restart: "no"
     depends_on:
@@ -128,6 +151,13 @@ services:
       - /tmp:rw,nosuid,nodev,noexec,mode=1777
       - /var/lib/nginx/tmp:rw,nosuid,nodev,noexec,uid=10001,gid=10001,mode=0700
       - /run/nginx:rw,nosuid,nodev,noexec,uid=10001,gid=10001,mode=0750
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          memory: 64M
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "5"}
@@ -154,6 +184,13 @@ services:
       retries: 10
       start_period: 20s
     security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 256M
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "5"}
@@ -167,6 +204,13 @@ services:
       - clamav-data:/var/lib/clamav
     networks: [backend, egress]
     security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          memory: 1024M
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "5"}
@@ -179,11 +223,19 @@ services:
     environment:
       PGHOST: postgres
       PGDATABASE: ${DB_NAME:-smartupcms}
-      PGUSER: ${DB_USER:?DB_USER is required}
-      PGPASSWORD_FILE: /run/secrets/database_password
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      MIGRATE_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      MIGRATE_DB_PASSWORD_FILE: /run/secrets/migrate_database_password
+      APP_DB_USER: ${DB_USER:-smartupcms}
+      APP_DB_PASSWORD_FILE: /run/secrets/database_password
       BACKUP_DB_USER: ${BACKUP_DB_USER:-smartupcms_backup}
       BACKUP_DB_PASSWORD_FILE: /run/secrets/backup_database_password
-    secrets: [database_password, backup_database_password]
+    secrets:
+      - postgres_password
+      - migrate_database_password
+      - database_password
+      - backup_database_password
     networks: [backend]
     depends_on:
       postgres: {condition: service_healthy}
@@ -224,6 +276,13 @@ services:
     cap_drop: [ALL]
     read_only: true
     tmpfs: [/tmp]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          memory: 128M
     logging:
       driver: json-file
       options: {max-size: "50m", max-file: "5"}
@@ -238,6 +297,10 @@ networks:
     driver: bridge
 
 secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:-${DB_PASSWORD_FILE:?DB_PASSWORD_FILE is required}}
+  migrate_database_password:
+    file: ${MIGRATE_DB_PASSWORD_FILE:-${DB_PASSWORD_FILE:?DB_PASSWORD_FILE is required}}
   database_password:
     file: ${DB_PASSWORD_FILE:?DB_PASSWORD_FILE is required}
   backup_database_password:

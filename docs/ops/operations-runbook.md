@@ -139,6 +139,57 @@ plan; database metadata and object bytes must stay consistent.
 5. Recover from verified images and backups; validate permissions and object
    integrity before reopening access.
 
+## Database roles and least privilege
+
+SmartupCMS enforces strict role separation across database operations:
+- **`smartupcms_migrator`**: Schema owner with DDL privileges. Used only by Flyway during bootstrap and release upgrades.
+- **`smartupcms`**: Application runtime user. Has DML privileges (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) on public tables; lacks `CREATE TABLE`, `DROP`, `ALTER`, `TRUNCATE`, and superuser privileges.
+- **`smartupcms_backup`**: Read-only user (`SELECT` on public tables + `pg_read_all_data`) used by `backup-loop.sh`.
+
+If an application feature reports `permission denied for table ...` or fails with DDL errors at runtime, confirm the runtime is connecting as `smartupcms` and that Flyway was successfully run by `smartupcms_migrator`.
+
+## Audit partition maintenance
+
+Audit logs are partitioned monthly into `audit_log_YYYY_MM` tables:
+- An automated worker maintains a forward partition runway of at least 3 months.
+- Under least privilege, the runtime user invokes restricted `SECURITY DEFINER` functions:
+  ```sql
+  -- Manually create a future partition:
+  SELECT audit_log_create_partition(2026, 11);
+
+  -- Manually detach an aged partition for archival:
+  SELECT audit_log_detach_partition(2025, 9);
+  ```
+- If partition creation fails, inspect postgres logs to verify function permissions and ensure disk space is sufficient.
+
+## Search outbox sync and reconciliation
+
+Mutations to tasks, files, and notes are staged transactionally in `search_outbox` and asynchronously delivered to Typesense by `SearchDeliveryWorker`:
+- Transient Typesense outages do not abort client transactions. Events retry with exponential backoff and jitter up to 8 attempts.
+- If search results become stale, check the outbox queue status and trigger reconciliation via the management API:
+  ```bash
+  curl -X POST http://127.0.0.1:8080/api/v1/search/management/reconcile \
+    -H "Authorization: Bearer dwh_operator_token"
+  ```
+- Alternatively, restarting the server container triggers non-blocking startup reconciliation automatically.
+
+## Task optimistic concurrency conflicts (HTTP 409)
+
+Tasks enforce monotonic compare-and-set versioning via the `revision` column:
+- If two users or processes modify the same task concurrently with a stale `expectedRevision`, the API returns HTTP 409 with error code `task_revision_conflict`.
+- Triage: The UI prompts the user to refresh the task to view the latest changes before reapplying edits. If automated integrations receive 409, they should re-fetch the current task revision and retry.
+
+## Rate limiting and upload concurrency (HTTP 429)
+
+- **API and Auth Rate Limiting**: Client IPs are resolved via trusted proxy validation (`ClientIpResolver`). Floods from an untrusted origin or brute-force attempts are rejected with HTTP 429 (`RATE_LIMITED`).
+- **File Upload Admission**: File uploads acquire a permit from an in-memory semaphore (default 10 permits). If the server reaches capacity under burst load, excess uploads return HTTP 429 immediately rather than exhausting server heap.
+- Triage: Inspect NGINX logs for authentic client IPs and evaluate whether `dwh.security.rate-limit.login.capacity` or `dwh.files.max-concurrent-uploads` require adjustment for enterprise scale.
+
+## Export streaming and memory bounding
+
+- Task exports (`/api/v1/reports/tasks-export-csv` and XML) stream directly to the client with `defaultRowFetchSize: 500` and a hard cap (`dwh.reports.export.max-rows`, default 50,000 rows).
+- If a client disconnects mid-download, `ReportService` catches `ClientAbortException | IOException`, cleanly aborts the database cursor, and returns the Hikari connection to the pool without leaking resources.
+
 ## Incident closure
 
 Document impact, timeline, root cause, data/security assessment, remediation,

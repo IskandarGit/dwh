@@ -3,6 +3,7 @@ package com.greenwhite.dwh.instance.config.idempotency;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,18 +51,29 @@ public class IdempotencyRepository {
                 .optional();
     }
 
-    public boolean tryReserve(UUID key, Long userId, String requestHash, UUID reservationToken) {
+    public boolean tryReserve(UUID key, Long userId, String requestHash, UUID reservationToken, Instant expiredCutoff) {
         return jdbcClient.sql("""
                 insert into idempotency_keys
-                    (key, user_id, request_hash, response_status, response_body, state, reservation_token)
-                values (:key, :userId, :requestHash, null, null, 'PENDING', :reservationToken)
-                on conflict (key) do nothing
+                    (key, user_id, request_hash, response_status, response_body, state, reservation_token, created_at)
+                values (:key, :userId, :requestHash, null, null, 'PENDING', :reservationToken, now())
+                on conflict (key) do update
+                set reservation_token = :reservationToken,
+                    user_id = :userId,
+                    request_hash = :requestHash,
+                    created_at = now()
+                where idempotency_keys.state = 'PENDING'
+                  and idempotency_keys.created_at < :expiredCutoff
                 """)
                 .param("key", key)
                 .param("userId", userId)
                 .param("requestHash", requestHash)
                 .param("reservationToken", reservationToken)
+                .param("expiredCutoff", Timestamp.from(expiredCutoff))
                 .update() == 1;
+    }
+
+    public boolean tryReserve(UUID key, Long userId, String requestHash, UUID reservationToken) {
+        return tryReserve(key, userId, requestHash, reservationToken, Instant.now().minusSeconds(120));
     }
 
     public boolean complete(UUID key, UUID reservationToken, int responseStatus, String responseBodyJson) {
@@ -95,9 +107,9 @@ public class IdempotencyRepository {
                 .update();
     }
 
-    public void deleteOlderThan(Instant cutoff) {
-        jdbcClient.sql("delete from idempotency_keys where created_at < :cutoff")
-                .param("cutoff", cutoff)
+    public int deleteOlderThan(Instant cutoff) {
+        return jdbcClient.sql("delete from idempotency_keys where created_at < :cutoff")
+                .param("cutoff", Timestamp.from(cutoff))
                 .update();
     }
 }

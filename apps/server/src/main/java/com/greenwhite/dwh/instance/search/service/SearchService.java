@@ -203,7 +203,11 @@ public class SearchService {
         }
 
         try {
-            return fallbackResult(cleanQuery, fallbackRepository.search(cleanQuery, queryVariants, cleanEntityType, effectiveLimit),
+            var searchResult = fallbackRepository.search(cleanQuery, queryVariants, cleanEntityType, effectiveLimit);
+            if (searchResult == null) {
+                searchResult = fallbackRepository.search(cleanQuery, cleanEntityType, effectiveLimit);
+            }
+            return fallbackResult(cleanQuery, searchResult,
                     effectiveLimit, true, false, suggestedQuery);
         } catch (Exception fallbackFailure) {
             throw unavailable();

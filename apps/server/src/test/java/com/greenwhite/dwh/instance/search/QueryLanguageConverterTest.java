@@ -18,7 +18,7 @@ class QueryLanguageConverterTest {
 
         // Russian to English layout
         assertThat(converter.convertLayout("еуые")).isEqualTo("test");
-        assertThat(converter.convertLayout("ефые")).isEqualTo("task");
+        assertThat(converter.convertLayout("ефыл")).isEqualTo("task");
         assertThat(converter.convertLayout("гыук")).isEqualTo("user");
     }
 

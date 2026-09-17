@@ -15,6 +15,7 @@ public enum ErrorCode {
     INVALID_URL("invalid_url", 400),
     WEBHOOK_TARGET_UNREACHABLE("webhook_target_unreachable", 400),
     IDEMPOTENCY_KEY_INVALID("idempotency_key_invalid", 400),
+    IDEMPOTENCY_NOT_SUPPORTED("idempotency_not_supported", 400),
     I18N_LANGUAGE_INVALID("i18n_language_invalid", 400),
     I18N_TRANSLATION_INVALID("i18n_translation_invalid", 400),
 
@@ -60,9 +61,11 @@ public enum ErrorCode {
     IDEMPOTENCY_REQUEST_IN_PROGRESS("idempotency_request_in_progress", 409),
     I18N_LANGUAGE_EXISTS("i18n_language_exists", 409),
     I18N_REVISION_CONFLICT("i18n_revision_conflict", 409),
+    TASK_REVISION_CONFLICT("task_revision_conflict", 409),
 
 
     // 413 Payload Too Large & 415 Unsupported Media Type
+    PAYLOAD_TOO_LARGE("payload_too_large", 413),
     FILE_SIZE_EXCEEDED("file_size_exceeded", 413),
     FILE_TYPE_FORBIDDEN("file_type_forbidden", 415),
     STORAGE_QUOTA_EXCEEDED("storage_quota_exceeded", 413),

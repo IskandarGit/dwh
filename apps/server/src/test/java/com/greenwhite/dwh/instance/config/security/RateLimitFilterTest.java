@@ -110,6 +110,29 @@ class RateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("Untrusted peer cannot bypass IP rate limit by spoofing rotating X-Forwarded-For headers")
+    void untrustedPeer_spoofedXff_rateLimitedByRemoteAddr() throws Exception {
+        String attackerDirectIp = "198.51.100.25";
+
+        mvc.perform(post("/api/v1/auth/login")
+                .with(r -> { r.setRemoteAddr(attackerDirectIp); return r; })
+                .header("X-Forwarded-For", "1.1.1.1"));
+
+        mvc.perform(post("/api/v1/auth/login")
+                .with(r -> { r.setRemoteAddr(attackerDirectIp); return r; })
+                .header("X-Forwarded-For", "2.2.2.2"));
+
+        mvc.perform(post("/api/v1/auth/login")
+                .with(r -> { r.setRemoteAddr(attackerDirectIp); return r; })
+                .header("X-Forwarded-For", "3.3.3.3"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("rate_limited"));
+
+        verify(auditLogService, times(1)).logSecurityEvent(
+                eq(RateLimitFilter.EVENT_RATE_LIMIT_EXCEEDED), isNull(), eq(attackerDirectIp), any(), any());
+    }
+
+    @Test
     @DisplayName("Лимит пользователя считается отдельно от IP и привязан к user_id")
     void userLimitTracksAuthenticatedUser() throws Exception {
         mockAuthenticatedUser(7L, "session-7");

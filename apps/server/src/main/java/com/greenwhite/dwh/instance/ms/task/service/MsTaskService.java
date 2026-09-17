@@ -86,7 +86,7 @@ public class MsTaskService {
             com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService) {
         this(taskRepository, statusRepository, typeRepository, memberRepository, projectRepository,
              customFieldService, scopeService, fileService, eventPublisher, searchChangePublisher,
-             auditLogService, new MsTaskStatusService(statusRepository, typeRepository, searchChangePublisher));
+             auditLogService, new MsTaskStatusService(statusRepository, typeRepository, searchChangePublisher, auditLogService));
     }
 
 
@@ -453,13 +453,18 @@ public class MsTaskService {
 
     @Transactional
     public void changeStatus(Long taskId, Long newStatusId, Long currentUserId) {
+        changeStatus(taskId, newStatusId, null, currentUserId);
+    }
+
+    @Transactional
+    public void changeStatus(Long taskId, Long newStatusId, Long expectedRevision, Long currentUserId) {
         var existing = getTaskById(taskId, currentUserId);
         searchChangePublisher.lockStatusMembership(newStatusId);
         var newStatus = statusRepository.findById(newStatusId)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Статус не найден"));
 
         Instant resolvedTime = newStatus.isTerminal() ? Instant.now() : null;
-        taskRepository.updateStatus(taskId, newStatusId, resolvedTime, currentUserId);
+        taskRepository.updateStatus(taskId, newStatusId, resolvedTime, expectedRevision, currentUserId);
 
         var task = getTaskById(taskId, currentUserId);
         eventPublisher.publishEvent(new MsTaskEvents.TaskStatusChanged(
@@ -707,7 +712,8 @@ public class MsTaskService {
                 requested.observerUserIdsPresent(), requested.observerUserIds(),
                 attributesPresent, requested.attributes(),
                 requested.beginTimePresent(), requested.beginTime(),
-                requested.endTimePresent(), requested.endTime());
+                requested.endTimePresent(), requested.endTime(),
+                requested.expectedRevisionPresent(), requested.expectedRevision());
     }
 
     private void validateDeadline(MsTaskRepository.TaskRecord existing, MsTaskPatch patch) {

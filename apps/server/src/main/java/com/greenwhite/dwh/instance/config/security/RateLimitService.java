@@ -1,5 +1,7 @@
 package com.greenwhite.dwh.instance.config.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
@@ -7,34 +9,48 @@ import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.Refill;
 import io.github.bucket4j.TimeMeter;
 import io.github.bucket4j.TokensInheritanceStrategy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * In-memory bucket'ы Bucket4j по ключу (ip:/user:/api:). Достаточно для одного
  * инстанса приложения на экземпляр (ТЗ-01: несколько нод — отдельное решение).
- * Ограничение роста карты: при превышении порога вычищаются записи,
- * к которым не обращались дольше 10 минут.
+ * Ограничение роста карты (H05, FR-SEC-2): хранилище ограничено Caffeine Cache
+ * с жестким лимитом емкости (максимум maxEntries, по умолчанию 10_000) и
+ * автоматическим вытеснением W-TinyLFU / expireAfterAccess(10 минут).
  */
 @Service
 public class RateLimitService {
 
-    private static final int CLEANUP_THRESHOLD = 50_000;
-    private static final long STALE_AFTER_MS = Duration.ofMinutes(10).toMillis();
+    public static final int DEFAULT_MAX_ENTRIES = 10_000;
+    private static final Duration DEFAULT_EXPIRE_AFTER_ACCESS = Duration.ofMinutes(10);
 
-    private final Map<String, Entry> buckets = new ConcurrentHashMap<>();
+    private final Cache<String, Entry> buckets;
     private final TimeMeter timeMeter;
 
     public RateLimitService() {
-        this(TimeMeter.SYSTEM_NANOTIME);
+        this(TimeMeter.SYSTEM_NANOTIME, DEFAULT_MAX_ENTRIES);
+    }
+
+    @Autowired
+    public RateLimitService(RateLimitProperties props) {
+        this(TimeMeter.SYSTEM_NANOTIME, props != null ? props.maxEntries() : DEFAULT_MAX_ENTRIES);
     }
 
     RateLimitService(TimeMeter timeMeter) {
+        this(timeMeter, DEFAULT_MAX_ENTRIES);
+    }
+
+    RateLimitService(TimeMeter timeMeter, int maxEntries) {
         this.timeMeter = timeMeter;
+        int capacity = Math.max(100, maxEntries);
+        this.buckets = Caffeine.newBuilder()
+                .maximumSize(capacity)
+                .expireAfterAccess(DEFAULT_EXPIRE_AFTER_ACCESS)
+                .build();
     }
 
     /** Пытается списать 1 токен; возвращает probe с остатком и временем до пополнения. */
@@ -44,9 +60,8 @@ public class RateLimitService {
 
     public ConsumptionProbe tryConsume(String key, int limitPerMinute, int capacity) {
         Budget budget = new Budget(limitPerMinute, capacity);
-        Entry entry = buckets.computeIfAbsent(key, k -> new Entry(newBucket(budget), budget));
+        Entry entry = buckets.get(key, k -> new Entry(newBucket(budget), budget));
         entry.lastAccessMs.set(System.currentTimeMillis());
-        maybeCleanup();
         synchronized (entry) {
             if (!budget.equals(entry.budget)) {
                 entry.bucket.replaceConfiguration(configuration(budget), TokensInheritanceStrategy.AS_IS);
@@ -61,13 +76,23 @@ public class RateLimitService {
      * иначе атака превращала бы журнал во вторую жертву.
      */
     public boolean shouldLogRejection(String key) {
-        Entry entry = buckets.get(key);
+        Entry entry = buckets.getIfPresent(key);
         if (entry == null) {
             return true;
         }
         long nowMin = System.currentTimeMillis() / 60_000;
         long prev = entry.lastLoggedMinute.get();
         return prev != nowMin && entry.lastLoggedMinute.compareAndSet(prev, nowMin);
+    }
+
+    /** Текущее расчетное число бакетов в памяти. */
+    public long estimatedSize() {
+        return buckets.estimatedSize();
+    }
+
+    /** Синхронная очистка для тестов. */
+    public void cleanUp() {
+        buckets.cleanUp();
     }
 
     private Bucket newBucket(Budget budget) {
@@ -84,14 +109,6 @@ public class RateLimitService {
     private static Bandwidth bandwidth(Budget budget) {
         return Bandwidth.classic(budget.capacity,
                 Refill.greedy(budget.perMinute, Duration.ofMinutes(1)));
-    }
-
-    private void maybeCleanup() {
-        if (buckets.size() <= CLEANUP_THRESHOLD) {
-            return;
-        }
-        long staleBefore = System.currentTimeMillis() - STALE_AFTER_MS;
-        buckets.entrySet().removeIf(e -> e.getValue().lastAccessMs.get() < staleBefore);
     }
 
     private static final class Entry {
