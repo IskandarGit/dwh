@@ -26,7 +26,8 @@ import {
   UPL_PERIODICITY_KEY,
   UPL_STRICTNESS_KEY,
   UPL_VERSION_STATUS_KEY,
-  uplErrorKey
+  uplErrorKey,
+  uplProblemText
 } from '../upl-labels';
 
 /** Реквизиты источника в форме экрана: код не правится и здесь не хранится. */
@@ -716,8 +717,6 @@ export class SourceCardComponent {
   }
 
   private problemText(problem: ProblemDetail): string {
-    const key = uplErrorKey(problem?.detail ?? '');
-    const text = this.i18n.translate(key);
-    return text === key ? `${problem?.detail} (${problem?.code})` : text;
+    return uplProblemText(problem, key => this.i18n.translate(key));
   }
 }
