@@ -33,7 +33,8 @@ import {
   UPL_FILE_KIND_KEY,
   UPL_MATCH_BY_KEY,
   UPL_VERSION_STATUS_KEY,
-  uplErrorKey
+  uplErrorKey,
+  uplProblemText
 } from '../upl-labels';
 import { UplFieldError, parseUplProblem, uplCellError, uplSheetError, uplSheetHasErrors } from './upl-format-errors';
 
@@ -1052,8 +1053,6 @@ export class FormatEditorComponent implements RecordNavigationPage {
   }
 
   private problemText(problem: ProblemDetail): string {
-    const key = uplErrorKey(problem?.detail ?? '');
-    const text = this.i18n.translate(key);
-    return text === key ? `${problem?.detail} (${problem?.code})` : text;
+    return uplProblemText(problem, key => this.i18n.translate(key));
   }
 }

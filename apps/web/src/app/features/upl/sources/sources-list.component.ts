@@ -18,7 +18,7 @@ import {
   UplSourceRequest,
   UplStrictness
 } from '../upl-api';
-import { UPL_PERIODICITY_KEY, UPL_STRICTNESS_KEY, uplErrorKey } from '../upl-labels';
+import { UPL_PERIODICITY_KEY, UPL_STRICTNESS_KEY, uplProblemText } from '../upl-labels';
 
 /** Модель окна «Новый источник»: обычный объект, чтобы работал `[(ngModel)]`. */
 interface SourceCreateForm {
@@ -585,9 +585,6 @@ export class SourcesListComponent implements OnInit {
 
   /** Неизвестный код ошибки не прячем: показываем подкод и код каркаса. */
   private problemText(problem: ProblemDetail): string {
-    const detail = problem?.detail ?? '';
-    const key = uplErrorKey(detail);
-    const text = this.i18n.translate(key);
-    return text === key ? `${detail} (${problem?.code ?? ''})` : text;
+    return uplProblemText(problem, key => this.i18n.translate(key));
   }
 }

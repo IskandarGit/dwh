@@ -79,7 +79,11 @@ import { finalize } from 'rxjs';
           </a>
 
           <!-- System -->
-          <div class="nav-section-title" *ngIf="(!isCollapsed() || isMobileMenuOpen()) && (canViewFiles() || canViewNotifications() || canViewAnnouncements() || canViewAudit() || canViewSystem() || canViewSettings())">{{ 'audit.sistema' | t }}</div>
+          <div class="nav-section-title" *ngIf="(!isCollapsed() || isMobileMenuOpen()) && (canViewSources() || canViewFiles() || canViewNotifications() || canViewAnnouncements() || canViewAudit() || canViewSystem() || canViewSettings())">{{ 'audit.sistema' | t }}</div>
+          <a *ngIf="canViewSources()" routerLink="/upl/sources" routerLinkActive="active" [attr.aria-current]="isRouteActive('/upl/sources') ? 'page' : null" class="nav-item" [title]="'nav.upl_sources' | t">
+            <span class="material-symbols-outlined nav-icon" aria-hidden="true">table_view</span>
+            <span class="nav-label" *ngIf="!isCollapsed() || isMobileMenuOpen()">{{ 'nav.upl_sources' | t }}</span>
+          </a>
           <a *ngIf="canViewFiles()" routerLink="/files" routerLinkActive="active" [attr.aria-current]="isRouteActive('/files') ? 'page' : null" class="nav-item" [title]="'files.faylovoe_hranilische' | t">
             <span class="material-symbols-outlined nav-icon" aria-hidden="true">folder_open</span>
             <span class="nav-label" *ngIf="!isCollapsed() || isMobileMenuOpen()">{{ 'layout.app_shell.fayly' | t }}</span>
@@ -780,6 +784,10 @@ export class AppShellComponent implements OnDestroy {
 
   canViewCustomFields(): boolean {
     return this.permService.canView('md.custom_fields') || this.permService.canView('system.custom_fields') || this.permService.canView('md_custom_fields');
+  }
+
+  canViewSources(): boolean {
+    return this.permService.canView('upl.sources');
   }
 
   canViewFiles(): boolean {

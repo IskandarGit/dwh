@@ -1,3 +1,4 @@
+import { ProblemDetail } from '../../core/models/common.models';
 import {
   UplDataType,
   UplEncoding,
@@ -54,4 +55,12 @@ export const UPL_MATCH_BY_KEY: Record<UplMatchBy, string> = {
 /** Код ошибки контракта (`UPL_*`, `STALE_VERSION`, `FND_VERSION_*`, `VALIDATION_FAILED`, `PERMISSION_DENIED`) → ключ словаря. */
 export function uplErrorKey(code: string): string {
   return 'upl.err.' + code;
+}
+
+/** Текст ошибки сервера: подкод (`detail`) → ключ `upl.err.*`; неизвестный код не прячем — `detail (code)`. */
+export function uplProblemText(problem: ProblemDetail | null | undefined, translate: (key: string) => string): string {
+  const detail = problem?.detail ?? '';
+  const key = uplErrorKey(detail);
+  const text = translate(key);
+  return text === key ? `${detail} (${problem?.code ?? ''})` : text;
 }
