@@ -1,13 +1,16 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiService } from '../../../core/services/api.service';
+import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { TranslatePipe, I18nService } from '../../../core/services/i18n.service';
 
 import {
   User,
   UserSession,
+  UserChannel,
+  BindChannelResponse,
   ApiToken,
   CreatedTokenResponse,
   PasswordForm,
@@ -18,6 +21,7 @@ import {
 import { UserProfileCardComponent } from './components/user-profile-card.component';
 import { ProfilePasswordCardComponent } from './components/profile-password-card.component';
 import { ProfileSecurityCardComponent } from './components/profile-security-card.component';
+import { ProfileChannelsCardComponent } from './components/profile-channels-card.component';
 import { ProfileSessionsCardComponent } from './components/profile-sessions-card.component';
 import { ProfileTokensCardComponent } from './components/profile-tokens-card.component';
 
@@ -32,6 +36,7 @@ export * from './profile.models';
     UserProfileCardComponent,
     ProfilePasswordCardComponent,
     ProfileSecurityCardComponent,
+    ProfileChannelsCardComponent,
     ProfileSessionsCardComponent,
     ProfileTokensCardComponent
   ],
@@ -70,6 +75,20 @@ export * from './profile.models';
 
         <!-- Security & 2FA Info Card -->
         <app-profile-security-card [user]="authService.currentUser()"></app-profile-security-card>
+
+        <!-- Communication Channels Card -->
+        <app-profile-channels-card
+          #channelsCard
+          [channels]="channels()"
+          [isLoadingChannels]="isLoadingChannels()"
+          [isBindingChannel]="isBindingChannel()"
+          [isConfirmingChannel]="isConfirmingChannel()"
+          [isUnbindingChannel]="isUnbindingChannel()"
+          [canManageChannels]="canManageChannels()"
+          (bindChannel)="onBindChannel($event)"
+          (confirmChannel)="onConfirmChannel($event)"
+          (unbindChannel)="onUnbindChannel($event)"
+        ></app-profile-channels-card>
 
         <!-- Active Sessions Card -->
         <app-profile-sessions-card
@@ -174,15 +193,25 @@ export * from './profile.models';
 })
 export class ProfileComponent implements OnInit {
   private readonly uiI18n = inject(I18nService);
+  public readonly permissionService = inject(PermissionService);
+
+  @ViewChild('channelsCard') channelsCard?: ProfileChannelsCardComponent;
+
   readonly sessions = signal<UserSession[]>([]);
   readonly tokens = signal<ApiToken[]>([]);
+  readonly channels = signal<UserChannel[]>([]);
 
   readonly isLoadingSessions = signal<boolean>(false);
   readonly isLoadingTokens = signal<boolean>(false);
+  readonly isLoadingChannels = signal<boolean>(false);
   readonly isCreatingToken = signal<boolean>(false);
   readonly isRevokingToken = signal<boolean>(false);
   readonly isTerminatingSession = signal<boolean>(false);
+  readonly isBindingChannel = signal<boolean>(false);
+  readonly isConfirmingChannel = signal<boolean>(false);
+  readonly isUnbindingChannel = signal<boolean>(false);
   readonly copiedSecret = signal<boolean>(false);
+  readonly canManageChannels = computed(() => this.permissionService.hasPermission('iam.profile', 'manage_channels'));
 
   readonly isCreateTokenModalOpen = signal<boolean>(false);
   readonly isTokenSecretModalOpen = signal<boolean>(false);
@@ -273,6 +302,67 @@ export class ProfileComponent implements OnInit {
   ngOnInit() {
     this.loadSessions();
     this.loadTokens();
+    this.loadChannels();
+  }
+
+  loadChannels() {
+    this.isLoadingChannels.set(true);
+    this.api.get<UserChannel[]>('/iam/profile/channels').subscribe({
+      next: res => {
+        this.channels.set(res || []);
+        this.isLoadingChannels.set(false);
+      },
+      error: () => {
+        this.isLoadingChannels.set(false);
+      }
+    });
+  }
+
+  onBindChannel(event: { channel: string; address: string }) {
+    this.isBindingChannel.set(true);
+    this.api.post<BindChannelResponse>('/iam/profile/channels', event).subscribe({
+      next: res => {
+        this.isBindingChannel.set(false);
+        this.toast.info(this.uiI18n.translate('iam.kod_podtverzhdeniya_otpravlen', { address: event.address }));
+        this.channelsCard?.openConfirmModal(res.verifyToken, event.address);
+        this.loadChannels();
+      },
+      error: (err: any) => {
+        this.isBindingChannel.set(false);
+        this.toast.error(err?.error?.detail || this.uiI18n.translate('iam.oshibka_privyazki_kanala'));
+      }
+    });
+  }
+
+  onConfirmChannel(event: { verifyToken: string; code: string }) {
+    this.isConfirmingChannel.set(true);
+    this.api.post<void>('/iam/profile/channels/confirm', event).subscribe({
+      next: () => {
+        this.isConfirmingChannel.set(false);
+        this.toast.success(this.uiI18n.translate('iam.kanal_uspeshno_privyazan'));
+        this.channelsCard?.closeConfirmModal();
+        this.loadChannels();
+      },
+      error: (err: any) => {
+        this.isConfirmingChannel.set(false);
+        this.toast.error(err?.error?.detail || this.uiI18n.translate('iam.oshibka_podtverzhdeniya_kanala'));
+      }
+    });
+  }
+
+  onUnbindChannel(channel: string) {
+    this.isUnbindingChannel.set(true);
+    this.api.delete(`/iam/profile/channels/${channel}`).subscribe({
+      next: () => {
+        this.isUnbindingChannel.set(false);
+        this.toast.success(this.uiI18n.translate('iam.kanal_uspeshno_otvyazan'));
+        this.loadChannels();
+      },
+      error: (err: any) => {
+        this.isUnbindingChannel.set(false);
+        this.toast.error(err?.error?.detail || this.uiI18n.translate('iam.oshibka_otvyazki_kanala'));
+      }
+    });
   }
 
   loadSessions() {

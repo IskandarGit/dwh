@@ -6,6 +6,7 @@ import { UiModalComponent } from '../../../../shared/ui/ui-modal.component';
 import { UiButtonComponent } from '../../../../shared/ui/ui-button.component';
 import { User, UserSecuritySummary } from '../../../../core/models/auth.models';
 import { UserOrgUnitsPanelComponent } from '../../org-units/public-api';
+import { UserEffectivePermissionsPanelComponent } from './user-effective-permissions-panel.component';
 
 export interface SecurityConfirmConfig {
   title: string;
@@ -23,14 +24,15 @@ export interface SecurityConfirmConfig {
     TranslatePipe,
     UiModalComponent,
     UiButtonComponent,
-    UserOrgUnitsPanelComponent
+    UserOrgUnitsPanelComponent,
+    UserEffectivePermissionsPanelComponent
   ],
   template: `
     <!-- User View / Profile Modal -->
     <ui-modal
       [isOpen]="isOpen"
       [title]="'iam.profil_polzovatelya' | t"
-      [size]="activeViewTab === 'security' || (canViewOrgUnits && viewingUser && safeRecordId(viewingUser.id)) ? 'xl' : 'sm'"
+      [size]="activeViewTab === 'security' || activeViewTab === 'permissions' || (canViewOrgUnits && viewingUser && safeRecordId(viewingUser.id)) ? 'xl' : 'sm'"
       (close)="closeRecordView.emit()"
     >
       <div body *ngIf="recordLoading" role="status">{{ 'search.record_loading' | t }}</div>
@@ -86,6 +88,18 @@ export interface SecurityConfirmConfig {
           >
             <span class="material-symbols-outlined tab-icon">account_tree</span>
             {{ 'iam.org_struktura' | t }}
+          </button>
+          <button
+            *ngIf="canViewAssignments && safeRecordId(u.id)"
+            type="button"
+            role="tab"
+            class="modal-tab-btn"
+            [class.active]="activeViewTab === 'permissions'"
+            [attr.aria-selected]="activeViewTab === 'permissions'"
+            (click)="switchTab.emit({ tab: 'permissions', userId: u.id })"
+          >
+            <span class="material-symbols-outlined tab-icon">lock_person</span>
+            {{ 'iam.effektivnye_prava' | t }}
           </button>
         </div>
 
@@ -283,6 +297,16 @@ export interface SecurityConfirmConfig {
             (busyChange)="orgPanelBusy.emit($event)"
           ></app-user-org-units-panel>
         </div>
+
+        <!-- Effective Permissions Tab -->
+        <div *ngIf="activeViewTab === 'permissions'">
+          <app-user-effective-permissions-panel
+            *ngIf="isOpen && canViewAssignments && safeRecordId(u.id)"
+            [userId]="u.id"
+            [canAssign]="canAssignPermissions"
+            [userRoleNames]="getUserRoleNames(u)"
+          ></app-user-effective-permissions-panel>
+        </div>
       </div>
       <div footer>
         <ui-button variant="secondary" size="md" (onClick)="closeRecordView.emit()">{{ (routeRecordId ? 'search.back_to_list' : 'audit.zakryt') | t }}</ui-button>
@@ -334,12 +358,14 @@ export class UserDetailModalComponent {
   @Input() recordLoading = false;
   @Input() recordError = false;
   @Input() recordNotFound = false;
-  @Input() activeViewTab: 'info' | 'security' | 'orgUnits' = 'info';
+  @Input() activeViewTab: 'info' | 'security' | 'orgUnits' | 'permissions' = 'info';
   @Input() isLoadingSecurity = false;
   @Input() userSecurity: UserSecuritySummary | null = null;
   @Input() isSecurityActionPending = false;
   @Input() canUpdateUser = false;
   @Input() canViewOrgUnits = false;
+  @Input() canViewAssignments = false;
+  @Input() canAssignPermissions = false;
   @Input() safeRecordId!: (id: any) => boolean;
   @Input() getUserInitial!: (u: User) => string;
   @Input() getAvatarBgColor!: (name: string) => string;
@@ -355,7 +381,7 @@ export class UserDetailModalComponent {
 
   @Output() closeRecordView = new EventEmitter<void>();
   @Output() retryRecordView = new EventEmitter<string | null>();
-  @Output() switchTab = new EventEmitter<{ tab: 'info' | 'security' | 'orgUnits', userId: number }>();
+  @Output() switchTab = new EventEmitter<{ tab: 'info' | 'security' | 'orgUnits' | 'permissions', userId: number }>();
   @Output() openEdit = new EventEmitter<void>();
   @Output() forcePasswordChange = new EventEmitter<number>();
   @Output() reset2fa = new EventEmitter<number>();

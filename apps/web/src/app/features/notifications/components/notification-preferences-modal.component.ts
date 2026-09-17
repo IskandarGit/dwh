@@ -7,7 +7,6 @@ import { TranslatePipe } from '../../../core/services/i18n.service';
 export interface EventTypeRow {
   code: string;
   titleKey: string;
-  defaultTitle: string;
 }
 
 @Component({
@@ -277,12 +276,12 @@ export class NotificationPreferencesModalComponent implements OnInit {
   @Output() save = new EventEmitter<NotificationPrefItem[]>();
 
   readonly eventRows: EventTypeRow[] = [
-    { code: 'task_assigned', titleKey: 'notifications.pref_task_assigned', defaultTitle: 'Назначение на задачу (ответственный / соисполнитель)' },
-    { code: 'task_observer', titleKey: 'notifications.pref_task_observer', defaultTitle: 'Добавление наблюдателем задачи' },
-    { code: 'task_status', titleKey: 'notifications.pref_task_status', defaultTitle: 'Изменение статуса задачи' },
-    { code: 'task_deadline', titleKey: 'notifications.pref_task_deadline', defaultTitle: 'Изменение дедлайна' },
-    { code: 'task_deadline_reminder', titleKey: 'notifications.pref_task_deadline_reminder', defaultTitle: 'Приближение дедлайна (напоминание)' },
-    { code: 'task_member_removed', titleKey: 'notifications.pref_task_member_removed', defaultTitle: 'Снятие с задачи' }
+    { code: 'task_assigned', titleKey: 'notifications.pref_task_assigned' },
+    { code: 'task_observer', titleKey: 'notifications.pref_task_observer' },
+    { code: 'task_status', titleKey: 'notifications.pref_task_status' },
+    { code: 'task_deadline', titleKey: 'notifications.pref_task_deadline' },
+    { code: 'task_deadline_reminder', titleKey: 'notifications.pref_task_deadline_reminder' },
+    { code: 'task_member_removed', titleKey: 'notifications.pref_task_member_removed' }
   ];
 
   private readonly prefsMap = new Map<string, boolean>();

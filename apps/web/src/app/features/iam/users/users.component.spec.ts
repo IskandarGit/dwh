@@ -527,6 +527,28 @@ describe('UsersComponent UI contracts', () => {
     confirmSpy.mockRestore();
   });
 
+  it('terminates a single user session via /iam/users/{userId}/sessions/{sessionId}', async () => {
+    const fixture = await createFixture();
+    const api = TestBed.inject(ApiService) as unknown as {
+      delete: ReturnType<typeof vi.fn>;
+    };
+    api.delete.mockReturnValue(of({}));
+
+    fixture.componentInstance.terminateSingleSession(101, 42);
+    expect(api.delete).toHaveBeenCalledWith('/iam/users/42/sessions/101');
+  });
+
+  it('evaluates assignment permissions and switches to permissions tab', async () => {
+    const fixture = await createFixture();
+    const component = fixture.componentInstance;
+
+    expect(component.canViewAssignments()).toBe(true);
+    expect(component.canAssignPermissions()).toBe(true);
+
+    component.switchViewTab('permissions', 42);
+    expect(component.activeViewTab()).toBe('permissions');
+  });
+
   function user(id: number, name: string): User {
     return {
       id, name, login: name.toLowerCase(), email: `${name.toLowerCase()}@example.test`, state: 'A',

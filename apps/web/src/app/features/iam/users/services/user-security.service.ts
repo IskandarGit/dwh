@@ -56,7 +56,7 @@ export class UserSecurityService {
 
   terminateSingleSession(sessionId: number, userId: number): void {
     this.isSecurityActionPending.set(true);
-    this.api.delete(`/iam/sessions/${sessionId}`).subscribe({
+    this.api.delete(`/iam/users/${userId}/sessions/${sessionId}`).subscribe({
       next: () => {
         this.isSecurityActionPending.set(false);
         this.toast.success(this.uiI18n.translate('iam.sessiya_zavershena'));

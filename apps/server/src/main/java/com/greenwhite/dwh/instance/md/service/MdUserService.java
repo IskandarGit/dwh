@@ -240,6 +240,7 @@ public class MdUserService {
         if (!userRepository.compareAndSetPassword(userId, authenticatedVersion, user.passwordHash(), newHash)) {
             throw ApiException.invalidCredentials();
         }
+        userRepository.incrementAuthenticationVersion(userId);
         sessionInvalidator.invalidateAllAccess(userId);
 
         auditLogService.logSecurityEvent("PASSWORD_CHANGED", userId, null, null, Map.of("login", user.login()));
@@ -260,6 +261,7 @@ public class MdUserService {
         // I-U1 (FR-USR-4): блокировка атомарно закрывает сессии и отзывает токены —
         // в ТОЙ ЖЕ транзакции, никаких «окон», когда state=P, а сессия жива.
         if (MdPref.STATE_PASSIVE.equals(newState)) {
+            userRepository.incrementAuthenticationVersion(targetUserId);
             sessionInvalidator.invalidateAllAccess(targetUserId);
         }
 
@@ -276,6 +278,7 @@ public class MdUserService {
         var targetUser = getUserById(targetUserId);
         userRepository.setForcePasswordChange(targetUserId, force, currentUserId);
         if (force) {
+            userRepository.incrementAuthenticationVersion(targetUserId);
             sessionInvalidator.invalidateAllAccess(targetUserId);
         }
         searchChangePublisher.changed("USER", targetUserId);
@@ -289,6 +292,7 @@ public class MdUserService {
     public void reset2fa(Long targetUserId, Long currentUserId) {
         var targetUser = getUserById(targetUserId);
         userRepository.set2faEnabled(targetUserId, false, currentUserId);
+        userRepository.incrementAuthenticationVersion(targetUserId);
         sessionInvalidator.invalidateAllAccess(targetUserId);
         searchChangePublisher.changed("USER", targetUserId);
         auditLogService.logChange("md_users", String.valueOf(targetUserId), "U",
@@ -310,6 +314,7 @@ public class MdUserService {
         userRepository.anonymizeUser(targetUserId, currentUserId);
 
         // Закрытие всех сессий и отзыв токенов
+        userRepository.incrementAuthenticationVersion(targetUserId);
         sessionInvalidator.invalidateAllAccess(targetUserId);
 
         searchChangePublisher.changed("USER", targetUserId);
