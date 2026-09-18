@@ -248,15 +248,32 @@ describe('SourceCardComponent', () => {
         status: 422,
         code: 'validation_failed',
         detail: 'VALIDATION_FAILED: name',
-        invalid_params: [{ name: 'name', reason: 'x' }]
+        errors: [{ field: 'name', code: 'Size', message: 'x' }]
       }
     });
     setInput(fixture, 'upl-field-name', 'Edited TEST');
     clickUiButton(fixture, 'upl-save-source');
     expect(el(fixture, 'upl-err-name')).not.toBeNull();
+    expect(el(fixture, 'upl-err-name')?.textContent).toContain(PACKAGED_RUSSIAN['upl.err.Size']);
     expect(el(fixture, 'upl-save-error')?.textContent).toContain(PACKAGED_RUSSIAN['upl.err.VALIDATION_FAILED']);
     expect((el(fixture, 'upl-field-name') as HTMLInputElement).value).toBe('Edited TEST');
     expect(el(fixture, 'upl-conflict')).toBeNull();
+  });
+
+  it('shows an unknown field code as server message plus code, never a raw dictionary key', async () => {
+    const { fixture } = await createFixture({
+      updateError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'VALIDATION_FAILED: ownerOrg',
+        errors: [{ field: 'ownerOrg', code: 'UPL_SOMETHING_NEW', message: 'srv' }]
+      }
+    });
+    setInput(fixture, 'upl-field-name', 'Edited TEST');
+    clickUiButton(fixture, 'upl-save-source');
+    const shown = el(fixture, 'upl-err-ownerOrg')?.textContent ?? '';
+    expect(shown).toContain('srv (UPL_SOMETHING_NEW)');
+    expect(shown).not.toContain('upl.err.');
   });
 
   it('shows permission denied and an unknown error as text', async () => {

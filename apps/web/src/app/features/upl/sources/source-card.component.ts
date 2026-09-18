@@ -22,11 +22,11 @@ import {
   UplVersionItem,
   UplVersionStatus
 } from '../upl-api';
+import { parseUplProblem, uplFieldErrorText } from '../formats/upl-format-errors';
 import {
   UPL_PERIODICITY_KEY,
   UPL_STRICTNESS_KEY,
   UPL_VERSION_STATUS_KEY,
-  uplErrorKey,
   uplProblemText
 } from '../upl-labels';
 
@@ -133,6 +133,7 @@ type DraftMode = 'empty' | 'copy';
               id="upl-source-owner-org"
               class="form-input"
               type="text"
+              maxlength="200"
               data-testid="upl-field-ownerOrg"
               [disabled]="!canEdit()"
               [(ngModel)]="form.ownerOrg"
@@ -148,6 +149,7 @@ type DraftMode = 'empty' | 'copy';
               id="upl-source-owner-contact"
               class="form-input"
               type="text"
+              maxlength="200"
               data-testid="upl-field-ownerContact"
               [disabled]="!canEdit()"
               [(ngModel)]="form.ownerContact"
@@ -706,8 +708,8 @@ export class SourceCardComponent {
     }
     if (problem?.status === 422) {
       const errors: Record<string, string> = {};
-      for (const item of problem.invalid_params ?? []) {
-        errors[item.name] = item.code ? this.i18n.translate(uplErrorKey(item.code)) : item.reason;
+      for (const item of parseUplProblem(problem)) {
+        errors[item.field] = uplFieldErrorText(item, key => this.i18n.translate(key));
       }
       this.fieldErrors.set(errors);
       this.saveError.set('upl.err.VALIDATION_FAILED');

@@ -129,6 +129,20 @@ describe('SourcesListComponent', () => {
     expect(testId(fixture, 'upl-more')).toHaveLength(0);
   });
 
+  it('при hasMore без курсора кнопку «Загрузить ещё» не показывает и страницу не повторяет', async () => {
+    const { fixture, api } = await createFixture({
+      pages: [of(page([firstItem], true, null)), of(page([secondItem]))]
+    });
+
+    expect(testId(fixture, 'upl-more')).toHaveLength(0);
+
+    fixture.componentInstance.loadMore();
+    fixture.detectChanges();
+
+    expect(api.listSources).toHaveBeenCalledTimes(1);
+    expect(testId(fixture, 'upl-source-row')).toHaveLength(1);
+  });
+
   it('кнопку «Новый источник» показывает только при праве create', async () => {
     const withoutRight = await createFixture({ canCreate: false });
     expect(testId(withoutRight.fixture, 'upl-new-source')).toHaveLength(0);
@@ -184,19 +198,35 @@ describe('SourcesListComponent', () => {
     expect(fixture.componentInstance.isCreateOpen()).toBe(true);
   });
 
+  it('«код занят» узнаётся по коду каркаса, даже если detail переведён', async () => {
+    const problem: ProblemDetail = {
+      title: 'Bad Request',
+      status: 400,
+      code: 'CODE_ALREADY_EXISTS',
+      detail: 'Такой код уже существует'
+    };
+    const { fixture } = await createFixture({ createResult: throwError(() => problem) });
+
+    await openCreateForm(fixture, { code: 'cement.output', name: 'Vypusk', ownerOrg: 'Org' });
+
+    expect(testId(fixture, 'upl-err-code')).toHaveLength(1);
+    expect(fixture.componentInstance.isCreateOpen()).toBe(true);
+  });
+
   it('раскладывает ошибки 422 по полям', async () => {
     const problem: ProblemDetail = {
       title: 'Unprocessable Entity',
       status: 422,
       code: 'validation_failed',
       detail: 'VALIDATION_FAILED: name',
-      invalid_params: [{ name: 'name', reason: 'x' }]
+      errors: [{ field: 'name', code: 'Size', message: 'x' }]
     };
     const { fixture } = await createFixture({ createResult: throwError(() => problem) });
 
     await openCreateForm(fixture, { code: 'cement.output', name: 'Vypusk', ownerOrg: 'Org' });
 
     expect(testId(fixture, 'upl-err-name')).toHaveLength(1);
+    expect(testId(fixture, 'upl-err-name')[0].textContent).toContain(PACKAGED_RUSSIAN['upl.err.Size']);
     expect(testId(fixture, 'upl-create-error')).toHaveLength(1);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProblemDetail } from '../../../core/models/common.models';
-import { parseUplFieldErrors, parseUplProblem, uplCellError, uplSheetError, uplSheetHasErrors } from './upl-format-errors';
+import { parseUplFieldErrors, parseUplProblem, uplCellError, uplFieldErrorText, uplSheetError, uplSheetHasErrors } from './upl-format-errors';
 
 function problem(extra: Partial<ProblemDetail>): ProblemDetail {
   return { title: 'Ошибка', status: 422, code: 'validation_failed', detail: 'UPL_FORMAT_INVALID', ...extra };
@@ -73,5 +73,29 @@ describe('upl format field errors', () => {
     expect(uplSheetHasErrors(list, 1)).toBe(true);
     expect(uplSheetHasErrors(list, 0)).toBe(false);
     expect(uplSheetError(list, 1, 'headerRow')).toMatchObject({ code: 'UPL_HEADER_ROW_INVALID' });
+  });
+});
+
+describe('uplFieldErrorText', () => {
+  function fieldError(code: string, message: string) {
+    return parseUplFieldErrors([{ field: 'name', code, message }])[0];
+  }
+
+  it('берёт перевод, когда ключ есть в словаре', () => {
+    const error = fieldError('UPL_KNOWN', 'x');
+
+    expect(uplFieldErrorText(error, () => 'Понятный текст')).toBe('Понятный текст');
+  });
+
+  it('без перевода показывает сообщение сервера и код в скобках', () => {
+    const error = fieldError('UPL_NEW', 'x');
+
+    expect(uplFieldErrorText(error, key => key)).toBe('x (UPL_NEW)');
+  });
+
+  it('без перевода и без сообщения показывает код дважды, но не сырой ключ', () => {
+    const error = fieldError('UPL_NEW', '');
+
+    expect(uplFieldErrorText(error, key => key)).toBe('UPL_NEW (UPL_NEW)');
   });
 });
