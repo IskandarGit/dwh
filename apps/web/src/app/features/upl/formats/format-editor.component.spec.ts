@@ -320,6 +320,28 @@ describe('FormatEditorComponent', () => {
     expect(cells[4].classList.contains('upl-cell-error')).toBe(true);
   });
 
+  it('drops the error summary when the addressed column is removed', async () => {
+    const { fixture } = await createFixture({
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets[0].columns[1].nameInFile', code: 'Size', message: 'x' }]
+      }
+    });
+
+    addValidColumn(fixture);
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+    expect(one(fixture, 'upl-errors-summary')).not.toBeNull();
+
+    click(many(fixture, 'upl-column-remove')[1]);
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-errors-summary')).toBeNull();
+    expect(one(fixture, 'upl-tab-error')).toBeNull();
+  });
+
   it('keeps unsaved edits when the version is stale', async () => {
     const { fixture, component } = await createFixture({
       saveError: { status: 409, code: 'CONFLICT', detail: 'STALE_VERSION' }

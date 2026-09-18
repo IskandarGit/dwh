@@ -93,9 +93,9 @@ describe('uplFieldErrorText', () => {
     expect(uplFieldErrorText(error, key => key)).toBe('x (UPL_NEW)');
   });
 
-  it('без перевода и без сообщения показывает код дважды, но не сырой ключ', () => {
+  it('без перевода и без сообщения показывает код один раз, но не сырой ключ', () => {
     const error = fieldError('UPL_NEW', '');
 
-    expect(uplFieldErrorText(error, key => key)).toBe('UPL_NEW (UPL_NEW)');
+    expect(uplFieldErrorText(error, key => key)).toBe('UPL_NEW');
   });
 });

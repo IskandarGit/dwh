@@ -577,7 +577,7 @@ export class SourcesListComponent implements OnInit {
       this.createError.set('upl.err.VALIDATION_FAILED');
       return;
     }
-    if (problem?.code === 'CODE_ALREADY_EXISTS' || problem?.detail === 'UPL_SOURCE_CODE_TAKEN') {
+    if ((problem?.code ?? '').toLowerCase() === 'code_already_exists' || problem?.detail === 'UPL_SOURCE_CODE_TAKEN') {
       this.fieldErrors.set({ code: 'upl.err.UPL_SOURCE_CODE_TAKEN' });
       return;
     }

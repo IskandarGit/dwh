@@ -75,10 +75,16 @@ export function parseUplProblem(problem: ProblemDetail): UplFieldError[] {
   return result;
 }
 
-/** Текст ошибки поля: ключ словаря, а если его нет — сообщение сервера и код в скобках (сырой ключ в UI не попадает). */
+/**
+ * Текст ошибки поля: ключ словаря, а если его нет — сообщение сервера и код в скобках
+ * (сырой ключ в UI не попадает); без сообщения сервера — только код.
+ */
 export function uplFieldErrorText(error: UplFieldError, translate: (key: string) => string): string {
   const translated = translate(error.key);
-  return translated === error.key ? `${error.message || error.code} (${error.code})` : translated;
+  if (translated !== error.key) {
+    return translated;
+  }
+  return error.message ? `${error.message} (${error.code})` : error.code;
 }
 
 /** Ошибка конкретной ячейки колонки. */
