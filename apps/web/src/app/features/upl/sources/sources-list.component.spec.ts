@@ -202,7 +202,7 @@ describe('SourcesListComponent', () => {
     const problem: ProblemDetail = {
       title: 'Bad Request',
       status: 400,
-      code: 'CODE_ALREADY_EXISTS',
+      code: 'code_already_exists',
       detail: 'Такой код уже существует'
     };
     const { fixture } = await createFixture({ createResult: throwError(() => problem) });

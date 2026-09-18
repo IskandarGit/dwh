@@ -1228,6 +1228,7 @@ export const PACKAGED_RUSSIAN: Readonly<Record<string, string>> = Object.freeze(
   "upl.err.NotBlank": "Заполните поле",
   "upl.err.Pattern": "Недопустимое значение: проверьте формат",
   "upl.err.PERMISSION_DENIED": "Нет права",
+  "upl.err.Positive": "Значение должно быть больше нуля",
   "upl.err.Size": "Слишком длинное значение",
   "upl.err.STALE_VERSION": "Запись изменена другим пользователем. Обновите",
   "upl.err.UPL_BASE_UNIT_MISMATCH": "Базовая единица не соответствует выбранной единице",

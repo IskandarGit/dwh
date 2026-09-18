@@ -838,7 +838,7 @@ export class FormatEditorComponent implements RecordNavigationPage {
   }
 
   focusError(problem: UplFieldError): void {
-    if (problem.sheet !== null) {
+    if (problem.sheet !== null && problem.sheet < this.model.sheets.length) {
       this.activeSheet.set(problem.sheet);
     }
   }
@@ -860,6 +860,7 @@ export class FormatEditorComponent implements RecordNavigationPage {
     const index = this.sheetToRemove();
     if (index === null) return;
     this.model.sheets.splice(index, 1);
+    this.errors.set([]);
     this.sheetToRemove.set(null);
     if (this.activeSheet() >= this.model.sheets.length) {
       this.activeSheet.set(Math.max(0, this.model.sheets.length - 1));
@@ -899,6 +900,7 @@ export class FormatEditorComponent implements RecordNavigationPage {
     const sheet = this.activeSheetModel();
     if (!sheet) return;
     sheet.columns.splice(index, 1);
+    this.errors.set([]);
   }
 
   /** Поля, которых у нового типа нет, очищаются — единственная молчаливая правка, и о ней говорим тостом. */
