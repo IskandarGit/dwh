@@ -342,6 +342,42 @@ describe('FormatEditorComponent', () => {
     expect(one(fixture, 'upl-tab-error')).toBeNull();
   });
 
+  it('drops the error summary when a column is moved', async () => {
+    const { fixture } = await createFixture({
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets[0].columns[1].nameInFile', code: 'Size', message: 'x' }]
+      }
+    });
+
+    addValidColumn(fixture);
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+    expect(one(fixture, 'upl-errors-summary')).not.toBeNull();
+
+    click(many(fixture, 'upl-column-up')[1]);
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-errors-summary')).toBeNull();
+    expect(one(fixture, 'upl-tab-error')).toBeNull();
+  });
+
+  it('does not publish with an empty date and shows the error under the field', async () => {
+    const { fixture, component, api } = await createFixture();
+    click(one(fixture, 'upl-publish'));
+    fixture.detectChanges();
+
+    component.validFrom.set('');
+    click(one(fixture, 'upl-publish-confirm'));
+    fixture.detectChanges();
+
+    expect(api.publish).not.toHaveBeenCalled();
+    expect(component.isPublishOpen()).toBe(true);
+    expect(one(fixture, 'upl-publish-date-error')!.textContent).toContain(PACKAGED_RUSSIAN['upl.err.NotNull']);
+  });
+
   it('keeps unsaved edits when the version is stale', async () => {
     const { fixture, component } = await createFixture({
       saveError: { status: 409, code: 'CONFLICT', detail: 'STALE_VERSION' }
