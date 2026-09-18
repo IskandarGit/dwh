@@ -894,6 +894,7 @@ export class FormatEditorComponent implements RecordNavigationPage {
     if (target < 0 || target >= sheet.columns.length) return;
     const [column] = sheet.columns.splice(index, 1);
     sheet.columns.splice(target, 0, column);
+    this.errors.set([]);
   }
 
   removeColumn(index: number): void {
@@ -987,6 +988,10 @@ export class FormatEditorComponent implements RecordNavigationPage {
 
   confirmPublish(): void {
     if (this.isPublishing()) return;
+    if (!this.validFrom()) {
+      this.publishDateError.set(uplErrorKey('NotNull'));
+      return;
+    }
     this.isPublishing.set(true);
     this.publishDateError.set(null);
     this.actionError.set(null);
