@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable, forkJoin } from 'rxjs';
-import { ProblemDetail } from '../../../core/models/common.models';
+import { FieldErrorItem, ProblemDetail } from '../../../core/models/common.models';
 import { RecordNavigationDecision, RecordNavigationPage } from '../../../core/guards/record-navigation.guard';
 import { I18nService, TranslatePipe } from '../../../core/services/i18n.service';
 import { PermissionService } from '../../../core/services/permission.service';
@@ -36,7 +36,17 @@ import {
   uplErrorKey,
   uplProblemText
 } from '../upl-labels';
-import { UplFieldError, parseUplProblem, uplCellError, uplSheetError, uplSheetHasErrors } from './upl-format-errors';
+import {
+  UplFieldError,
+  parseUplFieldErrors,
+  parseUplProblem,
+  uplCellError,
+  uplFieldErrorText,
+  uplSheetError,
+  uplSheetHasErrors
+} from './upl-format-errors';
+
+const TARGET_FIELD_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
 
 /** Пустая строка в необязательном поле означает «не заполнено», а не пустое значение. */
 function trimToNull(value: string | null | undefined): string | null {
@@ -200,6 +210,29 @@ function emptyModel(): UplFormatDraftRequest {
             }
           </div>
 
+          @if (errors().length > 0) {
+            <div class="alert alert-error" role="alert" data-testid="upl-errors-summary">
+              <p class="upl-errors-title">{{ 'upl.format.errors_title' | t }}</p>
+              <ul class="upl-errors-list">
+                @for (problem of errors(); track $index) {
+                  <li>
+                    <button type="button" class="upl-error-item" (click)="focusError(problem)">
+                      @if (problem.sheet !== null && problem.column !== null) {
+                        <span class="upl-error-at">{{ text('upl.format.err_at_column', {
+                          sheet: (problem.sheet + 1).toString(),
+                          column: (problem.column + 1).toString()
+                        }) }}</span>
+                      } @else if (problem.sheet !== null) {
+                        <span class="upl-error-at">{{ text('upl.format.err_at_sheet', { sheet: (problem.sheet + 1).toString() }) }}</span>
+                      }
+                      <span>{{ errorText(problem) }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
           @if (model.sheets.length === 0) {
             <p class="upl-muted" data-testid="upl-no-sheets">{{ 'upl.format.no_sheets' | t }}</p>
           } @else if (activeSheetModel(); as sheet) {
@@ -256,29 +289,6 @@ function emptyModel(): UplFormatDraftRequest {
                 }
               </div>
             </div>
-
-            @if (errors().length > 0) {
-              <div class="alert alert-error" role="alert" data-testid="upl-errors-summary">
-                <p class="upl-errors-title">{{ 'upl.format.errors_title' | t }}</p>
-                <ul class="upl-errors-list">
-                  @for (problem of errors(); track $index) {
-                    <li>
-                      <button type="button" class="upl-error-item" (click)="focusError(problem)">
-                        @if (problem.sheet !== null && problem.column !== null) {
-                          <span class="upl-error-at">{{ text('upl.format.err_at_column', {
-                            sheet: (problem.sheet + 1).toString(),
-                            column: (problem.column + 1).toString()
-                          }) }}</span>
-                        } @else if (problem.sheet !== null) {
-                          <span class="upl-error-at">{{ text('upl.format.err_at_sheet', { sheet: (problem.sheet + 1).toString() }) }}</span>
-                        }
-                        <span>{{ errorText(problem) }}</span>
-                      </button>
-                    </li>
-                  }
-                </ul>
-              </div>
-            }
 
             <div class="table-card">
               <div class="table-scroll">
@@ -390,7 +400,7 @@ function emptyModel(): UplFormatDraftRequest {
                           [attr.title]="cellTitle(activeSheet(), $index, 'baseUnit')"
                         >
                           @if (isNumeric(column)) {
-                            <span data-testid="upl-cell-base-unit">{{ column.baseUnit }}</span>
+                            <span data-testid="upl-cell-base-unit">{{ baseUnitLabel(column) }}</span>
                           }
                         </td>
                         <td
@@ -516,7 +526,7 @@ function emptyModel(): UplFormatDraftRequest {
           }
         </section>
 
-        @if (version()?.status === 'draft') {
+        @if (version()?.status === 'draft' && (canEdit() || canPublish())) {
           <div class="upl-actions" data-testid="upl-actions">
             @if (canEdit()) {
               <ui-button
@@ -817,8 +827,14 @@ export class FormatEditorComponent implements RecordNavigationPage {
 
   /** Неизвестный код не прячем: показываем сообщение сервера и сам код. */
   errorText(problem: UplFieldError): string {
-    const translated = this.i18n.translate(problem.key);
-    return translated === problem.key ? `${problem.message || problem.code} (${problem.code})` : translated;
+    return uplFieldErrorText(problem, key => this.i18n.translate(key));
+  }
+
+  /** «Имя (код)» из /upl/units; единица вне списка — только код. */
+  baseUnitLabel(column: UplColumn): string {
+    const code = column.baseUnit ?? '';
+    const unit = this.units().find(item => item.code === code);
+    return unit ? `${unit.name} (${unit.code})` : code;
   }
 
   focusError(problem: UplFieldError): void {
@@ -929,6 +945,12 @@ export class FormatEditorComponent implements RecordNavigationPage {
 
   save(onSaved?: () => void): void {
     if (this.isSaving()) return;
+    const local = this.localErrors();
+    if (local.length > 0) {
+      this.errors.set(local);
+      this.activeSheet.set(local[0].sheet ?? this.activeSheet());
+      return;
+    }
     this.isSaving.set(true);
     this.actionError.set(null);
     this.api.saveDraft(this.sourceId, this.versionNumber, this.buildRequest()).subscribe({
@@ -999,6 +1021,29 @@ export class FormatEditorComponent implements RecordNavigationPage {
   settleLeave(allow: boolean): void {
     this.isLeaveOpen.set(false);
     this.navigationDecision.settle(allow);
+  }
+
+  /** Проверка до отправки — то, что сервер отверг бы кодами Bean Validation; коды те же, текст — из словаря. */
+  private localErrors(): UplFieldError[] {
+    const found: FieldErrorItem[] = [];
+    this.model.sheets.forEach((sheet, s) => {
+      const row = Number(sheet.headerRow);
+      if (sheet.headerRow === null || !Number.isInteger(row) || row < 1) {
+        found.push({ field: `sheets[${s}].headerRow`, code: 'Min', message: '' });
+      }
+      sheet.columns.forEach((column, c) => {
+        if ((column.nameInFile ?? '').trim().length === 0) {
+          found.push({ field: `sheets[${s}].columns[${c}].nameInFile`, code: 'NotBlank', message: '' });
+        }
+        const target = (column.targetField ?? '').trim();
+        if (target.length === 0) {
+          found.push({ field: `sheets[${s}].columns[${c}].targetField`, code: 'NotBlank', message: '' });
+        } else if (!TARGET_FIELD_PATTERN.test(target)) {
+          found.push({ field: `sheets[${s}].columns[${c}].targetField`, code: 'Pattern', message: '' });
+        }
+      });
+    });
+    return parseUplFieldErrors(found);
   }
 
   private showPublishDialog(): void {

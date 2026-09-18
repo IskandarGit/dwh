@@ -28,7 +28,8 @@ const SOURCE: UplSource = {
 const UNITS: UplUnit[] = [
   { code: 'ton', name: 'Tonna', baseUnitCode: 'kg' },
   { code: 'kg', name: 'Kilogramm', baseUnitCode: 'kg' },
-  { code: 'liter', name: 'Litr', baseUnitCode: 'l' }
+  { code: 'liter', name: 'Litr', baseUnitCode: 'l' },
+  { code: 'l', name: 'Litr', baseUnitCode: 'l' }
 ];
 
 const VERSION_ITEMS: UplVersionItem[] = [
@@ -172,6 +173,22 @@ function selectOption(element: HTMLElement | null, match: (option: HTMLOptionEle
   element.dispatchEvent(new Event('change'));
 }
 
+function setInputValue(input: HTMLInputElement, value: string): void {
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+}
+
+/** Грязный черновик: новая колонка, заполненная так, чтобы локальная проверка её пропустила. */
+function addValidColumn(fixture: ComponentFixture<FormatEditorComponent>, name = 'Новая', target = 'new_col'): void {
+  click(one(fixture, 'upl-add-column'));
+  fixture.detectChanges();
+  const rows = many(fixture, 'upl-column-row');
+  const row = rows[rows.length - 1];
+  setInputValue(row.querySelector('[data-testid="upl-cell-name-in-file"]') as HTMLInputElement, name);
+  setInputValue(row.querySelector('[data-testid="upl-cell-target-field"]') as HTMLInputElement, target);
+  fixture.detectChanges();
+}
+
 function twoSheetVersion(): UplFormatVersion {
   const base = draftVersion();
   const second = structuredClone(base.sheets[0]);
@@ -226,8 +243,7 @@ describe('FormatEditorComponent', () => {
   it('saves the whole draft with lock version and ordinals', async () => {
     const { fixture, api, toast, component } = await createFixture();
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -281,6 +297,7 @@ describe('FormatEditorComponent', () => {
 
     expect(component.model.sheets[0].columns[1].sourceUnit).toBe('liter');
     expect(component.model.sheets[0].columns[1].baseUnit).toBe('l');
+    expect(one(fixture, 'upl-cell-base-unit')!.textContent).toContain('Litr (l)');
   });
 
   it('shows server field errors in the summary, on the tab and in the cell', async () => {
@@ -293,8 +310,7 @@ describe('FormatEditorComponent', () => {
       }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -309,8 +325,7 @@ describe('FormatEditorComponent', () => {
       saveError: { status: 409, code: 'CONFLICT', detail: 'STALE_VERSION' }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -331,8 +346,7 @@ describe('FormatEditorComponent', () => {
     expect(clean.api.saveDraft).not.toHaveBeenCalled();
 
     const dirty = await createFixture();
-    click(one(dirty.fixture, 'upl-add-column'));
-    dirty.fixture.detectChanges();
+    addValidColumn(dirty.fixture);
     click(one(dirty.fixture, 'upl-publish'));
     dirty.fixture.detectChanges();
     expect(dirty.api.saveDraft).toHaveBeenCalledTimes(1);
@@ -371,8 +385,7 @@ describe('FormatEditorComponent', () => {
       saveError: { status: 409, code: 'CONFLICT', detail: 'UPL_FORMAT_NOT_DRAFT' }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -468,6 +481,7 @@ describe('FormatEditorComponent', () => {
     expect((many(fixture, 'upl-cell-name-in-file')[0] as HTMLInputElement).disabled).toBe(true);
     expect((many(fixture, 'upl-cell-type')[0] as HTMLSelectElement).disabled).toBe(true);
     expect((one(fixture, 'upl-file-kind') as HTMLSelectElement).disabled).toBe(true);
+    expect(one(fixture, 'upl-actions')).toBeNull();
     expect(many(fixture, 'upl-column-row').length).toBe(2);
   });
 
@@ -476,8 +490,7 @@ describe('FormatEditorComponent', () => {
       saveError: { status: 403, code: 'permission_denied', detail: 'PERMISSION_DENIED' }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -492,8 +505,7 @@ describe('FormatEditorComponent', () => {
       saveError: { status: 400, code: 'bad_request', detail: 'UPL_SOMETHING_NEW' }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -514,8 +526,7 @@ describe('FormatEditorComponent', () => {
       }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -537,8 +548,7 @@ describe('FormatEditorComponent', () => {
 
     expect(component.activeSheet()).toBe(0);
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
 
@@ -552,8 +562,7 @@ describe('FormatEditorComponent', () => {
       saveError: { status: 409, code: 'CONFLICT', detail: 'STALE_VERSION' }
     });
 
-    click(one(fixture, 'upl-add-column'));
-    fixture.detectChanges();
+    addValidColumn(fixture);
     click(one(fixture, 'upl-save'));
     fixture.detectChanges();
     expect(one(fixture, 'upl-conflict')).not.toBeNull();
@@ -584,5 +593,73 @@ describe('FormatEditorComponent', () => {
     expect(one(csv.fixture, 'upl-encoding')).not.toBeNull();
     expect(one(csv.fixture, 'upl-sheet-name')).toBeNull();
     expect(many(csv.fixture, 'upl-cell-file-position').length).toBe(2);
+  });
+  it('shows the publish rejection of a draft without sheets', async () => {
+    const { fixture, component } = await createFixture({
+      version: { ...draftVersion(), sheets: [] },
+      publishError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets', code: 'UPL_NO_SHEETS', message: '' }]
+      }
+    });
+
+    click(one(fixture, 'upl-publish'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-publish-confirm'));
+    fixture.detectChanges();
+
+    expect(component.isPublishOpen()).toBe(false);
+    expect(one(fixture, 'upl-errors-summary')!.textContent).toContain(PACKAGED_RUSSIAN['upl.err.UPL_NO_SHEETS']);
+    expect(one(fixture, 'upl-no-sheets')).not.toBeNull();
+  });
+
+  it('does not send a column without names and shows Russian texts', async () => {
+    const { fixture, api } = await createFixture();
+
+    click(one(fixture, 'upl-add-column'));
+    fixture.detectChanges();
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(one(fixture, 'upl-errors-summary')!.textContent).toContain(PACKAGED_RUSSIAN['upl.err.NotBlank']);
+    const cells = many(fixture, 'upl-column-row')[2].querySelectorAll('td');
+    expect(cells[0].classList.contains('upl-cell-error')).toBe(true);
+    expect(cells[1].classList.contains('upl-cell-error')).toBe(true);
+  });
+
+  it('rejects a target field that does not match the pattern before sending', async () => {
+    const { fixture, api } = await createFixture();
+
+    addValidColumn(fixture, 'A', 'Поле 1');
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    const summary = one(fixture, 'upl-errors-summary')!.textContent!;
+    expect(summary).toContain(PACKAGED_RUSSIAN['upl.err.Pattern']);
+    expect(summary).not.toContain('[a-z]');
+  });
+
+  it('shows a server validator code with a Russian text', async () => {
+    const { fixture, api } = await createFixture({
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets[0].columns[0].nameInFile', code: 'Size', message: 'size must be between 0 and 200' }]
+      }
+    });
+
+    addValidColumn(fixture);
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+
+    expect(api.saveDraft).toHaveBeenCalledTimes(1);
+    const summary = one(fixture, 'upl-errors-summary')!.textContent!;
+    expect(summary).toContain(PACKAGED_RUSSIAN['upl.err.Size']);
+    expect(summary).not.toContain('size must be');
   });
 });

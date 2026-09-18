@@ -128,11 +128,11 @@ export class UplApiService {
   private readonly api = inject(ApiService);
 
   listSources(limit = 50, cursor?: string | null): Observable<KeysetPage<UplSourceItem>> {
-    return this.api.get<KeysetPage<UplSourceItem>>(SOURCES, { limit, ...(cursor ? { cursor } : {}) });
+    return this.api.get<KeysetPage<UplSourceItem>>(SOURCES, { limit, ...(cursor ? { cursor } : {}) }, { notifyError: false });
   }
 
   getSource(id: string): Observable<UplSource> {
-    return this.api.get<UplSource>(`${SOURCES}/${id}`);
+    return this.api.get<UplSource>(`${SOURCES}/${id}`, undefined, { notifyError: false });
   }
 
   createSource(body: UplSourceRequest): Observable<UplSource> {
@@ -144,7 +144,7 @@ export class UplApiService {
   }
 
   listVersions(id: string): Observable<UplVersionItem[]> {
-    return this.api.get<UplVersionItem[]>(`${SOURCES}/${id}/format-versions`);
+    return this.api.get<UplVersionItem[]>(`${SOURCES}/${id}/format-versions`, undefined, { notifyError: false });
   }
 
   createDraft(id: string, copyFrom?: number): Observable<UplFormatVersion> {
@@ -152,7 +152,7 @@ export class UplApiService {
   }
 
   getVersion(id: string, v: string): Observable<UplFormatVersion> {
-    return this.api.get<UplFormatVersion>(`${SOURCES}/${id}/format-versions/${v}`);
+    return this.api.get<UplFormatVersion>(`${SOURCES}/${id}/format-versions/${v}`, undefined, { notifyError: false });
   }
 
   saveDraft(id: string, v: string, body: UplFormatDraftRequest): Observable<UplFormatVersion> {
@@ -164,6 +164,6 @@ export class UplApiService {
   }
 
   listUnits(): Observable<UplUnit[]> {
-    return this.api.get<UplUnit[]>('/upl/units');
+    return this.api.get<UplUnit[]>('/upl/units', undefined, { notifyError: false });
   }
 }

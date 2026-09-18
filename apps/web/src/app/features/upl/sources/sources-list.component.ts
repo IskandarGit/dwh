@@ -18,6 +18,7 @@ import {
   UplSourceRequest,
   UplStrictness
 } from '../upl-api';
+import { parseUplProblem, uplFieldErrorText } from '../formats/upl-format-errors';
 import { UPL_PERIODICITY_KEY, UPL_STRICTNESS_KEY, uplProblemText } from '../upl-labels';
 
 /** Модель окна «Новый источник»: обычный объект, чтобы работал `[(ngModel)]`. */
@@ -149,7 +150,7 @@ function emptyForm(): SourceCreateForm {
             </table>
           </div>
         </div>
-        @if (hasMore()) {
+        @if (hasMore() && nextCursor() !== null) {
           <div class="upl-more">
             <ui-button
               variant="secondary"
@@ -478,7 +479,7 @@ export class SourcesListComponent implements OnInit {
   }
 
   loadMore(): void {
-    if (this.isLoadingMore() || !this.hasMore()) {
+    if (this.isLoadingMore() || !this.hasMore() || this.nextCursor() === null) {
       return;
     }
     this.isLoadingMore.set(true);
@@ -569,14 +570,14 @@ export class SourcesListComponent implements OnInit {
   private handleCreateError(problem: ProblemDetail): void {
     if (problem?.status === 422) {
       const errors: Record<string, string> = {};
-      for (const param of problem.invalid_params ?? []) {
-        errors[param.name] = param.reason;
+      for (const item of parseUplProblem(problem)) {
+        errors[item.field] = uplFieldErrorText(item, key => this.i18n.translate(key));
       }
       this.fieldErrors.set(errors);
       this.createError.set('upl.err.VALIDATION_FAILED');
       return;
     }
-    if (problem?.detail === 'UPL_SOURCE_CODE_TAKEN') {
+    if (problem?.code === 'CODE_ALREADY_EXISTS' || problem?.detail === 'UPL_SOURCE_CODE_TAKEN') {
       this.fieldErrors.set({ code: 'upl.err.UPL_SOURCE_CODE_TAKEN' });
       return;
     }
