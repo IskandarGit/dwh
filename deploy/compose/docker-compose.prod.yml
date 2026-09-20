@@ -7,6 +7,10 @@ x-server-common: &server-common
     DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
     DB_USER: ${DB_USER:?DB_USER is required}
     DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    APP_DWH_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
+    APP_DWH_USERNAME: ${DB_USER:?DB_USER is required}
+    APP_DWH_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    APP_DWH_CONNECT_TIMEOUT: ${APP_DWH_CONNECT_TIMEOUT:-5s}
     DWH_INSTANCE_CLIENT_CODE: ${ORGANIZATION_CODE:-default}
     DWH_INSTANCE_CLIENT_NAME: ${ORGANIZATION_NAME:?ORGANIZATION_NAME is required}
     DWH_INSTANCE_RESOURCE_PROFILE: ${RESOURCE_PROFILE:-S}
@@ -69,6 +73,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-smartupcms}
+      DWH_DB_NAME: ${DWH_DB_NAME:-smartupcms_dwh}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
       POSTGRES_INITDB_ARGS: "--data-checksums"
@@ -105,9 +110,26 @@ services:
     <<: *server-common
     profiles: [tools]
     environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
       DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
       DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
-    command: ["--spring.profiles.active=migrate"]
+      APP_DWH_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
+      APP_DWH_USERNAME: ${DB_USER:?DB_USER is required}
+      APP_DWH_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      APP_DWH_CONNECT_TIMEOUT: ${APP_DWH_CONNECT_TIMEOUT:-5s}
+      DWH_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
+      DWH_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      DWH_DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
+      DWH_DATA_DB_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
+      DWH_DATA_DB_USER: ${DB_USER:?DB_USER is required}
+      DWH_DATA_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    # ADR-0001, two databases: MigrateMain applies db/migration and db/dwh first, then the regular migrate profile runs
+    # (DwhSchemaVersionGate checks pg-dwh on every Spring context start). All arguments are inline: nothing is lost in sh -c.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        java -cp app.jar com.greenwhite.dwh.instance.fnd.migration.MigrateMain
+        && exec java -jar app.jar --spring.profiles.active=migrate
     restart: "no"
     depends_on:
       postgres: {condition: service_healthy}

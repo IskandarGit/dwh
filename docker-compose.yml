@@ -5,6 +5,10 @@ x-server-environment: &server-environment
   DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
   DB_USER: ${DB_USER:-smartupcms}
   DB_PASSWORD: ${DB_PASSWORD:-smartupcms_local_dev}
+  APP_DWH_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
+  APP_DWH_USERNAME: ${DB_USER:-smartupcms}
+  APP_DWH_PASSWORD: ${DB_PASSWORD:-smartupcms_local_dev}
+  APP_DWH_CONNECT_TIMEOUT: ${APP_DWH_CONNECT_TIMEOUT:-5s}
   DWH_INSTANCE_CLIENT_CODE: ${ORGANIZATION_CODE:-local}
   DWH_INSTANCE_CLIENT_NAME: ${ORGANIZATION_NAME:-Local Organization}
   DWH_INSTANCE_RESOURCE_PROFILE: ${RESOURCE_PROFILE:-S}
@@ -59,6 +63,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-smartupcms}
+      DWH_DB_NAME: ${DWH_DB_NAME:-smartupcms_dwh}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
       POSTGRES_INITDB_ARGS: "--data-checksums"
@@ -84,11 +89,24 @@ services:
     image: ${IMAGE_REGISTRY:-smartupcms}/server:${APP_VERSION:-dev}
     profiles: [tools]
     restart: "no"
-    command: ["--spring.profiles.active=migrate"]
+    # ADR-0001, two databases: MigrateMain applies db/migration and db/dwh first, then the regular migrate profile runs.
+    # DwhSchemaVersionGate checks pg-dwh on every Spring context start (the migrate profile included),
+    # so db/dwh has to be applied before the first context start. All arguments are inline: nothing is lost in sh -c.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        java -cp app.jar com.greenwhite.dwh.instance.fnd.migration.MigrateMain
+        && exec java -jar app.jar --spring.profiles.active=migrate
     environment:
       <<: *server-environment
       DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
       DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
+      DWH_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
+      DWH_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
+      DWH_DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:-smartupcms_local_dev}}
+      DWH_DATA_DB_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
+      DWH_DATA_DB_USER: ${DB_USER:-smartupcms}
+      DWH_DATA_DB_PASSWORD: ${DB_PASSWORD:-smartupcms_local_dev}
     depends_on:
       postgres: {condition: service_healthy}
 
