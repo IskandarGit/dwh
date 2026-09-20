@@ -30,6 +30,7 @@ export interface BuildNavSectionsOptions {
   canViewTasks: () => boolean;
   canViewProjects: () => boolean;
   canViewNotes: () => boolean;
+  canViewSources: () => boolean;
   canViewFiles: () => boolean;
   canViewAnalytics: () => boolean;
   canViewNotifications: () => boolean;
@@ -71,6 +72,7 @@ export function buildNavSections(options: BuildNavSectionsOptions): NavSection[]
   }
 
   workspaceItems.push(
+    { id: 'upl-sources', route: '/upl/sources', labelKey: 'nav.upl_sources', icon: 'table_view', permission: options.canViewSources },
     { id: 'files', route: '/files', labelKey: 'layout.app_shell.fayly', titleKey: 'files.faylovoe_hranilische', icon: 'folder_open', permission: options.canViewFiles },
     { id: 'analytics', route: '/analytics', labelKey: 'layout.app_shell.analitika', titleKey: 'analytics.analitika_i_dashbordy', icon: 'insights', permission: options.canViewAnalytics },
     { id: 'notifications', route: '/notifications', labelKey: 'nav.notifications', icon: 'notifications', permission: options.canViewNotifications, badge: options.unreadCount }
