@@ -48,6 +48,21 @@ import {
 
 const TARGET_FIELD_PATTERN = /^[a-z][a-z0-9_]{0,62}$/;
 
+/** Лист поля ошибки (`errors[].field` → хвост после `columns[n].`) → ключ заголовка колонки в таблице (М-21). */
+const COLUMN_FIELD_LABEL_KEY: Record<string, string> = {
+  nameInFile: 'upl.format.col.name_in_file',
+  targetField: 'upl.format.col.target_field',
+  dataType: 'upl.format.col.type',
+  required: 'upl.format.col.required',
+  sourceUnit: 'upl.format.col.source_unit',
+  baseUnit: 'upl.format.col.base_unit',
+  keyMask: 'upl.format.col.key_mask',
+  keyPadLength: 'upl.format.col.key_pad_length',
+  keyPadMax: 'upl.format.col.key_pad_max',
+  refBookCode: 'upl.format.col.ref_book',
+  filePosition: 'upl.format.col.file_position'
+};
+
 /** Пустая строка в необязательном поле означает «не заполнено», а не пустое значение. */
 function trimToNull(value: string | null | undefined): string | null {
   const trimmed = (value ?? '').trim();
@@ -217,13 +232,8 @@ function emptyModel(): UplFormatDraftRequest {
                 @for (problem of errors(); track $index) {
                   <li>
                     <button type="button" class="upl-error-item" (click)="focusError(problem)">
-                      @if (problem.sheet !== null && problem.column !== null) {
-                        <span class="upl-error-at">{{ text('upl.format.err_at_column', {
-                          sheet: (problem.sheet + 1).toString(),
-                          column: (problem.column + 1).toString()
-                        }) }}</span>
-                      } @else if (problem.sheet !== null) {
-                        <span class="upl-error-at">{{ text('upl.format.err_at_sheet', { sheet: (problem.sheet + 1).toString() }) }}</span>
+                      @if (problem.sheet !== null) {
+                        <span class="upl-error-at">{{ errorAddress(problem) }}</span>
                       }
                       <span>{{ errorText(problem) }}</span>
                     </button>
@@ -825,6 +835,18 @@ export class FormatEditorComponent implements RecordNavigationPage {
     return uplSheetHasErrors(this.errors(), sheet);
   }
 
+  /** Адрес ошибки в сводке: с именем поля, если оно известно по заголовку таблицы (М-21). */
+  errorAddress(problem: UplFieldError): string {
+    if (problem.sheet === null) return '';
+    const sheet = (problem.sheet + 1).toString();
+    if (problem.column === null) return this.text('upl.format.err_at_sheet', { sheet });
+    const column = (problem.column + 1).toString();
+    const labelKey = COLUMN_FIELD_LABEL_KEY[problem.field];
+    return labelKey
+      ? this.text('upl.format.err_at_field', { sheet, column, field: this.i18n.translate(labelKey) })
+      : this.text('upl.format.err_at_column', { sheet, column });
+  }
+
   /** Неизвестный код не прячем: показываем сообщение сервера и сам код. */
   errorText(problem: UplFieldError): string {
     return uplFieldErrorText(problem, key => this.i18n.translate(key));
@@ -924,6 +946,7 @@ export class FormatEditorComponent implements RecordNavigationPage {
       cleared = true;
     }
     if (cleared) {
+      this.errors.set([]);
       this.toast.info(this.i18n.translate('upl.format.cleared'));
     }
   }

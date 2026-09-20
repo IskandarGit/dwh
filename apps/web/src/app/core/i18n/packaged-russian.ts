@@ -1284,6 +1284,7 @@ export const PACKAGED_RUSSIAN: Readonly<Record<string, string>> = Object.freeze(
   "upl.format.encoding.utf_8": "utf-8",
   "upl.format.encoding.windows_1251": "windows-1251",
   "upl.format.err_at_column": "лист {sheet}, колонка {column}:",
+  "upl.format.err_at_field": "лист {sheet}, колонка {column}, «{field}»:",
   "upl.format.err_at_sheet": "лист {sheet}:",
   "upl.format.errors_title": "Проверьте анкету",
   "upl.format.field.delimiter": "Разделитель",
