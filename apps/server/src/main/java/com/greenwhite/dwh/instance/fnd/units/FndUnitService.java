@@ -14,6 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -71,6 +72,15 @@ public class FndUnitService {
                 .query((rs, rowNum) -> new FndUnit(rs.getLong("id"), rs.getString("code"),
                         rs.getString("name_i18n"), rs.getString("base_unit_code")))
                 .optional();
+    }
+
+    /** Все единицы экземпляра по коду — для выпадающих списков экранов (К-1, И4). Содержимое {@code nameI18n} ядру безразлично. */
+    @Transactional(readOnly = true)
+    public List<FndUnit> listUnits() {
+        return jdbc.sql("select id, code, name_i18n::text as name_i18n, base_unit_code from fnd_units order by code")
+                .query((rs, rowNum) -> new FndUnit(rs.getLong("id"), rs.getString("code"),
+                        rs.getString("name_i18n"), rs.getString("base_unit_code")))
+                .list();
     }
 
     /**

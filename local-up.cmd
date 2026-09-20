@@ -2,6 +2,7 @@
 REM Локальный запуск SmartupCMS директора БЕЗ Docker (проверено 09.09.2026)
 REM PostgreSQL 18 portable: C:\tools\pgsql18, данные C:\tools\pgdata18
 setlocal
+cd /d "%~dp0"
 set JAVA_HOME=C:\tools\jdk-25.0.4.1+1
 set PATH=C:\tools\node-v24.20.0-win-x64;%PATH%
 set DB_URL=jdbc:postgresql://127.0.0.1:5432/smartupcms
