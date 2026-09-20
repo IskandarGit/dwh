@@ -25,6 +25,7 @@ public class MsTaskStatusService {
     private final SearchChangePublisher searchChangePublisher;
     private final AuditLogService auditLogService;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public MsTaskStatusService(
             MsTaskStatusRepository statusRepository,
             MsTaskTypeRepository typeRepository,

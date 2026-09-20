@@ -21,6 +21,7 @@ public class MsNotificationService {
     private final com.greenwhite.dwh.instance.ms.notify.repository.MsNotificationPrefRepository prefRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public MsNotificationService(
             MsNotificationRepository notificationRepository,
             MsOutboxRepository outboxRepository,
