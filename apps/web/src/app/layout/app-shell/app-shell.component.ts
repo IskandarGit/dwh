@@ -438,7 +438,7 @@ export class AppShellComponent implements OnDestroy {
   canViewSettings = () => true;
   canViewSystem = () => this.permService.canView('platform.settings');
   canViewNotes = () => this.permService.canView('notes') && this.moduleService.isModuleActive('notes');
-  canViewSources = () => this.permService.canView('upl.sources');
+  canViewSources = () => this.permService.canView('upl.sources') && this.moduleService.isModuleActive('upl');
   canViewModules = () => this.permService.canView('platform.modules');
   canViewNavigationSettings = () => this.permService.canView('platform.navigation');
 

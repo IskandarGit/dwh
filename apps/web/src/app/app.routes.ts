@@ -91,18 +91,18 @@ export const routes: Routes = [
       {
         path: 'upl/sources',
         pathMatch: 'full',
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         loadComponent: () => import('./features/upl/sources/sources-list.component').then(m => m.SourcesListComponent)
       },
       {
         matcher: uplFormatMatcher,
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         canDeactivate: [recordNavigationGuard],
         loadComponent: () => import('./features/upl/formats/format-editor.component').then(m => m.FormatEditorComponent)
       },
       {
         matcher: uplSourceMatcher,
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         loadComponent: () => import('./features/upl/sources/source-card.component').then(m => m.SourceCardComponent)
       },
       {
