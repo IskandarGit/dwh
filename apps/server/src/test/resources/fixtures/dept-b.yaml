@@ -1,0 +1,35 @@
+# Конфигурация экземпляра «ведомство Б» (AC-41): другие коды (точка, дефис, кириллица в именах), другие множители,
+# другие источники и периоды. Только тест-ресурс.
+name: dept-b
+units:
+  - code: unit.b1
+    name_uz: Асосий бирлик TEST
+    base: unit.b1
+  - code: unit-b2
+    name_uz: Иккинчи бирлик TEST
+    base: unit.b1
+  - code: unit_b3
+    name_uz: Учинчи бирлик TEST
+    base: unit_b3
+coefficients:
+  - from: unit-b2
+    to: unit.b1
+    factor: 0.5
+    valid_from: 2025-10-01
+  - from: unit-b2
+    to: unit.b1
+    factor: 0.75
+    valid_from: 2026-04-01
+loads:
+  - source: manba.b
+    period_from: 2026-03-01
+    period_to: 2026-03-31
+    format: "2.0"
+  - source: manba.b.filial
+    period_from: 2026-03-01
+    period_to: 2026-03-31
+    format: "2.0"
+  - source: manba.b
+    period_from: 2026-04-01
+    period_to: 2026-04-30
+    format: "2.0"

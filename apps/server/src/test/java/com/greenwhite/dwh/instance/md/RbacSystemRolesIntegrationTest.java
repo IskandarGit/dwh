@@ -121,7 +121,8 @@ class RbacSystemRolesIntegrationTest {
     void systemRolesExist() {
         List<String> pcodes = jdbc.sql("select pcode from md_roles where pcode is not null order by pcode")
                 .query(String.class).list();
-        assertThat(pcodes).containsExactlyInAnyOrder("admin", "manager", "auditor", "user");
+        // [допущение] И1: pcode есть и у ролей экземпляра (V110), поэтому contains, а не точное равенство
+        assertThat(pcodes).contains("admin", "manager", "auditor", "user");
     }
 
     @Test
