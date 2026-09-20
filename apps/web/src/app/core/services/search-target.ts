@@ -41,6 +41,7 @@ export function searchTarget(hit: SearchHit): string[] | null {
     case 'TASK': return ['/tasks/items', hit.id];
     case 'PROJECT': return ['/tasks/projects', hit.id];
     case 'USER': return ['/iam/users', hit.id];
+    case 'NOTE': return ['/notes'];
     default: return null;
   }
 }

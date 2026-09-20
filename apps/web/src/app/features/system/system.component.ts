@@ -16,11 +16,11 @@ export interface SystemInfo {
   components: Record<string, { status: string }>;
   backup: {
     status: string;
-    completedAt: string | null;
-    failureCode: string | null;
+    completedAt?: string | null;
+    failureCode?: string | null;
     freshness: string;
-    ageSeconds: number | null;
-    maxAgeSeconds: number | null;
+    ageSeconds?: number | null;
+    maxAgeSeconds?: number | null;
   };
   checkedAt: string;
 }
@@ -133,10 +133,10 @@ type OverallStatus = 'healthy' | 'attention' | 'unavailable';
               <div>
                 <strong>{{ backupStatusLabel(info.backup) }}</strong>
                 <p *ngIf="info.backup.completedAt">{{ info.backup.completedAt | date:'dd.MM.yyyy, HH:mm:ss' }}</p>
-                <p *ngIf="info.backup.status === 'SUCCESS' && info.backup.ageSeconds !== null">
+                <p *ngIf="info.backup.status === 'SUCCESS' && info.backup.ageSeconds != null">
                   {{ 'system.backup_age' | t:{duration: formatDuration(info.backup.ageSeconds)} }}
                 </p>
-                <p *ngIf="info.backup.maxAgeSeconds !== null">
+                <p *ngIf="info.backup.maxAgeSeconds != null">
                   {{ 'system.backup_max_age' | t:{duration: formatDuration(info.backup.maxAgeSeconds)} }}
                 </p>
                 <p *ngIf="info.backup.status === 'FAILED' && info.backup.failureCode" class="failure-code mono">
@@ -384,8 +384,11 @@ export class SystemComponent implements OnInit {
     return 'attention';
   }
 
-  formatDuration(seconds: number): string {
-    if (!Number.isFinite(seconds) || seconds < 60) {
+  formatDuration(seconds: number | null | undefined): string {
+    if (seconds == null || !Number.isFinite(seconds) || seconds < 0) {
+      return '';
+    }
+    if (seconds < 60) {
       return this.uiI18n.translate('system.duration_less_than_minute');
     }
     const totalMinutes = Math.floor(seconds / 60);

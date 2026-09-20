@@ -73,4 +73,9 @@ public class MsNotificationService {
     public void markAnnouncementAsRead(Long announcementId, Long userId) {
         announcementRepository.markAsRead(announcementId, userId);
     }
+
+    @Transactional(readOnly = true)
+    public boolean hasRecentNotification(Long userId, String sourceCode, java.time.Duration window) {
+        return notificationRepository.hasRecentNotification(userId, sourceCode, java.time.Instant.now().minus(window));
+    }
 }

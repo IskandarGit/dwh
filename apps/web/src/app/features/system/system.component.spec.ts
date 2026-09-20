@@ -148,4 +148,20 @@ describe('SystemComponent', () => {
     const overall = fixture.nativeElement.querySelector('[data-testid="overall-status"]');
     expect(overall?.getAttribute('data-status')).toBe('attention');
   });
+
+  it('omits backup age and max age when not configured or absent', async () => {
+    const { fixture } = await createFixture(of({
+      ...systemInfo,
+      backup: {
+        status: 'NEVER',
+        freshness: 'NOT_APPLICABLE'
+      }
+    }));
+
+    const backupPanel = fixture.nativeElement.querySelector('[data-testid="backup-status"]');
+    expect(backupPanel?.textContent).toContain('Резервная копия ещё не создавалась');
+    expect(backupPanel?.textContent).not.toContain('Допустимый возраст');
+    expect(backupPanel?.textContent).not.toContain('Возраст:');
+    expect(backupPanel?.textContent).not.toContain('Меньше минуты');
+  });
 });

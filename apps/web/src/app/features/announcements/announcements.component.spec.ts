@@ -21,6 +21,34 @@ describe('AnnouncementsComponent', () => {
     lockVersion: 3
   };
 
+  const published: AnnouncementAdminRecord = {
+    id: 8,
+    titleJson: { ru: 'Релиз обновлен', en: 'Release updated' },
+    bodyJson: { ru: 'Добавлены новые отчеты.', en: 'New reports added.' },
+    bannerType: 'INFO',
+    state: 'PUBLISHED',
+    createdBy: 1,
+    createdAt: '2026-09-03T08:00:00Z',
+    modifiedAt: '2026-09-03T08:00:00Z',
+    publishedAt: '2026-09-03T08:00:00Z',
+    archivedAt: null,
+    lockVersion: 1
+  };
+
+  const archived: AnnouncementAdminRecord = {
+    id: 9,
+    titleJson: { ru: 'Архивное сообщение' },
+    bodyJson: { ru: 'Старое сообщение.' },
+    bannerType: 'CRITICAL',
+    state: 'ARCHIVED',
+    createdBy: 1,
+    createdAt: '2026-09-01T08:00:00Z',
+    modifiedAt: '2026-09-01T09:00:00Z',
+    publishedAt: '2026-09-01T08:00:00Z',
+    archivedAt: '2026-09-01T09:00:00Z',
+    lockVersion: 2
+  };
+
   async function createFixture(options: {
     records?: AnnouncementAdminRecord[];
     getError?: boolean;
@@ -111,5 +139,43 @@ describe('AnnouncementsComponent', () => {
     const failed = await createFixture({ getError: true });
     expect(failed.fixture.nativeElement.querySelector('[data-testid="announcements-load-error"][role="alert"]')?.textContent).toContain('Не удалось загрузить объявления');
     expect(failed.fixture.nativeElement.querySelector('button[aria-label="Повторить загрузку объявлений"]')).not.toBeNull();
+  });
+
+  it('filters announcements by status and search text', async () => {
+    const { fixture } = await createFixture({ records: [draft, published, archived] });
+    const comp = fixture.componentInstance;
+
+    expect(comp.filteredAnnouncements()).toHaveLength(3);
+
+    comp.setStatusFilter('PUBLISHED');
+    expect(comp.filteredAnnouncements()).toHaveLength(1);
+    expect(comp.filteredAnnouncements()[0].id).toBe(8);
+
+    comp.setStatusFilter('DRAFT');
+    expect(comp.filteredAnnouncements()).toHaveLength(1);
+    expect(comp.filteredAnnouncements()[0].id).toBe(7);
+
+    comp.setStatusFilter('ARCHIVED');
+    expect(comp.filteredAnnouncements()).toHaveLength(1);
+    expect(comp.filteredAnnouncements()[0].id).toBe(9);
+
+    comp.setStatusFilter('ALL');
+    comp.searchQuery.set('Релиз');
+    expect(comp.filteredAnnouncements()).toHaveLength(1);
+    expect(comp.filteredAnnouncements()[0].id).toBe(8);
+
+    comp.resetFilters();
+    expect(comp.statusFilter()).toBe('ALL');
+    expect(comp.searchQuery()).toBe('');
+    expect(comp.filteredAnnouncements()).toHaveLength(3);
+  });
+
+  it('highlights the active published announcement with an active badge', async () => {
+    const { fixture } = await createFixture({ records: [draft, published, archived] });
+    fixture.detectChanges();
+
+    const activeBadge = fixture.nativeElement.querySelector('.active-badge');
+    expect(activeBadge).not.toBeNull();
+    expect(activeBadge.textContent).toContain('Активно');
   });
 });

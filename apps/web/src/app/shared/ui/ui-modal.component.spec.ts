@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 import { UiModalComponent } from './ui-modal.component';
+import { UiSearchableSelectComponent } from './ui-searchable-select.component';
 
 describe('UiModalComponent', () => {
   it('labels the dialog with its visible title', async () => {
@@ -44,7 +45,7 @@ describe('UiModalComponent', () => {
     expect(closes).toBe(0);
   });
 
-  it('leaves Escape to an expanded control inside the dialog', async () => {
+  it('closes for an ordinary expanded disclosure inside the dialog', async () => {
     await TestBed.configureTestingModule({ imports: [UiModalComponent] }).compileComponents();
     const fixture = TestBed.createComponent(UiModalComponent);
     fixture.componentRef.setInput('isOpen', true);
@@ -58,8 +59,30 @@ describe('UiModalComponent', () => {
     const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
     document.dispatchEvent(escape);
 
+    expect(closes).toBe(1);
+    expect(escape.defaultPrevented).toBe(true);
+  });
+
+  it('lets an actual open searchable select consume Escape before its dialog', async () => {
+    await TestBed.configureTestingModule({ imports: [UiModalComponent, UiSearchableSelectComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(UiModalComponent);
+    const select = TestBed.createComponent(UiSearchableSelectComponent);
+    fixture.componentRef.setInput('isOpen', true);
+    select.componentRef.setInput('options', [{ id: 1, label: 'Первый' }]);
+    let closes = 0;
+    fixture.componentInstance.close.subscribe(() => closes++);
+    fixture.detectChanges();
+    select.detectChanges();
+    fixture.nativeElement.append(select.nativeElement);
+    select.componentInstance.toggleDropdown();
+    select.detectChanges();
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    document.dispatchEvent(escape);
+
+    expect(select.componentInstance.isOpen()).toBe(false);
     expect(closes).toBe(0);
-    expect(escape.defaultPrevented).toBe(false);
+    expect(escape.defaultPrevented).toBe(true);
   });
 
   it('locks background scrolling only while open', async () => {

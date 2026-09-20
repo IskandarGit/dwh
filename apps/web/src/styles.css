@@ -21,6 +21,7 @@
   --primary-hover: #075985;
   --primary-subtle: #e0f2fe;
   --primary-text: #0369a1;
+  --on-primary: #ffffff;
 
   /* Semantics */
   --success: #166534;
@@ -34,6 +35,19 @@
   --info-bg: #dbeafe;
 
   /* Metrics & Layout */
+  --control-height: 34px;
+  --control-touch-height: 44px;
+  --sidebar-width: 220px;
+  --sidebar-compact-width: 60px;
+  --topbar-height: 52px;
+  --content-padding: 20px;
+  --content-padding-mobile: 12px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-strong: #f8fafc;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --radius-xs: 3px;
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -67,6 +81,7 @@
   --primary-hover: #0ea5e9;
   --primary-subtle: #082f49;
   --primary-text: #7dd3fc;
+  --on-primary: #090d16;
 
   --success: #22c55e;
   --success-bg: #052e16;
@@ -386,19 +401,24 @@ body.modal-open {
   border-radius: 50%;
 }
 
-.clean-select {
-  height: 32px;
+.clean-select, .ui-select {
+  height: var(--control-height);
   padding: 0 8px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background-color: var(--bg-surface);
   color: var(--text-main);
   font-size: 12px;
+  font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
-.clean-select:focus {
+.clean-select:focus, .ui-select:focus {
   border-color: var(--primary);
+}
+
+@media (max-width: 767px) {
+  .ui-select { min-height: var(--control-touch-height); }
 }
 
 /* Card & Table Standard */

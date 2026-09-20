@@ -39,8 +39,35 @@ public class MsTaskService {
     private final ApplicationEventPublisher eventPublisher;
     private final com.greenwhite.dwh.instance.search.SearchChangePublisher searchChangePublisher;
     private final com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService;
+    private final MsTaskStatusService statusService;
 
-
+    @org.springframework.beans.factory.annotation.Autowired
+    public MsTaskService(
+            MsTaskRepository taskRepository,
+            MsTaskStatusRepository statusRepository,
+            MsTaskTypeRepository typeRepository,
+            MsTaskMemberRepository memberRepository,
+            MsProjectRepository projectRepository,
+            MdCustomFieldService customFieldService,
+            MdScopeService scopeService,
+            MfFileService fileService,
+            ApplicationEventPublisher eventPublisher,
+            com.greenwhite.dwh.instance.search.SearchChangePublisher searchChangePublisher,
+            com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService,
+            MsTaskStatusService statusService) {
+        this.taskRepository = taskRepository;
+        this.statusRepository = statusRepository;
+        this.typeRepository = typeRepository;
+        this.memberRepository = memberRepository;
+        this.projectRepository = projectRepository;
+        this.customFieldService = customFieldService;
+        this.scopeService = scopeService;
+        this.fileService = fileService;
+        this.eventPublisher = eventPublisher;
+        this.searchChangePublisher = searchChangePublisher;
+        this.auditLogService = auditLogService;
+        this.statusService = statusService;
+    }
 
     public MsTaskService(
             MsTaskRepository taskRepository,
@@ -54,17 +81,9 @@ public class MsTaskService {
             ApplicationEventPublisher eventPublisher,
             com.greenwhite.dwh.instance.search.SearchChangePublisher searchChangePublisher,
             com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService) {
-        this.taskRepository = taskRepository;
-        this.statusRepository = statusRepository;
-        this.typeRepository = typeRepository;
-        this.memberRepository = memberRepository;
-        this.projectRepository = projectRepository;
-        this.customFieldService = customFieldService;
-        this.scopeService = scopeService;
-        this.fileService = fileService;
-        this.eventPublisher = eventPublisher;
-        this.searchChangePublisher = searchChangePublisher;
-        this.auditLogService = auditLogService;
+        this(taskRepository, statusRepository, typeRepository, memberRepository, projectRepository,
+             customFieldService, scopeService, fileService, eventPublisher, searchChangePublisher,
+             auditLogService, new MsTaskStatusService(statusRepository, typeRepository, searchChangePublisher));
     }
 
 
@@ -221,6 +240,14 @@ public class MsTaskService {
     public KeysetPage<MsTaskRepository.TaskRecord> listTasks(
             int limit, String cursor, Long projectId, Long statusId, String priority, String search,
             Boolean hideTerminal, Long currentUserId) {
+        return listTasks(limit, cursor, projectId, statusId, priority, search, hideTerminal,
+                null, null, null, currentUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public KeysetPage<MsTaskRepository.TaskRecord> listTasks(
+            int limit, String cursor, Long projectId, Long statusId, String priority, String search,
+            Boolean hideTerminal, Long assignedUserId, Long reporterId, Boolean overdue, Long currentUserId) {
 
         Long afterId = null;
         if (cursor != null && !cursor.isBlank()) {
@@ -235,7 +262,7 @@ public class MsTaskService {
         int fetchLimit = limit + 1;
         List<MsTaskRepository.TaskRecord> tasks = taskRepository.listTasks(
                 fetchLimit, afterId, projectId, statusId, priority, search, hideTerminal,
-                scopeService.filterForTasks(currentUserId));
+                assignedUserId, reporterId, overdue, scopeService.filterForTasks(currentUserId));
 
         boolean hasMore = tasks.size() > limit;
         List<MsTaskRepository.TaskRecord> resultItems = hasMore ? tasks.subList(0, limit) : tasks;
@@ -516,89 +543,56 @@ public class MsTaskService {
     }
 
     // =========================================================================
-    // Dynamic Statuses
+    // Dynamic Statuses & Types (Delegated to MsTaskStatusService)
     // =========================================================================
     @Transactional
     public List<MsTaskStatusRepository.StatusRecord> listStatuses() {
-        statusRepository.initDefaultStatusesIfEmpty();
-        return statusRepository.listStatuses();
+        return statusService.listStatuses();
     }
 
     @Transactional
     public MsTaskStatusRepository.StatusRecord createStatus(String pcode, String name, String color, int orderNo, boolean isTerminal) {
-        if (name == null || name.isBlank()) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Название статуса обязательно");
-        }
-        return statusRepository.create(pcode, name, color, orderNo, isTerminal);
+        return statusService.createStatus(pcode, name, color, orderNo, isTerminal);
     }
 
     @Transactional
     public void updateStatusRecord(Long id, String name, String color, Integer orderNo, Boolean isTerminal) {
-        statusRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Статус не найден"));
-        statusRepository.update(id, name, color, orderNo, isTerminal);
-        if (name != null) searchChangePublisher.statusChanged(id);
+        statusService.updateStatusRecord(id, name, color, orderNo, isTerminal);
     }
 
     @Transactional
     public void deleteStatus(Long id) {
-        var status = statusRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Статус не найден"));
-        if (status.pcode() != null) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Нельзя удалить базовый системный статус");
-        }
-        boolean deleted = statusRepository.delete(id);
-        if (!deleted) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Нельзя удалить статус, который используется в задачах");
-        }
+        statusService.deleteStatus(id);
     }
 
-    // =========================================================================
-    // Dynamic Types
-    // =========================================================================
     @Transactional
     public List<MsTaskTypeRepository.TypeRecord> listTypes() {
-        typeRepository.initDefaultTypesIfEmpty();
-        return typeRepository.listTypes();
+        return statusService.listTypes();
     }
 
     @Transactional
     public MsTaskTypeRepository.TypeRecord createType(String code, String name, String icon, String color, int orderNo) {
-        if (code == null || code.isBlank() || name == null || name.isBlank()) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Код и название типа обязательны");
-        }
-        String cleanCode = code.trim().toLowerCase().replaceAll("[^a-z0-9_]", "_");
-        if (typeRepository.findByCode(cleanCode).isPresent()) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Тип с таким кодом уже существует");
-        }
-        return typeRepository.create(cleanCode, name, icon, color, orderNo);
+        return statusService.createType(code, name, icon, color, orderNo);
     }
 
     @Transactional
     public void updateType(Long id, String name, String icon, String color, Integer orderNo) {
-        typeRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Тип задачи не найден"));
-        typeRepository.update(id, name, icon, color, orderNo);
+        statusService.updateType(id, name, icon, color, orderNo);
     }
 
     @Transactional
     public void deleteType(Long id) {
-        var type = typeRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Тип задачи не найден"));
-        if (type.isSystem()) {
-            throw ApiException.badRequest(ErrorCode.BAD_REQUEST, "Нельзя удалить системный тип задачи");
-        }
-        typeRepository.delete(id);
+        statusService.deleteType(id);
     }
 
     @Transactional
     public void reorderStatuses(List<Long> orderedIds) {
-        statusRepository.reorder(orderedIds);
+        statusService.reorderStatuses(orderedIds);
     }
 
     @Transactional
     public void reorderTypes(List<Long> orderedIds) {
-        typeRepository.reorder(orderedIds);
+        statusService.reorderTypes(orderedIds);
     }
 
 

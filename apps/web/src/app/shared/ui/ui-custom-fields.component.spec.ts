@@ -59,4 +59,33 @@ describe('UiCustomFieldsComponent', () => {
 
     expect(emitted).toEqual({ region: 'Самарканд' });
   });
+
+  it('renders configured user_ref dropdown and emits numeric user id', async () => {
+    await TestBed.configureTestingModule({ imports: [UiCustomFieldsComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(UiCustomFieldsComponent);
+    fixture.componentRef.setInput('fields', [{
+      ...baseField,
+      id: 4,
+      code: 'curator_id',
+      name: 'Куратор',
+      fieldType: 'user_ref'
+    }] satisfies CustomField[]);
+    fixture.componentRef.setInput('users', [
+      { id: 42, name: 'Анна Смирнова', login: 'asmirnova' }
+    ]);
+    let emitted: Record<string, unknown> | undefined;
+    fixture.componentInstance.valuesChange.subscribe(value => emitted = value);
+    fixture.detectChanges();
+
+    const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+    expect(select.options.length).toBe(2);
+    expect(select.options[1].textContent?.trim()).toContain('Анна Смирнова');
+
+    select.value = select.options[1].value;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(emitted).toEqual({ curator_id: 42 });
+  });
 });

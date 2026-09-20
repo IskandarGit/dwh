@@ -1,0 +1,65 @@
+<section class="page" aria-labelledby="org-units-title">
+  <header><h1 id="org-units-title">{{ 'iam.org_units.title' | t }}</h1>
+    @if (can('view')) { <ui-button variant="secondary" [disabled]="pending || loading || editorOpen" (onClick)="reload()">{{ 'iam.org_units.refresh' | t }}</ui-button> }
+  </header>
+  @if (!can('view')) { <p role="alert">{{ 'iam.org_units.forbidden' | t }}</p> }
+  @else {
+    @if (loading) { <p role="status">{{ 'iam.org_units.loading' | t }}</p> }
+    @if (treeError) {
+      <div role="alert"><p>{{ (savedRefreshFailed ? 'iam.org_units.saved_refresh_error' : 'iam.org_units.load_error') | t }} {{ treeError.detail }}</p>
+        <ui-button data-action="retry-tree" variant="secondary" [disabled]="pending || loading || editorOpen" (onClick)="reload()">{{ 'iam.org_units.retry' | t }}</ui-button>
+      </div>
+    }
+    @if (loaded && !units.length && !treeError) { <p>{{ 'iam.org_units.empty' | t }}</p> }
+    <div class="columns">
+      <section class="tree" [attr.aria-label]="'iam.org_units.tree' | t">
+        <app-org-unit-tree [units]="units" [selectedId]="selected?.id ?? null" [disabled]="pending" (selectUnit)="select($event)" />
+      </section>
+      <section class="details" [attr.aria-label]="'iam.org_units.details' | t">
+        @if (selected; as unit) {
+          <h2>{{ unit.name }}</h2>
+          <dl>
+            <dt>{{ 'iam.org_units.code' | t }}</dt><dd>{{ unit.code }}</dd>
+            <dt>{{ 'iam.org_units.kind' | t }}</dt><dd>{{ kindKeys[unit.kind] ? (kindKeys[unit.kind] | t) : unit.kind }}</dd>
+            <dt>{{ 'iam.org_units.parent' | t }}</dt><dd>{{ parentName(unit) }}</dd>
+            <dt>{{ 'iam.org_units.state' | t }}</dt><dd>{{ (unit.state === 'A' ? 'iam.org_units.active' : 'iam.org_units.passive') | t }}</dd>
+            <dt>{{ 'iam.org_units.order' | t }}</dt><dd>{{ unit.orderNo }}</dd>
+          </dl>
+          @if (!safeId(unit.id)) { <p role="status">{{ 'iam.org_units.readonly_id' | t }}</p> }
+          @if (hasChildren && can('delete')) { <p>{{ 'iam.org_units.delete_children' | t }}</p> }
+          <div class="actions">
+            @if (can('update') && safeId(unit.id)) { <ui-button data-action="edit" variant="secondary" [disabled]="pending || loading" (onClick)="edit()">{{ 'iam.org_units.edit' | t }}</ui-button> }
+            @if (can('delete') && safeId(unit.id)) { <ui-button data-action="delete" variant="danger" [disabled]="pending || loading || hasChildren" (onClick)="requestDelete()">{{ 'iam.org_units.delete' | t }}</ui-button> }
+          </div>
+        }
+        @if (can('create')) { <ui-button data-action="create" [disabled]="!canCreate || pending || loading" (onClick)="create()">{{ (units.length ? 'iam.org_units.create_child' : 'iam.org_units.create_root') | t }}</ui-button> }
+      </section>
+    </div>
+  }
+</section>
+@if (can('view')) {
+<ui-modal [isOpen]="editorOpen" [title]="'iam.org_units.editor_title' | t" [hasFooter]="false" [dismissible]="!pending" (close)="closeEditor()">
+  @if (editorOpen) {
+    @if (detailLoading) { <p role="status">{{ 'iam.org_units.loading' | t }}</p> }
+    @if (detailError) { <p role="alert">{{ detailError.detail || ('iam.org_units.load_error' | t) }}</p><ui-button variant="secondary" (onClick)="loadDetail()">{{ 'iam.org_units.retry' | t }}</ui-button> }
+    @for (initial of editorInitial ? [editorInitial] : []; track initial) { <app-org-unit-editor [initial]="initial" [units]="units" [pending]="pending" [error]="saveError" (save)="save($event)" (cancel)="closeEditor()" /> }
+  }
+</ui-modal>
+<ui-modal [isOpen]="!!deleteTarget" [title]="'iam.org_units.delete_title' | t" [dismissible]="!pending" (close)="closeDelete()">
+  <div body data-delete-confirm>
+    <p>{{ 'iam.org_units.delete_warning' | t:{name: deleteTarget?.name ?? '', code: deleteTarget?.code ?? ''} }}</p>
+    @if (deleteError) { <p role="alert">{{ deleteError.detail || ('iam.org_units.delete_error' | t) }}</p> }
+  </div>
+  <div footer class="actions">
+    <ui-button variant="secondary" [disabled]="pending" (onClick)="closeDelete()">{{ 'iam.org_units.cancel' | t }}</ui-button>
+    <ui-button data-action="confirm-delete" variant="danger" [loading]="pending" (onClick)="confirmDelete()">{{ 'iam.org_units.delete' | t }}</ui-button>
+  </div>
+</ui-modal>
+<ui-modal [isOpen]="discard.open()" [title]="'iam.org_units.discard_title' | t" (close)="discard.cancel()">
+  <p body>{{ 'iam.org_units.discard_warning' | t }}</p>
+  <div footer class="actions">
+    <ui-button variant="secondary" (onClick)="discard.cancel()">{{ 'iam.org_units.keep_editing' | t }}</ui-button>
+    <ui-button variant="danger" (onClick)="discard.confirm()">{{ 'iam.org_units.discard' | t }}</ui-button>
+  </div>
+</ui-modal>
+}

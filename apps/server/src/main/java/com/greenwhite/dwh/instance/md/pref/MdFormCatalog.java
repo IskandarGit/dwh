@@ -153,6 +153,21 @@ public final class MdFormCatalog {
                 "view", "Просмотр аналитики",
                 "manage", "Управление дашбордами")));
 
+        forms.put("platform.modules", new FormMeta("md", "Модули системы", ordered(
+                "view", "Просмотр установленных модулей",
+                "manage", "Управление активностью модулей")));
+
+        forms.put("notes", new FormMeta("ms.note", "Заметки", ordered(
+                "view", "Просмотр заметок",
+                "create", "Создание заметки",
+                "update", "Редактирование заметки",
+                "delete", "Удаление заметки",
+                "pin", "Закрепление заметки")));
+
+        forms.put(MdPref.FORM_NAVIGATION, new FormMeta("md", "Навигация и меню", ordered(
+                "view", "Просмотр меню и отчетов",
+                "manage", "Управление пунктами меню и отчетами")));
+
         return Map.copyOf(forms);
     }
 

@@ -33,7 +33,7 @@ const russianKeys = new Set(Object.keys(catalogs.ru));
 const nonTranslationIdentifiers = new Set([
   'analytics.dashboard', 'iam.roles', 'iam.users', 'md.custom_fields', 'md.roles',
   'notify.inbox', 'platform.files', 'rbac.roles', 'role.pcode', 's.pcode',
-  'system.custom_fields', 'tasks.items', 'tasks.projects'
+  'system.custom_fields', 'tasks.items', 'tasks.projects', 'user.theme'
 ]);
 const usedKeys = new Set();
 const rawCopy = [];

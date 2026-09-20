@@ -18,14 +18,16 @@ public record SearchQueryPolicy(
         if (requestsPerMinute < 30 || requestsPerMinute > 600 || burst < 10 || burst > 60 || burst > requestsPerMinute)
             throw new IllegalArgumentException("Invalid search rate budget");
         if (!"MIXED".equals(schemaProfile) && !"RU".equals(schemaProfile)) throw new IllegalArgumentException("Invalid search schema profile");
-        if (fields == null || !fields.keySet().equals(Set.of("TASK", "PROJECT", "USER")))
-            throw new IllegalArgumentException("Exactly three search entities are required");
+        if (fields == null || !fields.keySet().containsAll(Set.of("TASK", "PROJECT", "USER"))
+                || !Set.of("TASK", "PROJECT", "USER", "NOTE").containsAll(fields.keySet()))
+            throw new IllegalArgumentException("Search entities must include TASK, PROJECT, USER and optionally NOTE");
         var copy = new LinkedHashMap<String, List<FieldPolicy>>();
         fields.forEach((entityType, policies) -> {
             Set<String> permitted = switch (entityType) {
                 case "TASK" -> Set.of("title", "description_markdown", "status_name", "project_name");
                 case "PROJECT" -> Set.of("name", "description");
                 case "USER" -> Set.of("name", "login", "email", "phone");
+                case "NOTE" -> Set.of("title", "content_md", "color");
                 default -> throw new IllegalArgumentException("Unknown search entity");
             };
             if (policies == null || policies.size() != permitted.size() || policies.stream().anyMatch(java.util.Objects::isNull)

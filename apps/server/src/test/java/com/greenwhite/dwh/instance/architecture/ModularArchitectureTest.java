@@ -106,6 +106,9 @@ class ModularArchitectureTest {
                 .check(importedClasses);
     }
 
+
+
+
     @Test
     @DisplayName("5. Модуль файлового хранилища (mf) не должен зависеть от прикладного модуля задач (ms)")
     void fileStorageModuleShouldNotDependOnTasksModule() {
@@ -142,6 +145,48 @@ class ModularArchitectureTest {
                 .and().areNotInterfaces()
                 .should().beAnnotatedWith(Repository.class)
                 .check(importedClasses);
+    }
+
+    @Test
+    @DisplayName("9. Модуль аутентификации (kauth) не должен напрямую зависеть от репозиториев мастер-данных (md), кроме адаптера KauthUserSessionInvalidator")
+    void kauthShouldNotDependOnMdRepositoriesDirectly() {
+        noClasses()
+                .that().resideInAPackage("com.greenwhite.dwh.instance.kauth..")
+                .and().doNotHaveSimpleName("KauthUserSessionInvalidator")
+                .should().dependOnClassesThat(
+                        JavaClass.Predicates.resideInAPackage("com.greenwhite.dwh.instance.md.repository..")
+                                .and(JavaClass.Predicates.simpleNameEndingWith("Repository")))
+                .check(importedClasses);
+    }
+
+    @Test
+    @DisplayName("10. Модуль задач (ms.task) не должен напрямую зависеть от репозиториев уведомлений (ms.notify)")
+    void taskModuleShouldNotDependOnNotifyRepositoriesDirectly() {
+        noClasses()
+                .that().resideInAPackage("com.greenwhite.dwh.instance.ms.task..")
+                .should().dependOnClassesThat(
+                        JavaClass.Predicates.resideInAPackage("com.greenwhite.dwh.instance.ms.notify.repository..")
+                                .and(JavaClass.Predicates.simpleNameEndingWith("Repository")))
+                .check(importedClasses);
+    }
+
+    @Test
+    @DisplayName("11. Правило запрета доступа к чужим репозиториям корректно выявляет нарушения")
+    void foreignRepositoryRuleRejectsDirectAccess() {
+        var rule = noClasses().should().dependOnClassesThat(
+                JavaClass.Predicates.resideInAPackage("com.greenwhite.dwh.instance.md.repository..")
+                        .and(JavaClass.Predicates.simpleNameEndingWith("Repository")));
+        var result = rule.evaluate(new ClassFileImporter().importClasses(FakeRepositoryConsumer.class));
+        assertThat(result.hasViolation()).isTrue();
+        assertThat(result.getFailureReport().getDetails())
+                .anyMatch(detail -> detail.contains("com.greenwhite.dwh.instance.md.repository.MdUserRepository"));
+    }
+
+    private static class FakeRepositoryConsumer {
+        private final com.greenwhite.dwh.instance.md.repository.MdUserRepository users;
+        FakeRepositoryConsumer(com.greenwhite.dwh.instance.md.repository.MdUserRepository users) {
+            this.users = users;
+        }
     }
 
     private static class CsrfCookieController {

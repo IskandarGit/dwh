@@ -11,9 +11,37 @@ import java.util.Optional;
 public class KauthSessionService {
 
     private final KauthSessionRepository sessionRepository;
+    private final com.greenwhite.dwh.instance.kauth.repository.KauthLoginAttemptRepository loginAttemptRepository;
 
     public KauthSessionService(KauthSessionRepository sessionRepository) {
+        this(sessionRepository, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public KauthSessionService(KauthSessionRepository sessionRepository,
+                               com.greenwhite.dwh.instance.kauth.repository.KauthLoginAttemptRepository loginAttemptRepository) {
         this.sessionRepository = sessionRepository;
+        this.loginAttemptRepository = loginAttemptRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public UserSecuritySummary getUserSecuritySummary(Long userId, com.greenwhite.dwh.instance.md.service.MdUserService.AuthUser user) {
+        var activeSessions = sessionRepository.findActiveByUserId(userId);
+        var recentAttempts = loginAttemptRepository != null
+                ? loginAttemptRepository.findRecentAttemptsForLogin(user.login(), 10)
+                : java.util.List.<com.greenwhite.dwh.instance.kauth.repository.KauthLoginAttemptRepository.LoginAttemptRecord>of();
+        return new UserSecuritySummary(
+                user.id(),
+                user.login(),
+                user.is2faEnabled(),
+                user.forcePasswordChange(),
+                null, // passwordChangedAt
+                user.createdAt(),
+                user.authenticationVersion(),
+                activeSessions.size(),
+                activeSessions,
+                recentAttempts
+        );
     }
 
     @Transactional(readOnly = true)
@@ -40,6 +68,11 @@ public class KauthSessionService {
     @Transactional
     public void closeAllUserSessions(Long userId) {
         sessionRepository.closeAllUserSessions(userId);
+    }
+
+    @Transactional
+    public void closeOtherSessions(Long userId, Long currentSessionId) {
+        sessionRepository.closeOtherSessions(userId, currentSessionId);
     }
 
     @Transactional

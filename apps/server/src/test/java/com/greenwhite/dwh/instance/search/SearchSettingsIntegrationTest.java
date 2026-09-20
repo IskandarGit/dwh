@@ -393,8 +393,10 @@ abstract class SearchSettingsIntegrationTestSupport {
     void authenticate(Set<String> allowed, boolean admin) {
         when(sessions.getActiveSession(anyString())).thenReturn(Optional.of(new KauthSessionRepository.SessionRecord(
                 actorId, actorId,"fixture","127.0.0.1","fixture",null,Instant.now(),Instant.now(),null,0)));
-        when(users.getUserById(actorId)).thenReturn(new MdUserRepository.UserRecord(actorId,"Fixture","fixture","fixture@example.invalid",null,"x",
-                "A",null,"ru","UTC",null,Map.of(),false,false,null,Instant.now(),Instant.now(),null,null,0));
+        var fixtureUser = new MdUserRepository.UserRecord(actorId,"Fixture","fixture","fixture@example.invalid",null,"x",
+                "A",null,"ru","UTC",null,Map.of(),false,false,null,Instant.now(),Instant.now(),null,null,0);
+        when(users.getUserById(actorId)).thenReturn(fixtureUser);
+        when(users.findAuthUserById(actorId)).thenReturn(Optional.of(MdUserService.AuthUser.from(fixtureUser)));
         when(permissions.getEffectivePermissions(actorId)).thenReturn(allowed);
         when(permissions.getPermissionVersion(actorId)).thenReturn(1L);
         when(roles.hasActiveRole(anyLong(), anyString())).thenReturn(admin);

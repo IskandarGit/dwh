@@ -27,10 +27,21 @@ echo '[2/7] Pulling immutable release images...'
 
 echo '[3/7] Creating the mandatory pre-migration backup when data exists...'
 postgres_id="$("${compose[@]}" ps -a -q postgres)"
+has_existing_data=0
 if [[ -n "$postgres_id" ]]; then
+    has_existing_data=1
+else
+    postgres_volume="$("${compose[@]}" config --format json 2>/dev/null | grep -o '"postgres-data":\s*{[^}]*"name":\s*"[^"]*"' | sed -E 's/.*"name":\s*"([^"]*)".*/\1/' || true)"
+    if [[ -n "$postgres_volume" ]] && docker volume inspect "$postgres_volume" >/dev/null 2>&1; then
+        has_existing_data=1
+    fi
+fi
+
+if [[ "$has_existing_data" -eq 1 ]]; then
+    "${compose[@]}" up -d --wait --wait-timeout "$HEALTH_TIMEOUT_SECONDS" postgres
     COMPOSE_FILE="$COMPOSE_FILE" ENV_FILE="$ENV_FILE" bash scripts/prod/backup.sh
 else
-    echo 'No existing PostgreSQL container found; treating this as an initial deployment.'
+    echo 'No existing PostgreSQL container or volume found; treating this as an initial deployment.'
 fi
 
 echo '[4/7] Starting dependencies...'

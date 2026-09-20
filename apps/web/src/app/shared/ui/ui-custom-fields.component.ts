@@ -1,14 +1,20 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CustomField } from '../../core/models/custom-field.models';
 import { TranslatePipe } from '../../core/services/i18n.service';
+import { ApiService } from '../../core/services/api.service';
+
+export interface UserLookupItem {
+  id: number;
+  name: string;
+  login?: string;
+}
 
 @Component({
   selector: 'ui-custom-fields',
   standalone: true,
-  imports: [
-    TranslatePipe,CommonModule, FormsModule],
+  imports: [TranslatePipe, CommonModule, FormsModule],
   template: `
     <div class="custom-fields-grid" *ngIf="fields && fields.length > 0">
       <div class="field-item" *ngFor="let f of fields">
@@ -71,6 +77,23 @@ import { TranslatePipe } from '../../core/services/i18n.service';
         >
           <option [ngValue]="null">{{ 'ui.custom_fields.vyberite_znachenie' | t }}</option>
           <option *ngFor="let option of getSelectOptions(f)" [ngValue]="option.value">{{ option.label }}</option>
+        </select>
+
+        <!-- User Reference Input -->
+        <select
+          *ngIf="f.fieldType === 'user_ref'"
+          [id]="controlId(f)"
+          [name]="f.code"
+          class="form-control"
+          [ngModel]="values[f.code] ?? null"
+          (ngModelChange)="onUserRefChange(f.code, $event)"
+          [required]="f.isRequired"
+          [attr.aria-required]="f.isRequired"
+        >
+          <option [ngValue]="null">{{ 'ui.custom_fields.vyberite_polzovatelya' | t }}</option>
+          <option *ngFor="let u of availableUsers()" [ngValue]="u.id">
+            {{ u.name }} ({{ '@' + (u.login || u.name) }})
+          </option>
         </select>
 
         <!-- Boolean Toggle -->
@@ -151,18 +174,45 @@ import { TranslatePipe } from '../../core/services/i18n.service';
     }
   `]
 })
-export class UiCustomFieldsComponent {
+export class UiCustomFieldsComponent implements OnInit {
   private static nextId = 0;
+  private readonly api = inject(ApiService, { optional: true });
 
   @Input() fields: CustomField[] = [];
   @Input() values: Record<string, any> = {};
+  @Input() users: UserLookupItem[] = [];
 
   @Output() valuesChange = new EventEmitter<Record<string, any>>();
 
   private readonly componentId = UiCustomFieldsComponent.nextId++;
+  readonly loadedUsers = signal<UserLookupItem[]>([]);
+
+  ngOnInit() {
+    if (this.users.length === 0 && this.hasUserRefField() && this.api) {
+      this.api.get<{ items: UserLookupItem[] }>('/iam/users', { limit: 100, state: 'A' }).subscribe({
+        next: res => {
+          const items = Array.isArray(res) ? res : (res?.items || []);
+          this.loadedUsers.set(items);
+        },
+        error: () => {}
+      });
+    }
+  }
+
+  hasUserRefField(): boolean {
+    return (this.fields || []).some(f => f.fieldType === 'user_ref');
+  }
+
+  availableUsers(): UserLookupItem[] {
+    if (this.users && this.users.length > 0) {
+      return this.users;
+    }
+    return this.loadedUsers();
+  }
 
   controlId(field: CustomField): string {
-    return `ui-custom-field-${this.componentId}-${field.id}-${field.code.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    const slug = ((field && field.code) || `field-${(field && field.id) || 'x'}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+    return `ui-custom-field-${this.componentId}-${(field && field.id) || 'x'}-${slug}`;
   }
 
   getSelectOptions(field: CustomField): Array<{ value: string | number | boolean; label: string }> {
@@ -194,6 +244,12 @@ export class UiCustomFieldsComponent {
 
   onValueChange(code: string, value: any) {
     this.values[code] = value;
+    this.valuesChange.emit({ ...this.values });
+  }
+
+  onUserRefChange(code: string, value: any) {
+    const num = value != null && value !== '' ? Number(value) : null;
+    this.values[code] = num;
     this.valuesChange.emit({ ...this.values });
   }
 }

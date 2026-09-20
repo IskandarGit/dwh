@@ -135,10 +135,13 @@ if ($LASTEXITCODE -ne 0 -or $backupUid.Trim() -ne '10001') {
     throw 'Backup image UID must match the server data UID so 0600 status remains readable.'
 }
 
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 $nginxConfigOutput = docker run --rm `
     --add-host server:127.0.0.1 `
     -v "${webNginxPath}:/etc/nginx/conf.d/default.conf:ro" `
     nginx:1.28-alpine nginx -T 2>&1
+$ErrorActionPreference = $prevEap
 if ($LASTEXITCODE -ne 0) { throw 'Web NGINX configuration failed nginx -t.' }
 Assert-Matches ($nginxConfigOutput -join [Environment]::NewLine) `
     'client_max_body_size\s+51m' `

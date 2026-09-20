@@ -6,6 +6,8 @@ import { projectRecordMatcher, taskRecordMatcher, userRecordMatcher } from './co
 import { recordNavigationGuard } from './core/guards/record-navigation.guard';
 import { uplFormatMatcher, uplSourceMatcher } from './features/upl/upl-routes';
 
+import { moduleActiveGuard } from './core/guards/module-active.guard';
+
 export const routes: Routes = [
   {
     path: 'login',
@@ -33,11 +35,19 @@ export const routes: Routes = [
       },
       {
         matcher: userRecordMatcher,
+        canDeactivate: [recordNavigationGuard],
         loadComponent: () => import('./features/iam/users/users.component').then(m => m.UsersComponent)
       },
       {
         path: 'iam/roles',
+        canDeactivate: [recordNavigationGuard],
         loadComponent: () => import('./features/iam/roles/roles.component').then(m => m.RolesComponent)
+      },
+      {
+        path: 'iam/org-units',
+        canActivate: [permissionGuard('iam.org_units', 'view')],
+        canDeactivate: [recordNavigationGuard],
+        loadComponent: () => import('./features/iam/org-units/org-units.component').then(m => m.OrgUnitsComponent)
       },
       {
         path: 'iam/custom-fields',
@@ -94,6 +104,25 @@ export const routes: Routes = [
         matcher: uplSourceMatcher,
         canActivate: [permissionGuard('upl.sources', 'view')],
         loadComponent: () => import('./features/upl/sources/source-card.component').then(m => m.SourceCardComponent)
+      },
+      {
+        path: 'notes',
+        canActivate: [moduleActiveGuard('notes'), permissionGuard('notes', 'view')],
+        loadComponent: () => import('./features/notes/notes.component').then(m => m.NotesComponent)
+      },
+      {
+        path: 'settings/modules',
+        canActivate: [permissionGuard('platform.modules', 'view')],
+        loadComponent: () => import('./features/settings/modules/modules.component').then(m => m.ModulesComponent)
+      },
+      {
+        path: 'settings/navigation',
+        canActivate: [permissionGuard('platform.navigation', 'view')],
+        loadComponent: () => import('./features/settings/navigation/navigation-settings.component').then(m => m.NavigationSettingsComponent)
+      },
+      {
+        path: 'embed/:code',
+        loadComponent: () => import('./features/reports/embedded-report.component').then(m => m.EmbeddedReportComponent)
       }
     ]
   },

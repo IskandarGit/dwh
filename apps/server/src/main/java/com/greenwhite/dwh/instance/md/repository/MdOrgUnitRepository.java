@@ -80,6 +80,11 @@ public class MdOrgUnitRepository {
                 .query(Long.class).single() > 0;
     }
 
+    public boolean existsByCode(String code) {
+        return jdbcClient.sql("select exists (select 1 from md_org_units where code = :code)")
+                .param("code", code).query(Boolean.class).single();
+    }
+
     public boolean hasChildren(Long id) {
         return jdbcClient.sql("select count(*) from md_org_units where parent_id = :id")
                 .param("id", id)

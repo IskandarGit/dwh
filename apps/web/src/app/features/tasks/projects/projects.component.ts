@@ -12,13 +12,23 @@ import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
 import { UiModalComponent } from '../../../shared/ui/ui-modal.component';
 import { UiPaginationComponent } from '../../../shared/ui/ui-pagination.component';
 import { Project, ProjectTaskStats } from '../../../core/models/task.models';
+import { UiCustomFieldsComponent } from '../../../shared/ui/ui-custom-fields.component';
+import { CustomField } from '../../../core/models/custom-field.models';
 import { TranslatePipe, I18nService } from '../../../core/services/i18n.service';
 
 @Component({
   selector: 'app-projects',
   standalone: true,
   imports: [
-    TranslatePipe,CommonModule, FormsModule, RouterModule, UiButtonComponent, UiModalComponent, UiPaginationComponent],
+    TranslatePipe,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    UiButtonComponent,
+    UiModalComponent,
+    UiPaginationComponent,
+    UiCustomFieldsComponent
+  ],
 
   template: `
     <ui-modal *ngIf="routeRecordId() !== null" [isOpen]="true" [title]="'projects.proekt' | t" size="sm" (close)="closeRecordView()">
@@ -33,6 +43,13 @@ import { TranslatePipe, I18nService } from '../../../core/services/i18n.service'
           <h3>{{ project.name }}</h3>
           <p>{{ project.description }}</p>
           <p>{{ (project.state === 'A' ? 'common.active_masculine' : 'common.blocked_masculine') | t }}</p>
+          <div class="attributes-stack" *ngIf="hasAttributes(project.attributes)">
+            <h4>{{ 'projects.custom_fields' | t }}</h4>
+            <div *ngFor="let item of formatAttributes(project.attributes)" class="attr-stack-item">
+              <span class="attr-k">{{ item.key }}:</span>
+              <span class="attr-v">{{ item.value }}</span>
+            </div>
+          </div>
         </div>
       </div>
       <div footer><ui-button variant="secondary" (onClick)="closeRecordView()">{{ 'search.back_to_list' | t }}</ui-button></div>
@@ -440,6 +457,13 @@ import { TranslatePipe, I18nService } from '../../../core/services/i18n.service'
               [placeholder]="'projects.celi_granicy_i_kontekst_proekta' | t"
             ></textarea>
           </div>
+          <div class="form-group" *ngIf="projectCustomFields().length > 0">
+            <ui-custom-fields
+              [fields]="projectCustomFields()"
+              [values]="createForm.attributes || {}"
+              (valuesChange)="createForm.attributes = $event"
+            ></ui-custom-fields>
+          </div>
           <div *ngIf="createSaveError()" class="request-state request-error" data-testid="project-create-save-error" role="alert">
             {{ createSaveError() }}
           </div>
@@ -517,6 +541,13 @@ import { TranslatePipe, I18nService } from '../../../core/services/i18n.service'
               <label class="clean-label" for="project-edit-description">{{ 'projects.opisanie' | t }}</label>
             </div>
             <textarea id="project-edit-description" name="projectEditDescription" class="clean-input clean-textarea" rows="3" [(ngModel)]="editForm.description"></textarea>
+          </div>
+          <div class="form-group" *ngIf="projectCustomFields().length > 0">
+            <ui-custom-fields
+              [fields]="projectCustomFields()"
+              [values]="editForm.attributes || {}"
+              (valuesChange)="editForm.attributes = $event"
+            ></ui-custom-fields>
           </div>
           <div *ngIf="editSaveError()" class="request-state request-error" data-testid="project-edit-save-error" role="alert">
             {{ editSaveError() }}
@@ -969,6 +1000,7 @@ import { TranslatePipe, I18nService } from '../../../core/services/i18n.service'
     .error-msg { font-size: 11px; color: var(--danger); margin-top: 2px; }
     .modal-form-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
+
     .clean-textarea { height: auto; padding: 6px 8px; resize: vertical; font-family: inherit; }
 
     .tabular-nums { font-variant-numeric: tabular-nums; }
@@ -976,6 +1008,10 @@ import { TranslatePipe, I18nService } from '../../../core/services/i18n.service'
     .text-right { text-align: right; }
     .text-muted { color: var(--text-muted); }
     .text-xs { font-size: 11px; }
+    .attributes-stack { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+    .attr-stack-item { display: flex; gap: 8px; font-size: 13px; }
+    .attr-k { color: var(--text-muted); font-weight: 500; }
+    .attr-v { color: var(--text-main); }
   `]
 })
 export class ProjectsComponent implements OnInit, OnDestroy {
@@ -1020,7 +1056,6 @@ export class ProjectsComponent implements OnInit, OnDestroy {
   currentPage = 1;
   pageSize = 10;
 
-
   isCreateSubmitted = false;
   isEditSubmitted = false;
 
@@ -1029,11 +1064,12 @@ export class ProjectsComponent implements OnInit, OnDestroy {
   readonly isCreateDiscardConfirmationOpen = signal<boolean>(false);
   readonly isEditDiscardConfirmationOpen = signal<boolean>(false);
 
-  createForm = { name: '', description: '' };
-  editForm = { name: '', description: '', state: 'A' };
+  readonly projectCustomFields = signal<CustomField[]>([]);
+  createForm: { name: string; description: string; attributes?: Record<string, any> } = { name: '', description: '', attributes: {} };
+  editForm: { name: string; description: string; state: 'A' | 'P'; attributes?: Record<string, any> } = { name: '', description: '', state: 'A', attributes: {} };
   editingProject: Project | null = null;
-  private createFormBaseline = { name: '', description: '' };
-  private editFormBaseline: { name: string; description: string; state: 'A' | 'P' } | null = null;
+  private createFormBaseline: { name: string; description: string; attributes?: Record<string, any> } = { name: '', description: '', attributes: {} };
+  private editFormBaseline: { name: string; description: string; state: 'A' | 'P'; attributes?: Record<string, any> } | null = null;
   private editTargetId: number | null = null;
 
   constructor(
@@ -1046,6 +1082,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadProjects();
     this.loadStats();
+    this.loadProjectCustomFields();
     this.recordRouteSubscription = this.recordRoute?.paramMap?.subscribe(params => this.loadRecordView(params.get('id')));
   }
 
@@ -1275,10 +1312,14 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     const requestId = ++this.createSaveRequestId;
     this.createSaveError.set(null);
     this.isSubmitting.set(true);
-    this.createSaveRequest = this.api.post<Project>('/tasks/projects', {
+    const payload: any = {
       name: this.createForm.name.trim(),
       description: this.createForm.description.trim()
-    }).subscribe({
+    };
+    if (this.createForm.attributes && Object.keys(this.createForm.attributes).length > 0) {
+      payload.attributes = this.createForm.attributes;
+    }
+    this.createSaveRequest = this.api.post<Project>('/tasks/projects', payload).subscribe({
       next: created => {
         if (
           this.destroyed
@@ -1390,6 +1431,9 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     if (name !== this.editFormBaseline.name) payload['name'] = name;
     if (description !== this.editFormBaseline.description) payload['description'] = description;
     if (this.editForm.state !== this.editFormBaseline.state) payload['state'] = this.editForm.state;
+    if (JSON.stringify(this.editForm.attributes || {}) !== JSON.stringify(this.editFormBaseline.attributes || {})) {
+      payload['attributes'] = this.editForm.attributes;
+    }
     if (Object.keys(payload).length === 0) {
       this.closeEditModal();
       return;
@@ -1449,14 +1493,17 @@ export class ProjectsComponent implements OnInit, OnDestroy {
           this.editLoadError.set(true);
           return;
         }
-        const normalized = {
+        const normalized: { name: string; description: string; state: 'A' | 'P'; attributes?: Record<string, any> } = {
           name: project.name.trim(),
           description: (project.description || '').trim(),
           state: project.state
         };
+        if (project.attributes && Object.keys(project.attributes).length > 0) {
+          normalized.attributes = { ...project.attributes };
+        }
         this.editingProject = project;
         this.editForm = { ...normalized };
-        this.editFormBaseline = { ...normalized };
+        this.editFormBaseline = { ...normalized, ...(normalized.attributes ? { attributes: { ...normalized.attributes } } : {}) };
       },
       error: () => {
         if (
@@ -1473,7 +1520,8 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
   private isCreateDraftDirty(): boolean {
     return this.createForm.name !== this.createFormBaseline.name
-      || this.createForm.description !== this.createFormBaseline.description;
+      || this.createForm.description !== this.createFormBaseline.description
+      || (!!this.createForm.attributes && Object.keys(this.createForm.attributes).length > 0);
   }
 
   private isEditDraftDirty(): boolean {
@@ -1481,6 +1529,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
       this.editForm.name !== this.editFormBaseline.name
       || this.editForm.description !== this.editFormBaseline.description
       || this.editForm.state !== this.editFormBaseline.state
+      || JSON.stringify(this.editForm.attributes || {}) !== JSON.stringify(this.editFormBaseline.attributes || {})
     );
   }
 
@@ -1557,5 +1606,52 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     if (this.isCreateModalOpen()) this.closeCreateModal();
     if (this.isEditModalOpen()) this.closeEditModal();
     return true;
+  }
+
+  loadProjectCustomFields() {
+    this.api.get<CustomField[]>('/custom-fields', { entity_type: 'PROJECT' }).subscribe({
+      next: res => {
+        if (Array.isArray(res)) {
+          const validFields = res.filter(f => f && typeof f === 'object' && typeof f.code === 'string' && typeof f.fieldType === 'string');
+          this.projectCustomFields.set(validFields);
+        } else {
+          this.projectCustomFields.set([]);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  hasAttributes(attrs: any): boolean {
+    if (!attrs || typeof attrs !== 'object') return false;
+    return Object.keys(attrs).length > 0;
+  }
+
+  formatAttributes(attrs: any): Array<{ key: string; value: string }> {
+    if (!this.hasAttributes(attrs)) return [];
+    const fields = this.projectCustomFields();
+    return Object.entries(attrs).map(([k, v]) => {
+      const field = fields.find(f => f.code === k);
+      const keyLabel = field ? field.name : k;
+      let valueStr = String(v ?? '');
+      if (field?.fieldType === 'boolean') {
+        valueStr = v === true || v === 'true'
+          ? this.uiI18n.translate('common.yes')
+          : this.uiI18n.translate('common.no');
+      } else if (field?.fieldType === 'select' && field.optionsJson) {
+        try {
+          const opts = JSON.parse(field.optionsJson);
+          if (Array.isArray(opts)) {
+            const matched = opts.find(o => typeof o === 'object' && o !== null ? o.value === v : o === v);
+            if (matched && typeof matched === 'object' && matched.label) {
+              valueStr = matched.label;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      return { key: keyLabel, value: valueStr };
+    });
   }
 }

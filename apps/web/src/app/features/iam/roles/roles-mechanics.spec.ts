@@ -37,6 +37,7 @@ describe('RolesComponent permission matrix lifecycle', () => {
     fixture.detectChanges();
     http.expectOne('/api/v1/rbac/forms').flush(forms);
     http.expectOne('/api/v1/rbac/roles').flush(roles);
+    http.expectOne('/api/v1/iam/roles/user-counts').flush({});
     fixture.detectChanges();
   });
 
@@ -57,7 +58,8 @@ describe('RolesComponent permission matrix lifecycle', () => {
   }
 
   function saveButton() {
-    return host.querySelector<HTMLButtonElement>('.matrix-actions-box button');
+    return host.querySelector<HTMLButtonElement>('.matrix-actions-box .btn-primary')
+      ?? host.querySelector<HTMLButtonElement>('.matrix-actions-box button');
   }
 
   it('saves only role B permissions after a late role A response', () => {

@@ -59,6 +59,7 @@ public class MdAssignmentService {
     /** Полная замена набора ролей пользователя (семантика PUT из ТЗ-04 разд. 4.4). */
     @Transactional
     public long assignRoles(Long userId, List<Long> roleIds) {
+        scopeService.acquireMutationLock();
         requireUser(userId);
         List<Long> requested = roleIds != null ? roleIds : List.of();
 

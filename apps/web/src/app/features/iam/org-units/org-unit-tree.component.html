@@ -1,0 +1,36 @@
+<ng-container *ngTemplateOutlet="branch; context: { $implicit: nodes }" />
+<ng-template #branch let-children>
+  <ul>
+    @for (node of children; track node.unit) {
+      <li>
+        <div class="node">
+          @if (node.children.length) {
+            <button type="button" class="expand" (click)="toggle(node.unit.id)"
+              [attr.aria-expanded]="!collapsed.has(node.unit.id)"
+              [attr.aria-label]="(collapsed.has(node.unit.id) ? 'iam.org_units.expand' : 'iam.org_units.collapse') | t:{name: node.unit.name}">
+              <span aria-hidden="true">{{ collapsed.has(node.unit.id) ? '+' : '−' }}</span>
+            </button>
+          }
+          @if (multiple) {
+            <label class="select check" [for]="checkboxPrefix + '-' + node.unit.id">
+              <input [id]="checkboxPrefix + '-' + node.unit.id" type="checkbox" [attr.data-check]="node.unit.id"
+                [checked]="checkedIds.includes(node.unit.id)" [disabled]="disabled" (change)="toggleUnit.emit(node.unit)">
+              <span class="check-copy"><span>{{ node.unit.code }} · {{ node.unit.name }}</span>
+                <small>{{ kindKeys[node.unit.kind] ? (kindKeys[node.unit.kind] | t) : node.unit.kind }} · {{ (node.unit.state === 'A' ? 'iam.org_units.active' : 'iam.org_units.passive') | t }}</small>
+              </span>
+            </label>
+          } @else {
+            <button type="button" class="select" [disabled]="disabled" [attr.data-select]="node.unit.id"
+              [attr.aria-current]="selectedId === node.unit.id ? 'true' : null" (click)="selectUnit.emit(node.unit)">
+              <span>{{ node.unit.code }} · {{ node.unit.name }}</span>
+              <small>{{ kindKeys[node.unit.kind] ? (kindKeys[node.unit.kind] | t) : node.unit.kind }} · {{ (node.unit.state === 'A' ? 'iam.org_units.active' : 'iam.org_units.passive') | t }}</small>
+            </button>
+          }
+        </div>
+        @if (node.children.length && !collapsed.has(node.unit.id)) {
+          <ng-container *ngTemplateOutlet="branch; context: { $implicit: node.children }" />
+        }
+      </li>
+    }
+  </ul>
+</ng-template>

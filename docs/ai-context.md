@@ -1,6 +1,6 @@
 # Контекст SmartupCMS для AI-ассистентов
 
-**Актуализировано:** 2026-09-08
+**Актуализировано:** 2026-09-10
 
 **Назначение:** краткий воспроизводимый handoff для следующей AI-сессии
 
@@ -18,7 +18,8 @@ SmartupCMS — открытая self-hosted платформа контента 
 одной организации и многих пользователей. Одна установка обслуживает одну
 организацию и использует отдельный экземпляр PostgreSQL и отдельное объектное
 хранилище. Продукт
-объединяет пользователей и RBAC, задачи и комментарии, файлы, поиск,
+объединяет пользователей и RBAC, задачи и комментарии, заметки (`ms/note`),
+реестр модулей и навигацию (`md/navigation`), файлы, поиск,
 уведомления, объявления, аудит и системное администрирование.
 
 Проект развивается по принципу «углублять качество, не расширять scope».
@@ -29,8 +30,12 @@ Control Plane, fleet orchestration, runtime licensing, remote enrollment,
 
 Плановые входные данные управляемого контура являются суммарными, а не
 per-installation: примерно 100 установок, 500 зарегистрированных пользователей,
-100 одновременно активных пользователей и 50 ГБ загрузок в месяц. Эти числа не
-являются измеренным SLO или доказательством производительности.
+100 одновременно активных пользователей и 50 ГБ загрузок в месяц. Целевой
+показатель доступности (SLO) утверждён на уровне 99.9% доступности сервиса.
+В релизный скоуп v1.0.0 включены модули `ms/note`, реестр модулей,
+настраиваемая навигация и Flyway-миграции `V028`–`V032`. В качестве целевого
+объектного хранилища поддерживаются MinIO (S3-совместимое) или локальный диск
+(`local_disk`); канал SMTP настраивается независимо per-deployment.
 
 ## 2. Нормативные источники
 
@@ -57,9 +62,10 @@ per-installation: примерно 100 установок, 500 зарегист�
 | Shared kernel | `libs/core-types`, `libs/platform-common`, `libs/provider-spi` |
 | Транзакционные данные | PostgreSQL 18 и неизменяемые Flyway migrations |
 | Поиск | Typesense 27.1 как производный индекс, не источник авторизации |
-| Файлы | `local_disk` или S3-compatible provider через SPI |
+| Файлы | `local_disk` или S3-compatible provider (включая MinIO) через SPI |
 | Поставка | Docker Compose; отдельный one-shot `migrate`; production backup и ClamAV |
 | Проверки | Maven, Angular/Vitest, Playwright, PowerShell architecture/docs/release gates |
+| Модули расширения | Заметки (`ms/note`), реестр модулей (`md_module_registry`), навигация (`md_navigation_items`) |
 | Локализация | Центральный PostgreSQL registry/overrides, восемь packaged-языков, русский per-key fallback |
 
 Browser обращается только к server API. Авторизация всегда выполняется на
@@ -73,7 +79,8 @@ repositories/adapters — I/O. Детали приведены в
 - Smartup-managed инфраструктура использует Cloudflare как внешний
   DNS/TLS/security edge и Cloudflare R2 как целевое объектное хранилище.
 - На инфраструктуре клиента оператор может выбрать собственный edge,
-  `local_disk` или любой проверенный S3-compatible provider.
+  `local_disk` или любой проверенный S3-compatible provider (включая MinIO); канал
+  уведомлений SMTP настраивается независимо per-deployment.
 - Локальная/development топология может работать без ClamAV и планового backup.
   Поддерживаемая production-поставка требует fail-closed ClamAV и
   зашифрованный backup.
@@ -101,6 +108,77 @@ repositories/adapters — I/O. Детали приведены в
 [production launch checklist](ops/production-launch-checklist.md).
 
 ## 6. Последняя подтверждённая проверка
+
+### Точка продолжения — 2026-09-10 (HEAD synchronized with origin/main)
+
+2026-09-10 зафиксирован и запушен коммит `8a5a4315716e2b2aedd1b8ca889685b99e658d30`
+(`feat(navigation): add category rail with flyout popover and modular system enhancements`).
+Ветка `main` полностью синхронизирована с `origin/main` (`ahead 0, behind 0`).
+Локальные черновики `audit/` сохранены в untracked-состоянии согласно `AGENTS.md`.
+
+Ключевые подтверждённые факты и выполненные решения:
+1. **Целевой SLO:** утверждён на уровне 99.9% доступности сервиса.
+2. **Объектное хранилище и каналы:** поддерживаются MinIO (S3-совместимое) и `local_disk`; канал SMTP настраивается независимо per-deployment.
+3. **Модульность ядра и БД:** в скоуп включены модуль `ms/note`, реестр модулей (`md_module_registry`), настраиваемая навигация (`md_navigation_items`) и миграции Flyway `V028`..`V032`.
+4. **Навигация и UI:**
+   - Левый рейл (60px) отображает категории/разделы (`space_dashboard`, `manage_accounts`, `tune`).
+   - Автоматическое расширение меню по ширине на ховере полностью отключено («меню не раскрывается»).
+   - Наведение или клик на категорию открывает компактную всплывающую карточку (`.rail-flyout-popover`) с заголовком раздела в uppercase, списком пунктов и активной синей плашкой `#0284c7`, точно по дизайну пользователя (`media_1788983193674.png`).
+   - Закрытие карточки реализовано по Escape и клику вне области. В подвале рейла профиль пользователя также открывает flyout-карточку.
+5. **Тестирование и верификация:**
+   - TypeScript: 0 ошибок (`npm run typecheck`).
+   - Frontend Vitest: 61 тестовый файл, 598 тестов пройдено из 598 (100% pass).
+   - Все 7 верификационных контрактов репозитория подтверждены (`test-public-docs.ps1`, `test-repository-hygiene.ps1`, `test-unified-boundaries.ps1`, `verify-release.ps1`, `test-release-config.ps1`, `test-backup-status.ps1`, `test-deploy-fail-closed.sh`).
+   - Граф знаний Graphify синхронизирован (`graphify update .`).
+   - Docker-контейнер `smartupcms-web-1` пересобран и активен на `http://localhost:4200`.
+
+### Текущая локальная работа — оргструктура и data scope, 2026-09-08
+
+Локальный пакет оргструктуры реализован в последовательности `8e43e19`,
+`f45f4ba`, `4dc7273`, `ae220f9`, `bcd4bd2`, `3338f07`, `0cc4a53` и
+`eefd8ae`. Финальный backend gate на неизменённом backend прошёл 750/750;
+перед ним один полный запуск получил один JDBC `BindException` в test fixture,
+после чего неизменённые focused 6/6 и полный 750/750 прошли. Причина занятого
+адреса на уровне ОС не доказана, исправление кода или сети не заявляется.
+
+Чистый архив source commit
+`eefd8aebbf35864df5bae90a8803aebb2e759357` прошёл Angular 54 файла / 492
+теста, typecheck, localization audit 1064/1299 и production build 495.70 kB /
+131.98 kB без budget warning. Новый изолированный Playwright-сценарий с
+синтетическими пользователями и задачами подтвердил UI назначений, effective
+scope и реальные task list/detail правила UNITS/SUBTREE/SELF, прямой 403 к
+оргструктуре, занятое удаление 409, keyboard/discard, pending real write и
+контролируемый 503/retry. Первоначальные функциональные пять сценариев прошли,
+но шестой выявил у общего primary button clean source недостаточный dark
+contrast: 13px/500 white `rgb(255,255,255)` на cyan `rgb(56,189,248)` —
+2.1423:1 при требовании 4.5:1 на обоих viewport. Light — 5.9336:1. Этот
+исторический результат остаётся 5/6; первоначальная версия вызывала финальную
+browser-health проверку после ожидаемо падающей contrast-проверки, поэтому тот
+запуск сам по себе не доказывал отсутствие console/pageerror.
+
+Fix round 1 заменил постоянный порт теста на явно заданный проверяемый bare
+loopback origin с отдельным портом, запрещает missing/mismatch/remote/4200 до
+навигации и использует один origin для CSRF и дочерних browser contexts. Он
+также проверяет browser health до contrast-агрегации и перед итоговым response
+ledger явно ожидает успешные `GET 200` для `/custom-fields` и
+`/tasks/projects`. Первый свежий clean-запуск прошёл origin guard, затем worker
+завершился с Windows-кодом `3221226505` во время seed; неизменённый повтор прошёл
+6/7 за 18.9 s, с единственным ожидаемым contrast fail и подтверждённо чистыми
+console/pageerror. Причина worker exit не доказана, исправление продукта или ОС
+не заявляется.
+
+Отдельный candidate из того же `eefd8ae` плюс семь точных, отдельно
+hash-манифестированных ранее существовавших dirty UI-файлов прошёл
+первоначальный browser suite 6/6 и свежий fix-round suite 7/7 за 21.2 s, а
+также Angular 54 файла / 501 тест, typecheck и localization. Его dark primary
+contrast — 9.0701:1; production build вышел с кодом 0, но 501.30 kB превысили
+budget 500 kB на 1.30 kB. Это evidence текущего preserved-workspace UI, а не
+clean feature HEAD; dirty UI-файлы не входят в пакет оргструктуры. Clean
+dark-contrast blocker сохраняется до публикации shared UI изменений.
+Task-view-only роль также воспроизводит два фоновых 403 toast из unconditional
+`/custom-fields` и `/tasks/projects`; scope actor использует ровно три read
+permission, не получает organization/IAM assign, а fresh suite теперь
+утверждает оба auxiliary `GET 200` до проверки полного page-response ledger.
 
 ### Публикация накопленных изменений — 2026-09-08
 

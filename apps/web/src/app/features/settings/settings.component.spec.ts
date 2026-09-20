@@ -7,29 +7,45 @@ import { I18nService } from '../../core/services/i18n.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { SearchManagementService } from '../../core/services/search-management.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { SettingsComponent } from './settings.component';
 import { translateTest } from '../../../testing/i18n-test.stub';
 
 describe('SettingsComponent UI contracts', () => {
-  async function createFixture(api: object = {
-    get: vi.fn(() => of({})),
-    patch: vi.fn(() => of({}))
-  }, hasPermission: (form: string, action: string) => boolean = () => true,
-  searchManagement: object = {
-    status: vi.fn(() => of({})),
-    settings: vi.fn(() => of({})),
-    jobs: vi.fn(() => of({ items: [], hasMore: false }))
-  }) {
+  async function createFixture(
+    api: object = {
+      get: vi.fn(() => of({})),
+      patch: vi.fn(() => of({}))
+    },
+    hasPermission: (form: string, action: string) => boolean = () => true,
+    searchManagement: object = {
+      status: vi.fn(() => of({})),
+      settings: vi.fn(() => of({})),
+      jobs: vi.fn(() => of({ items: [], hasMore: false }))
+    },
+    themeService?: object,
+    toast?: object,
+    i18nMock?: object
+  ) {
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
       providers: [
         { provide: ApiService, useValue: api },
         { provide: PermissionService, useValue: { hasPermission } },
         { provide: SearchManagementService, useValue: searchManagement },
-        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+        { provide: ToastService, useValue: toast ?? { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+        {
+          provide: ThemeService,
+          useValue: themeService ?? {
+            themePreference: signal('light'),
+            currentTheme: signal('light'),
+            setTheme: vi.fn(),
+            toggleTheme: vi.fn()
+          }
+        },
         {
           provide: I18nService,
-          useValue: {
+          useValue: i18nMock ?? {
             currentLang: signal('ru'),
             languages: signal([
               { code: 'ru', name: 'Русский', builtin: true, active: true },
@@ -202,5 +218,157 @@ describe('SettingsComponent UI contracts', () => {
     });
     expect(localStorage.getItem('dwh_custom_languages')).toBeNull();
     confirm.mockRestore();
+  });
+  it('disables system inputs, displays readonly badge, and hides save button for view-only users', async () => {
+    const hasPermission = (form: string, action: string) => {
+      if (form === 'platform.settings' || form === 'settings') {
+        return action === 'view';
+      }
+      return false;
+    };
+    const fixture = await createFixture(undefined, hasPermission);
+    fixture.detectChanges();
+
+    const readonlyBadges = fixture.nativeElement.querySelectorAll('.badge.badge-neutral');
+    expect(Array.from(readonlyBadges).some((b: any) => b.textContent?.includes('Только чтение'))).toBe(true);
+
+    const companyInput = fixture.nativeElement.querySelector('#settings-company-name') as HTMLInputElement;
+    expect(companyInput.disabled).toBe(true);
+
+    const generalSaveBtn = fixture.nativeElement.querySelector('#settings-general-panel .card-footer-actions ui-button');
+    expect(generalSaveBtn).toBeNull();
+  });
+
+  it('synchronizes theme changes with ThemeService immediately and on user settings save', async () => {
+    const themeServiceMock = {
+      themePreference: signal('light'),
+      currentTheme: signal('light'),
+      setTheme: vi.fn(),
+      toggleTheme: vi.fn()
+    };
+    const fixture = await createFixture(undefined, () => true, undefined, themeServiceMock);
+
+    // Immediate change via UI helper
+    fixture.componentInstance.onThemeChange('dark');
+    expect(themeServiceMock.setTheme).toHaveBeenCalledWith('dark');
+    expect(fixture.componentInstance.userSettings()['user.theme']).toBe('dark');
+
+    // On saveUserSettings
+    fixture.componentInstance.userSettings.set({ 'user.theme': 'system' });
+    fixture.componentInstance.saveUserSettings();
+    expect(themeServiceMock.setTheme).toHaveBeenCalledWith('system');
+  });
+
+  it('validates password length, session lifetime, and quota bounds before sending patch', async () => {
+    const api = {
+      get: vi.fn(() => of({})),
+      patch: vi.fn(() => of({}))
+    };
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn()
+    };
+    const fixture = await createFixture(api, () => true, undefined, undefined, toast);
+
+    // Min password too short (< 8)
+    fixture.componentInstance.systemSettings.set({ 'security.min_password_length': '5' });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+
+    // Session lifetime invalid (> 8760)
+    toast.error.mockClear();
+    fixture.componentInstance.systemSettings.set({ 'security.session_lifetime_hours': '10000' });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+
+    // User quota invalid (< 100)
+    toast.error.mockClear();
+    fixture.componentInstance.systemSettings.set({ 'storage.default_user_quota_mb': '50' });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('validates language code format and prevents registering invalid codes', async () => {
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn()
+    };
+    const i18nMock = {
+      currentLang: signal('ru'),
+      languages: signal([{ code: 'ru', name: 'Русский', builtin: true, active: true }]),
+      translate: translateTest,
+      setLanguage: vi.fn(() => of(undefined)),
+      registerLanguage: vi.fn(() => of({})),
+      refreshLanguages: vi.fn(() => of([])),
+      exportDictionary: vi.fn(() => '{}')
+    };
+    const fixture = await createFixture(undefined, () => true, undefined, undefined, toast, i18nMock);
+
+    fixture.componentInstance.newLangCode = 'invalid_123_toolongformat';
+    fixture.componentInstance.newLangName = 'Test';
+    fixture.componentInstance.saveNewLanguage();
+
+    expect(toast.error).toHaveBeenCalled();
+    expect(i18nMock.registerLanguage).not.toHaveBeenCalled();
+  });
+
+  it('opens add language modal with isOpen=true and closes it cleanly', async () => {
+    const fixture = await createFixture();
+    fixture.componentInstance.activeTab = 'languages';
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('ui-modal')).toBeNull();
+    fixture.componentInstance.openAddLangModal();
+    fixture.detectChanges();
+
+    const modal = fixture.nativeElement.querySelector('ui-modal');
+    expect(modal).not.toBeNull();
+    expect(fixture.componentInstance.isAddLangModalOpen()).toBe(true);
+    expect(modal.querySelector('.modal-dialog')).not.toBeNull();
+  });
+
+  it('rejects empty strings and non-numeric inputs for numeric settings', async () => {
+    const api = { get: vi.fn(() => of({})), patch: vi.fn(() => of({})) };
+    const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+    const fixture = await createFixture(api, () => true, undefined, undefined, toast);
+
+    fixture.componentInstance.systemSettings.set({ 'security.min_password_length': '   ' });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+
+    toast.error.mockClear();
+    fixture.componentInstance.systemSettings.set({
+      'security.min_password_length': '10',
+      'security.session_lifetime_hours': 'letters'
+    });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+
+    toast.error.mockClear();
+    fixture.componentInstance.systemSettings.set({
+      'security.min_password_length': '10',
+      'security.session_lifetime_hours': '720',
+      'storage.default_user_quota_mb': 'not-a-number'
+    });
+    fixture.componentInstance.saveSystemSettings();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('provides human-readable units for session hours and quota MB', async () => {
+    const fixture = await createFixture();
+    expect(fixture.componentInstance.formatSessionHours('720')).toBe('720 ч. (30 дн.)');
+    expect(fixture.componentInstance.formatSessionHours('24')).toBe('24 ч. (1 дн.)');
+    expect(fixture.componentInstance.formatSessionHours('12')).toBe('12 ч.');
+    expect(fixture.componentInstance.formatQuotaMb('1024')).toBe('1024 МБ (~1 ГБ)');
+    expect(fixture.componentInstance.formatQuotaMb('5120')).toBe('5120 МБ (~5 ГБ)');
+    expect(fixture.componentInstance.formatQuotaMb('500')).toBe('500 МБ');
   });
 });

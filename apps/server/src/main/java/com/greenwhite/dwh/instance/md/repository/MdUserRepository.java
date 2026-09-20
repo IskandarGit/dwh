@@ -278,6 +278,30 @@ public class MdUserRepository {
                 .update();
     }
 
+    public void setForcePasswordChange(Long userId, boolean force, Long modifiedBy) {
+        jdbcClient.sql("""
+                update md_users
+                set force_password_change = :force, modified_at = now(), modified_by = :modifiedBy
+                where id = :userId
+                """)
+                .param("userId", userId)
+                .param("force", force)
+                .param("modifiedBy", modifiedBy)
+                .update();
+    }
+
+    public void set2faEnabled(Long userId, boolean enabled, Long modifiedBy) {
+        jdbcClient.sql("""
+                update md_users
+                set is_2fa_enabled = :enabled, modified_at = now(), modified_by = :modifiedBy
+                where id = :userId
+                """)
+                .param("userId", userId)
+                .param("enabled", enabled)
+                .param("modifiedBy", modifiedBy)
+                .update();
+    }
+
     public void update(Long userId, UserUpdateData data, Long modifiedBy) {
         String attributesJson = data.attributes() != null ? toJson(data.attributes()) : null;
 

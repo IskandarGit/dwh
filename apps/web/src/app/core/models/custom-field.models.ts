@@ -1,9 +1,12 @@
+export type CustomFieldEntityType = 'USER' | 'PROJECT' | 'TASK' | 'NOTE' | string;
+export type CustomFieldType = 'string' | 'number' | 'boolean' | 'date' | 'select' | 'user_ref';
+
 export interface CustomField {
   id: number;
-  entityType: 'USER' | 'PROJECT' | 'TASK';
+  entityType: CustomFieldEntityType;
   code: string;
   name: string;
-  fieldType: 'string' | 'number' | 'boolean' | 'date' | 'select';
+  fieldType: CustomFieldType;
   isRequired: boolean;
   defaultValue?: string;
   optionsJson?: string;

@@ -21,6 +21,28 @@ import {
 export type Language = string;
 export type { LanguageInfo } from '../models/i18n.models';
 
+export const LANGUAGE_LOCALES: Record<string, string> = {
+  ru: 'ru-RU',
+  uz: 'uz-UZ',
+  en: 'en-US',
+  kk: 'kk-KZ',
+  ky: 'ky-KG',
+  tg: 'tg-TJ',
+  de: 'de-DE',
+  tr: 'tr-TR'
+};
+
+export const LANGUAGE_NATIVE_NAMES: Record<string, string> = {
+  ru: 'Русский',
+  uz: 'O‘zbekcha',
+  en: 'English',
+  kk: 'Қазақша',
+  ky: 'Кыргызча',
+  tg: 'Тоҷикӣ',
+  de: 'Deutsch',
+  tr: 'Türkçe'
+};
+
 const API_ROOT = '/api/v1';
 const RUSSIAN = 'ru';
 const FALLBACK_LANGUAGE: LanguageInfo = {
@@ -185,15 +207,112 @@ export class I18nService {
     return JSON.stringify(this.getDictionary(code), null, 2);
   }
 
+  hasKey(key: string): boolean {
+    return Boolean(this.activeDictionary()[key] || this.russianDictionary()[key] || this.offlineFallback[key]);
+  }
+
+  getPluralForm(count: number, lang: string = this.currentLang()): Intl.LDMLPluralRule {
+    try {
+      const locale = LANGUAGE_LOCALES[lang] || lang;
+      return new Intl.PluralRules(locale).select(count);
+    } catch {
+      return count === 1 ? 'one' : 'other';
+    }
+  }
+
   translate(key: string, params?: Record<string, string | number>): string {
-    const template = this.activeDictionary()[key]
+    let resolvedKey = key;
+    if (params && typeof params['count'] === 'number') {
+      const plural = this.getPluralForm(params['count'] as number);
+      const pluralKey = `${key}.${plural}`;
+      if (this.hasKey(pluralKey)) {
+        resolvedKey = pluralKey;
+      }
+    }
+
+    const template = this.activeDictionary()[resolvedKey]
+      ?? this.russianDictionary()[resolvedKey]
+      ?? this.offlineFallback[resolvedKey]
+      ?? this.activeDictionary()[key]
       ?? this.russianDictionary()[key]
       ?? this.offlineFallback[key]
       ?? key;
     if (!params) return template;
-    return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name: string) =>
+    return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder: string, name: string) =>
       Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
     );
+  }
+
+  formatDate(date: Date | string | number | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+    if (!date) return '';
+    try {
+      const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+      if (isNaN(d.getTime())) return String(date);
+      const locale = LANGUAGE_LOCALES[this.currentLang()] || this.currentLang();
+      return new Intl.DateTimeFormat(locale, options ?? {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).format(d);
+    } catch {
+      return String(date);
+    }
+  }
+
+  formatDateTime(date: Date | string | number | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+    if (!date) return '';
+    try {
+      const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+      if (isNaN(d.getTime())) return String(date);
+      const locale = LANGUAGE_LOCALES[this.currentLang()] || this.currentLang();
+      return new Intl.DateTimeFormat(locale, options ?? {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(d);
+    } catch {
+      return String(date);
+    }
+  }
+
+  formatNumber(value: number | null | undefined, options?: Intl.NumberFormatOptions): string {
+    if (value === null || value === undefined || typeof value !== 'number' || isNaN(value)) {
+      return String(value ?? '');
+    }
+    try {
+      const locale = LANGUAGE_LOCALES[this.currentLang()] || this.currentLang();
+      return new Intl.NumberFormat(locale, options).format(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  formatRelativeTime(date: Date | string | number | null | undefined): string {
+    if (!date) return '';
+    try {
+      const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+      if (isNaN(d.getTime())) return '';
+      const now = Date.now();
+      const diffInSeconds = Math.round((d.getTime() - now) / 1000);
+      const locale = LANGUAGE_LOCALES[this.currentLang()] || this.currentLang();
+      const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+
+      const absDiff = Math.abs(diffInSeconds);
+      if (absDiff < 60) return rtf.format(diffInSeconds, 'second');
+      const diffInMinutes = Math.round(diffInSeconds / 60);
+      if (Math.abs(diffInMinutes) < 60) return rtf.format(diffInMinutes, 'minute');
+      const diffInHours = Math.round(diffInMinutes / 60);
+      if (Math.abs(diffInHours) < 24) return rtf.format(diffInHours, 'hour');
+      const diffInDays = Math.round(diffInHours / 24);
+      if (Math.abs(diffInDays) < 30) return rtf.format(diffInDays, 'day');
+      const diffInMonths = Math.round(diffInDays / 30);
+      if (Math.abs(diffInMonths) < 12) return rtf.format(diffInMonths, 'month');
+      return rtf.format(Math.round(diffInDays / 365), 'year');
+    } catch {
+      return this.formatDate(date);
+    }
   }
 
   private async initializeOnce(): Promise<void> {

@@ -6,6 +6,7 @@ export interface Role {
   orderNo: number;
   createdAt: string;
   modifiedAt: string;
+  usersCount?: number;
 }
 
 export interface FormTreeItem {

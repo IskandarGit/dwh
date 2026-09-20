@@ -1,0 +1,53 @@
+<form [id]="formId" (ngSubmit)="submit()">
+  @if (error) { <p role="alert">{{ error.detail || ('iam.org_units.save_error' | t) }}</p> }
+  @if (attempted && !valid) { <p role="alert">{{ 'iam.org_units.validation' | t }}</p> }
+  <fieldset [disabled]="pending || impactOpen">
+    <legend class="sr-only">{{ 'iam.org_units.details' | t }}</legend>
+    <label [for]="formId + '-code'">{{ 'iam.org_units.code' | t }}</label>
+    <input [id]="formId + '-code'" name="code" [(ngModel)]="draft.code" required [readOnly]="editing"
+      [attr.aria-invalid]="fieldError('code') ? 'true' : null" [attr.aria-describedby]="fieldError('code') ? formId + '-code-error' : null">
+    @if (fieldError('code'); as message) { <small [id]="formId + '-code-error'">{{ message }}</small> }
+    <label [for]="formId + '-name'">{{ 'iam.org_units.name' | t }}</label>
+    <input [id]="formId + '-name'" name="name" [(ngModel)]="draft.name" required
+      [attr.aria-invalid]="fieldError('name') ? 'true' : null" [attr.aria-describedby]="fieldError('name') ? formId + '-name-error' : null">
+    @if (fieldError('name'); as message) { <small [id]="formId + '-name-error'">{{ message }}</small> }
+    <label [for]="formId + '-kind'">{{ 'iam.org_units.kind' | t }}</label>
+    <select [id]="formId + '-kind'" name="kind" [(ngModel)]="draft.kind" required
+      [attr.aria-invalid]="fieldError('kind') ? 'true' : null" [attr.aria-describedby]="fieldError('kind') ? formId + '-kind-error' : null">
+      @if (!kindKeys[original.kind]) { <option [value]="original.kind">{{ original.kind }}</option> }
+      @for (kind of kinds; track kind) { <option [value]="kind">{{ kindKeys[kind] | t }}</option> }
+    </select>
+    @if (fieldError('kind'); as message) { <small [id]="formId + '-kind-error'">{{ message }}</small> }
+    @if (editing && original.parentId !== null) {
+      <label [for]="formId + '-parent'">{{ 'iam.org_units.parent' | t }}</label>
+      <select [id]="formId + '-parent'" name="parentId" [(ngModel)]="draft.parentId"
+        [attr.aria-invalid]="fieldError('parentId') ? 'true' : null" [attr.aria-describedby]="fieldError('parentId') ? formId + '-parent-error' : null">
+        @for (unit of parents; track unit.id) { <option [ngValue]="unit.id">{{ unit.code }} · {{ unit.name }}</option> }
+      </select>
+      @if (fieldError('parentId'); as message) { <small [id]="formId + '-parent-error'">{{ message }}</small> }
+    } @else { <p>{{ (original.parentId === null ? 'iam.org_units.root' : 'iam.org_units.parent') | t }}{{ original.parentId === null ? '' : ': ' + original.parentId }}</p> }
+    @if (editing) {
+      <label [for]="formId + '-state'">{{ 'iam.org_units.state' | t }}</label>
+      <select [id]="formId + '-state'" name="state" [(ngModel)]="draft.state"
+        [attr.aria-invalid]="fieldError('state') ? 'true' : null" [attr.aria-describedby]="fieldError('state') ? formId + '-state-error' : null">
+        <option value="A">{{ 'iam.org_units.active' | t }}</option><option value="P">{{ 'iam.org_units.passive' | t }}</option>
+      </select>
+      @if (fieldError('state'); as message) { <small [id]="formId + '-state-error'">{{ message }}</small> }
+    }
+    <label [for]="formId + '-order'">{{ 'iam.org_units.order' | t }}</label>
+    <input [id]="formId + '-order'" name="orderNo" type="number" step="1" min="-2147483648" max="2147483647" [(ngModel)]="draft.orderNo" required
+      [attr.aria-invalid]="fieldError('orderNo') ? 'true' : null" [attr.aria-describedby]="fieldError('orderNo') ? formId + '-order-error' : null">
+    @if (fieldError('orderNo'); as message) { <small [id]="formId + '-order-error'">{{ message }}</small> }
+  </fieldset>
+  <div class="actions">
+    <ui-button variant="secondary" [disabled]="pending || impactOpen" (onClick)="cancel.emit()">{{ 'iam.org_units.cancel' | t }}</ui-button>
+    <ui-button type="submit" [loading]="pending" [disabled]="!dirty || !valid || impactOpen">{{ 'iam.org_units.save' | t }}</ui-button>
+  </div>
+</form>
+<ui-modal [isOpen]="impactOpen" [title]="'iam.org_units.impact_title' | t" (close)="impactOpen = false">
+  <p body>{{ 'iam.org_units.impact_warning' | t }}</p>
+  <div footer class="actions">
+    <ui-button variant="secondary" (onClick)="impactOpen = false">{{ 'iam.org_units.cancel' | t }}</ui-button>
+    <ui-button (onClick)="confirmImpact()">{{ 'iam.org_units.confirm_save' | t }}</ui-button>
+  </div>
+</ui-modal>

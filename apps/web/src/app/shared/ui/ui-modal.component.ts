@@ -24,6 +24,7 @@ import { TranslatePipe } from '../../core/services/i18n.service';
         role="dialog"
         aria-modal="true"
         [attr.aria-labelledby]="titleId"
+        [attr.aria-label]="ariaLabel || null"
         cdkTrapFocus
         [cdkTrapFocusAutoCapture]="true"
       >
@@ -44,7 +45,7 @@ import { TranslatePipe } from '../../core/services/i18n.service';
           <ng-content></ng-content>
         </div>
         <div class="modal-footer" *ngIf="hasFooter">
-          <ng-content select="[footer]"></ng-content>
+          <ng-content select="[footer], [modal-footer], [slot=footer]"></ng-content>
         </div>
       </div>
     </div>
@@ -143,6 +144,7 @@ export class UiModalComponent implements OnChanges, OnDestroy {
 
   @Input() isOpen: boolean = false;
   @Input() title: string = '';
+  @Input() ariaLabel?: string;
   @Input() size: 'sm' | 'md' | 'lg' | 'xl' = 'md';
   @Input() hasFooter: boolean = true;
   @Input() dismissible: boolean = true;
@@ -153,7 +155,7 @@ export class UiModalComponent implements OnChanges, OnDestroy {
 
   @HostListener('document:keydown.escape', ['$event'])
   onEscape(event: Event) {
-    if (event.defaultPrevented || this.host.nativeElement.querySelector('[aria-expanded="true"]')) return;
+    if (event.defaultPrevented || this.host.nativeElement.querySelector('[aria-haspopup="listbox"][aria-expanded="true"]')) return;
     if (this.isOpen && this.dismissible && UiModalComponent.openModals.at(-1) === this) {
       event.preventDefault();
       this.close.emit();

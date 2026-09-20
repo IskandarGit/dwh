@@ -42,7 +42,12 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   private readonly permissions = inject(PermissionService);
   private readonly i18n = inject(I18nService);
 
-  readonly entities: SearchEntityType[] = ['TASK', 'PROJECT', 'USER'];
+  readonly entities: SearchEntityType[] = ['TASK', 'PROJECT', 'USER', 'NOTE'];
+
+  get displayedEntities(): SearchEntityType[] {
+    const draft = this.draft();
+    return this.entities.filter(e => e !== 'NOTE' || (draft && draft.fields['NOTE'] && draft.fields['NOTE'].length > 0));
+  }
   readonly status = signal<SearchManagementStatus | null>(null);
   readonly statusLoading = signal(false);
   readonly statusError = signal<ProblemDetail | null>(null);
@@ -394,7 +399,7 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
 
   private updateField(entity: SearchEntityType, index: number, update: (field: SearchFieldPolicy) => SearchFieldPolicy): void {
     this.draft.update(current => {
-      if (!current || !current.fields[entity][index]) return current;
+      if (!current || !current.fields[entity] || !current.fields[entity][index]) return current;
       const rows = current.fields[entity].map((field, row) => row === index ? update(field) : field);
       return { ...current, fields: { ...current.fields, [entity]: rows } };
     });
@@ -411,7 +416,12 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
       errors.push('settings.search.validation.burst');
     for (const entity of this.entities) {
       const fields = policy.fields[entity] ?? [];
-      if (fields.length === 0 || !fields.some(field => Number.isInteger(field.weight) && field.weight > 0))
+      if (fields.length === 0) {
+        if (entity === 'NOTE') continue;
+        errors.push('settings.search.validation.searchable_field');
+        continue;
+      }
+      if (!fields.some(field => Number.isInteger(field.weight) && field.weight > 0))
         errors.push('settings.search.validation.searchable_field');
       if (fields.some(field => !Number.isInteger(field.weight) || field.weight < 0 || field.weight > 127))
         errors.push('settings.search.validation.weight');

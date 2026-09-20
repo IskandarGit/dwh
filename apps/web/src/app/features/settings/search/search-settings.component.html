@@ -60,7 +60,7 @@
         <label><span>{{ 'settings.search.global_limit' | t }}</span><input id="search-global-limit" name="searchGlobalLimit" type="number" min="1" max="50" step="1" inputmode="numeric" [ngModel]="policy.globalLimit" (ngModelChange)="updatePolicyNumber('globalLimit', $event)"><small>{{ 'settings.search.global_limit_hint' | t }}</small></label>
       </div>
       <div class="field-groups">
-        <div class="field-group" *ngFor="let entity of entities">
+        <div class="field-group" *ngFor="let entity of displayedEntities">
           <h4>{{ ('settings.search.entity.' + entity.toLowerCase()) | t }}</h4>
           <div class="field-grid-scroll" tabindex="0" [attr.aria-label]="'settings.search.fields.scroll_label' | t:{entity: entity}">
             <div class="field-grid field-grid-head" aria-hidden="true"><span>{{ 'settings.search.fields.field' | t }}</span><span>{{ 'settings.search.fields.weight' | t }}</span><span>{{ 'settings.search.fields.typos' | t }}</span><span>{{ 'settings.search.fields.prefix' | t }}</span></div>
@@ -78,7 +78,7 @@
       <h4>{{ 'settings.search.preview.title' | t }}</h4><p>{{ 'settings.search.preview.description' | t }}</p>
       <div class="preview-controls">
         <label><span>{{ 'settings.search.preview.query' | t }}</span><input id="search-preview-query" name="searchPreviewQuery" type="search" [(ngModel)]="previewQuery" autocomplete="off"></label>
-        <label><span>{{ 'settings.search.preview.entity' | t }}</span><select id="search-preview-entity" name="searchPreviewEntity" [(ngModel)]="previewEntity"><option value="">{{ 'settings.search.preview.all_entities' | t }}</option><option *ngFor="let entity of entities" [value]="entity">{{ ('settings.search.entity.' + entity.toLowerCase()) | t }}</option></select></label>
+        <label><span>{{ 'settings.search.preview.entity' | t }}</span><select id="search-preview-entity" name="searchPreviewEntity" [(ngModel)]="previewEntity"><option value="">{{ 'settings.search.preview.all_entities' | t }}</option><option *ngFor="let entity of displayedEntities" [value]="entity">{{ ('settings.search.entity.' + entity.toLowerCase()) | t }}</option></select></label>
         <button type="button" class="btn btn-secondary" data-action="preview-search-settings" [disabled]="!previewQuery.trim() || (draft() !== null && policyErrors().length > 0) || previewCooldownSeconds() > 0" [attr.aria-busy]="previewPending()" (click)="preview()">{{ 'settings.search.preview.action' | t }}</button>
       </div>
       <p *ngIf="previewCooldownSeconds() > 0" role="status">{{ 'settings.search.preview.cooldown' | t:{seconds: previewCooldownSeconds()} }}</p>

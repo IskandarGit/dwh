@@ -1,5 +1,5 @@
 export interface SearchHit {
-  entityType: 'USER' | 'TASK' | 'PROJECT';
+  entityType: 'USER' | 'TASK' | 'PROJECT' | 'NOTE';
   id: string;
   title: string;
   description: string;
@@ -14,4 +14,5 @@ export interface SearchResult {
   source: 'TYPESENSE' | 'POSTGRES';
   degraded: boolean;
   hits: SearchHit[];
+  suggestedQuery?: string | null;
 }

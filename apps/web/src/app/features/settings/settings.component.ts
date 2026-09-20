@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, signal, inject } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, signal, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, concatMap, finalize, from, switchMap, toArray } from 'rxjs';
@@ -7,10 +8,12 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { I18nService, TranslatePipe } from '../../core/services/i18n.service';
 import { PermissionService } from '../../core/services/permission.service';
+import { ThemeService, ThemePreference } from '../../core/services/theme.service';
 import { UiButtonComponent } from '../../shared/ui/ui-button.component';
 import { UiModalComponent } from '../../shared/ui/ui-modal.component';
 import { LanguageEditorComponent } from './language-editor.component';
 import { SearchSettingsComponent } from './search/search-settings.component';
+import { NavigationSettingsComponent } from './navigation/navigation-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -22,7 +25,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
     UiButtonComponent,
     UiModalComponent,
     LanguageEditorComponent,
-    SearchSettingsComponent
+    SearchSettingsComponent,
+    NavigationSettingsComponent
   ],
   template: `
     <div class="settings-page">
@@ -30,14 +34,28 @@ import { SearchSettingsComponent } from './search/search-settings.component';
       <div class="view-header">
         <div class="header-left">
           <h1 class="view-title">{{ 'settings.title' | t }}</h1>
-          <span class="count-badge">System Settings</span>
+          <p class="view-subtitle">{{ 'settings.sistemnye_nastroyki' | t }}</p>
         </div>
         <div class="header-right">
-          <button type="button" class="btn btn-secondary" [attr.aria-label]="'common.refresh' | t" (click)="loadAllSettings()" title="{{ 'common.refresh' | t }}">
-            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
-            <span>{{ 'common.refresh' | t }}</span>
-          </button>
+          <ui-button
+            variant="secondary"
+            icon="refresh"
+            [loading]="isLoading()"
+            [ariaLabel]="'common.refresh' | t"
+            (onClick)="loadAllSettings()"
+          >
+            {{ 'common.refresh' | t }}
+          </ui-button>
         </div>
+      </div>
+
+      <!-- Error Banner -->
+      <div *ngIf="loadError()" class="load-error-banner" role="alert">
+        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+        <span class="load-error-text">{{ loadError() }}</span>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="loadAllSettings()">
+          {{ 'common.retry' | t }}
+        </button>
       </div>
 
       <!-- Tabs Navigation -->
@@ -52,7 +70,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'general'"
             [attr.aria-selected]="activeTab === 'general'"
             aria-controls="settings-general-panel"
-            (click)="activeTab = 'general'"
+            (click)="setTab('general')"
+            (keydown)="onTabKeydown($event, 'general')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">tune</span>
             <span>{{ 'settings.tab.general' | t }}</span>
@@ -67,7 +86,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'security'"
             [attr.aria-selected]="activeTab === 'security'"
             aria-controls="settings-security-panel"
-            (click)="activeTab = 'security'"
+            (click)="setTab('security')"
+            (keydown)="onTabKeydown($event, 'security')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">security</span>
             <span>{{ 'settings.tab.security' | t }}</span>
@@ -82,7 +102,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'storage'"
             [attr.aria-selected]="activeTab === 'storage'"
             aria-controls="settings-storage-panel"
-            (click)="activeTab = 'storage'"
+            (click)="setTab('storage')"
+            (keydown)="onTabKeydown($event, 'storage')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">cloud</span>
             <span>{{ 'settings.tab.storage' | t }}</span>
@@ -96,7 +117,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'preferences'"
             [attr.aria-selected]="activeTab === 'preferences'"
             aria-controls="settings-preferences-panel"
-            (click)="activeTab = 'preferences'"
+            (click)="setTab('preferences')"
+            (keydown)="onTabKeydown($event, 'preferences')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">person</span>
             <span>{{ 'settings.tab.preferences' | t }}</span>
@@ -111,7 +133,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'languages'"
             [attr.aria-selected]="activeTab === 'languages'"
             aria-controls="settings-languages-panel"
-            (click)="activeTab = 'languages'"
+            (click)="setTab('languages')"
+            (keydown)="onTabKeydown($event, 'languages')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">language</span>
             <span>{{ 'settings.yazyki_i_lokalizaciya' | t }}</span>
@@ -126,10 +149,27 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             [class.active]="activeTab === 'search'"
             [attr.aria-selected]="activeTab === 'search'"
             aria-controls="settings-search-panel"
-            (click)="activeTab = 'search'"
+            (click)="setTab('search')"
+            (keydown)="onTabKeydown($event, 'search')"
           >
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">manage_search</span>
             <span>{{ 'settings.search.tab' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canViewNavigationSettings()"
+            id="settings-navigation-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'navigation'"
+            [attr.aria-selected]="activeTab === 'navigation'"
+            aria-controls="settings-navigation-panel"
+            (click)="setTab('navigation')"
+            (keydown)="onTabKeydown($event, 'navigation')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">menu_open</span>
+            <span>{{ 'settings.navigation.tab' | t }}</span>
           </button>
 
         </div>
@@ -137,6 +177,10 @@ import { SearchSettingsComponent } from './search/search-settings.component';
 
       <div id="settings-search-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-search-tab" *ngIf="activeTab === 'search' && canViewSearchSettings()">
         <app-search-settings />
+      </div>
+
+      <div id="settings-navigation-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-navigation-tab" *ngIf="activeTab === 'navigation' && canViewNavigationSettings()">
+        <app-navigation-settings />
       </div>
 
       <!-- =================================================================== -->
@@ -152,6 +196,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 <p class="card-desc">{{ 'settings.globalnye_parametry_dlya_vseh_sotrudnikov_organi' | t }}</p>
               </div>
             </div>
+            <span class="badge badge-neutral" *ngIf="!canUpdateSystemSettings()">{{ 'settings.readonly_badge' | t }}</span>
           </div>
 
           <div class="form-grid">
@@ -162,6 +207,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 name="settingsCompanyName"
                 type="text"
                 class="form-input"
+                [disabled]="!canUpdateSystemSettings() || isSaving()"
                 [(ngModel)]="systemSettings()['system.company_name']"
                 placeholder="SmartupCMS"
               />
@@ -169,7 +215,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
 
             <div class="form-group">
               <label class="form-label" for="settings-default-language">{{ 'settings.default_language' | t }}</label>
-              <select id="settings-default-language" name="settingsDefaultLanguage" class="form-select" [(ngModel)]="systemSettings()['system.default_language']">
+              <select id="settings-default-language" name="settingsDefaultLanguage" class="form-select" [disabled]="!canUpdateSystemSettings() || isSaving()" [(ngModel)]="systemSettings()['system.default_language']">
                 <option *ngFor="let lang of i18n.languages()" [value]="lang.code">
                   {{ lang.name }} ({{ lang.code.toUpperCase() }})
                 </option>
@@ -178,25 +224,41 @@ import { SearchSettingsComponent } from './search/search-settings.component';
 
             <div class="form-group">
               <label class="form-label" for="settings-default-timezone">{{ 'settings.default_timezone' | t }}</label>
-              <select id="settings-default-timezone" name="settingsDefaultTimezone" class="form-select" [(ngModel)]="systemSettings()['system.default_timezone']">
+              <select id="settings-default-timezone" name="settingsDefaultTimezone" class="form-select" [disabled]="!canUpdateSystemSettings() || isSaving()" [(ngModel)]="systemSettings()['system.default_timezone']">
                 <option value="Asia/Tashkent">Asia/Tashkent (UTC+5)</option>
+                <option value="Asia/Samarkand">Asia/Samarkand (UTC+5)</option>
                 <option value="Asia/Almaty">Asia/Almaty (UTC+5)</option>
+                <option value="Asia/Bishkek">Asia/Bishkek (UTC+6)</option>
+                <option value="Asia/Dushanbe">Asia/Dushanbe (UTC+5)</option>
+                <option value="Asia/Ashgabat">Asia/Ashgabat (UTC+5)</option>
+                <option value="Asia/Baku">Asia/Baku (UTC+4)</option>
                 <option value="Europe/Moscow">Europe/Moscow (UTC+3)</option>
+                <option value="Europe/Istanbul">Europe/Istanbul (UTC+3)</option>
+                <option value="Europe/Berlin">Europe/Berlin (UTC+1)</option>
+                <option value="Europe/London">Europe/London (UTC+0)</option>
                 <option value="UTC">UTC (GMT+0)</option>
+                <option *ngIf="isCustomTimezone(systemSettings()['system.default_timezone'])" [value]="systemSettings()['system.default_timezone']">
+                  {{ systemSettings()['system.default_timezone'] }}
+                </option>
               </select>
             </div>
 
             <div class="form-group">
               <label class="form-label" for="settings-date-format">{{ 'settings.date_format' | t }}</label>
-              <select id="settings-date-format" name="settingsDateFormat" class="form-select" [(ngModel)]="systemSettings()['system.date_format']">
+              <select id="settings-date-format" name="settingsDateFormat" class="form-select" [disabled]="!canUpdateSystemSettings() || isSaving()" [(ngModel)]="systemSettings()['system.date_format']">
                 <option value="dd.MM.yyyy HH:mm">29.08.2026 14:30 (dd.MM.yyyy HH:mm)</option>
                 <option value="yyyy-MM-dd HH:mm">2026-08-29 14:30 (yyyy-MM-dd HH:mm)</option>
                 <option value="MM/dd/yyyy hh:mm a">08/29/2026 02:30 PM (MM/dd/yyyy)</option>
+                <option value="dd.MM.yyyy">29.08.2026 (dd.MM.yyyy)</option>
+                <option value="dd/MM/yyyy HH:mm">29/08/2026 14:30 (dd/MM/yyyy HH:mm)</option>
+                <option *ngIf="isCustomDateFormat(systemSettings()['system.date_format'])" [value]="systemSettings()['system.date_format']">
+                  {{ systemSettings()['system.date_format'] }}
+                </option>
               </select>
             </div>
           </div>
 
-          <div class="card-footer-actions">
+          <div class="card-footer-actions" *ngIf="canUpdateSystemSettings()">
             <ui-button [loading]="isSaving()" (onClick)="saveSystemSettings()">
               {{ 'common.save' | t }}
             </ui-button>
@@ -217,6 +279,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 <p class="card-desc">{{ 'settings.trebovaniya_k_parolyam_2fa_i_veb_sessiyam' | t }}</p>
               </div>
             </div>
+            <span class="badge badge-neutral" *ngIf="!canUpdateSystemSettings()">{{ 'settings.readonly_badge' | t }}</span>
           </div>
 
           <div class="form-grid">
@@ -227,8 +290,9 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 name="settingsPasswordLength"
                 type="number"
                 min="8"
-                max="32"
+                max="64"
                 class="form-input"
+                [disabled]="!canUpdateSystemSettings() || isSaving()"
                 aria-describedby="settings-password-length-hint"
                 [(ngModel)]="systemSettings()['security.min_password_length']"
               />
@@ -236,7 +300,12 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="settings-session-lifetime">{{ 'settings.session_lifetime' | t }}</label>
+              <label class="form-label" for="settings-session-lifetime">
+                {{ 'settings.session_lifetime' | t }}
+                <span class="unit-badge" *ngIf="formatSessionHours(systemSettings()['security.session_lifetime_hours']) as sessionBadge">
+                  {{ sessionBadge }}
+                </span>
+              </label>
               <input
                 id="settings-session-lifetime"
                 name="settingsSessionLifetime"
@@ -244,6 +313,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 min="1"
                 max="8760"
                 class="form-input"
+                [disabled]="!canUpdateSystemSettings() || isSaving()"
                 aria-describedby="settings-session-lifetime-hint"
                 [(ngModel)]="systemSettings()['security.session_lifetime_hours']"
               />
@@ -262,6 +332,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                     name="settingsRequire2fa"
                     type="checkbox"
                     aria-labelledby="settings-require-2fa-label"
+                    [disabled]="!canUpdateSystemSettings() || isSaving()"
                     [checked]="systemSettings()['security.require_2fa'] === 'true'"
                     (change)="toggleRequire2fa($event)"
                   />
@@ -271,7 +342,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             </div>
           </div>
 
-          <div class="card-footer-actions">
+          <div class="card-footer-actions" *ngIf="canUpdateSystemSettings()">
             <ui-button [loading]="isSaving()" (onClick)="saveSystemSettings()">
               {{ 'common.save' | t }}
             </ui-button>
@@ -292,11 +363,17 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 <p class="card-desc">{{ 'settings.limity_diskovogo_prostranstva_dlya_novyh_sotrudn' | t }}</p>
               </div>
             </div>
+            <span class="badge badge-neutral" *ngIf="!canUpdateSystemSettings()">{{ 'settings.readonly_badge' | t }}</span>
           </div>
 
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label" for="settings-user-quota">{{ 'settings.default_user_quota' | t }}</label>
+              <label class="form-label" for="settings-user-quota">
+                {{ 'settings.default_user_quota' | t }}
+                <span class="unit-badge" *ngIf="formatQuotaMb(systemSettings()['storage.default_user_quota_mb']) as quotaBadge">
+                  {{ quotaBadge }}
+                </span>
+              </label>
               <input
                 id="settings-user-quota"
                 name="settingsUserQuota"
@@ -304,6 +381,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                 min="100"
                 max="102400"
                 class="form-input"
+                [disabled]="!canUpdateSystemSettings() || isSaving()"
                 aria-describedby="settings-user-quota-hint"
                 [(ngModel)]="systemSettings()['storage.default_user_quota_mb']"
               />
@@ -311,7 +389,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
             </div>
           </div>
 
-          <div class="card-footer-actions">
+          <div class="card-footer-actions" *ngIf="canUpdateSystemSettings()">
             <ui-button [loading]="isSaving()" (onClick)="saveSystemSettings()">
               {{ 'common.save' | t }}
             </ui-button>
@@ -337,7 +415,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label" for="settings-interface-language">{{ 'settings.yazyk_interfeysa' | t }}</label>
-              <select id="settings-interface-language" name="settingsInterfaceLanguage" class="form-select" [ngModel]="i18n.currentLang()" (ngModelChange)="changePersonalLang($event)">
+              <select id="settings-interface-language" name="settingsInterfaceLanguage" class="form-select" [disabled]="isSaving()" [ngModel]="i18n.currentLang()" (ngModelChange)="changePersonalLang($event)">
                 <option *ngFor="let lang of i18n.languages()" [value]="lang.code">
                   {{ lang.name }} ({{ lang.code.toUpperCase() }})
                 </option>
@@ -346,7 +424,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
 
             <div class="form-group">
               <label class="form-label" for="settings-theme">{{ 'settings.theme' | t }}</label>
-              <select id="settings-theme" name="settingsTheme" class="form-select" [(ngModel)]="userSettings()['user.theme']">
+              <select id="settings-theme" name="settingsTheme" class="form-select" [disabled]="isSaving()" [ngModel]="userThemePreference()" (ngModelChange)="onThemeChange($event)">
                 <option value="dark">{{ 'settings.temnaya_dark_premium' | t }}</option>
                 <option value="light">{{ 'settings.svetlaya_light_clean' | t }}</option>
                 <option value="system">{{ 'settings.sistemnaya_tema' | t }}</option>
@@ -365,6 +443,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
                     name="settingsNotificationSound"
                     type="checkbox"
                     aria-labelledby="settings-notification-sound-label"
+                    [disabled]="isSaving()"
                     [checked]="userSettings()['user.notifications_sound'] !== 'false'"
                     (change)="toggleSound($event)"
                   />
@@ -484,6 +563,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
     <!-- Modal: Add New Custom Language -->
     <ui-modal
       *ngIf="isAddLangModalOpen()"
+      [isOpen]="isAddLangModalOpen()"
       [title]="'settings.dobavlenie_novogo_yazyka' | t"
       [ariaLabel]="'settings.dobavlenie_novogo_yazyka' | t"
       (close)="isAddLangModalOpen.set(false)"
@@ -503,8 +583,8 @@ import { SearchSettingsComponent } from './search/search-settings.component';
         </div>
       </div>
       <div modal-footer class="modal-footer-btns">
-        <button type="button" class="btn btn-secondary" (click)="isAddLangModalOpen.set(false)">{{ 'common.cancel' | t }}</button>
-        <button type="button" class="btn btn-primary" (click)="saveNewLanguage()" [disabled]="!newLangCode || !newLangName">{{ 'settings.sohranit_yazyk' | t }}</button>
+        <ui-button variant="secondary" (onClick)="isAddLangModalOpen.set(false)" [disabled]="isAddingLang()">{{ 'common.cancel' | t }}</ui-button>
+        <ui-button variant="primary" [loading]="isAddingLang()" (onClick)="saveNewLanguage()" [disabled]="!newLangCode.trim() || !newLangName.trim()">{{ 'settings.sohranit_yazyk' | t }}</ui-button>
       </div>
     </ui-modal>
 
@@ -517,7 +597,7 @@ import { SearchSettingsComponent } from './search/search-settings.component';
       padding: 0;
       width: 100%;
       min-width: 0;
-      max-width: 1000px;
+      max-width: 1280px;
       margin: 0 auto;
     }
 
@@ -827,13 +907,58 @@ import { SearchSettingsComponent } from './search/search-settings.component';
       gap: 16px;
       margin: 16px 20px 0;
       padding: 12px 14px;
-      border: 1px solid var(--warning, #d59b00);
+      border: 1px solid var(--warning);
       border-radius: 9px;
       color: var(--text-main);
-      background: var(--warning-soft, #fff8e1);
+      background: var(--warning-bg);
     }
     .legacy-import > div { display: grid; gap: 3px; }
-    .legacy-import span { color: var(--text-light); font-size: 12px; }
+    .legacy-import span { color: var(--text-muted); font-size: 12px; }
+    .switch-toggle input:focus-visible + .toggle-slider {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .load-error-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .table-actions-right {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .badge-active {
+      background-color: var(--success-bg);
+      color: var(--success);
+    }
+
+    .unit-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      margin-left: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--primary-text);
+      background: var(--primary-subtle);
+      border-radius: var(--radius-sm);
+    }
+    .load-error-text {
+      flex: 1;
+      font-size: 14px;
+    }
+
     @media (max-width: 680px) {
       .legacy-import { align-items: stretch; flex-direction: column; }
     }
@@ -842,15 +967,21 @@ import { SearchSettingsComponent } from './search/search-settings.component';
 })
 export class SettingsComponent implements OnInit, OnDestroy {
   private readonly uiI18n = inject(I18nService);
+  private readonly themeService = inject(ThemeService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
   private pendingTabFocusScroll: ReturnType<typeof setTimeout> | null = null;
-  activeTab: 'general' | 'security' | 'storage' | 'preferences' | 'languages' | 'search' = 'general';
+  activeTab: 'general' | 'security' | 'storage' | 'preferences' | 'languages' | 'search' | 'navigation' = 'general';
 
+  readonly isLoading = signal<boolean>(false);
+  readonly loadError = signal<string | null>(null);
   readonly systemSettings = signal<Record<string, string>>({});
   readonly userSettings = signal<Record<string, string>>({});
   readonly isSaving = signal<boolean>(false);
 
   // Languages Management
   readonly isAddLangModalOpen = signal<boolean>(false);
+  readonly isAddingLang = signal<boolean>(false);
   readonly editingLanguageCode = signal<string | null>(null);
   readonly legacyLanguageCount = signal(0);
   readonly isMigratingLegacyLanguages = signal(false);
@@ -866,7 +997,16 @@ export class SettingsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    if (!this.canManageSystemSettings()) {
+    if (this.route) {
+      this.route.queryParams.subscribe(params => {
+        const tabParam = params['tab'];
+        if (tabParam && this.isTabAvailable(tabParam)) {
+          this.activeTab = tabParam as any;
+        } else if (!this.canManageSystemSettings()) {
+          this.activeTab = 'preferences';
+        }
+      });
+    } else if (!this.canManageSystemSettings()) {
       this.activeTab = 'preferences';
     }
     this.legacyLanguageCount.set(Object.keys(this.readLegacyLanguages()).length);
@@ -908,20 +1048,98 @@ export class SettingsComponent implements OnInit, OnDestroy {
     return this.permService.hasPermission('platform.search', 'view');
   }
 
+  canViewNavigationSettings(): boolean {
+    return this.permService.hasPermission('platform.navigation', 'view');
+  }
+
+  userThemePreference(): string {
+    return this.userSettings()['user.theme'] || this.themeService.themePreference();
+  }
+
+  onThemeChange(newTheme: string): void {
+    this.userSettings.update(settings => ({ ...settings, 'user.theme': newTheme }));
+    if (newTheme === 'light' || newTheme === 'dark' || newTheme === 'system') {
+      this.themeService.setTheme(newTheme);
+    }
+  }
+
   loadAllSettings() {
+    this.isLoading.set(true);
+    this.loadError.set(null);
+    let sysLoaded = !this.canManageSystemSettings();
+    let userLoaded = false;
+    const checkDone = () => {
+      if (sysLoaded && userLoaded) {
+        this.isLoading.set(false);
+      }
+    };
+
     if (this.canManageSystemSettings()) {
       this.api.get<Record<string, string>>('/settings/system').subscribe({
-        next: res => this.systemSettings.set({ ...res })
+        next: res => {
+          this.systemSettings.set({ ...res });
+          sysLoaded = true;
+          checkDone();
+        },
+        error: () => {
+          this.loadError.set(this.uiI18n.translate('settings.oshibka_zagruzki_nastroek'));
+          sysLoaded = true;
+          checkDone();
+        }
       });
-
     }
 
     this.api.get<Record<string, string>>('/settings/user').subscribe({
-      next: res => this.userSettings.set({ ...res })
+      next: res => {
+        this.userSettings.set({ ...res });
+        const theme = res['user.theme'];
+        if (theme === 'light' || theme === 'dark' || theme === 'system') {
+          this.themeService.setTheme(theme);
+        }
+        userLoaded = true;
+        checkDone();
+      },
+      error: () => {
+        this.loadError.set(this.uiI18n.translate('settings.oshibka_zagruzki_nastroek'));
+        userLoaded = true;
+        checkDone();
+      }
     });
   }
 
   saveSystemSettings() {
+    if (!this.canUpdateSystemSettings()) return;
+
+    const minPassStr = this.systemSettings()['security.min_password_length'];
+    if (minPassStr !== undefined) {
+      const trimmed = String(minPassStr).trim();
+      const minPass = trimmed === '' ? NaN : Number(trimmed);
+      if (!Number.isFinite(minPass) || minPass < 8 || minPass > 64) {
+        this.toast.error(this.uiI18n.translate('settings.validation.min_password'));
+        return;
+      }
+    }
+
+    const sessionStr = this.systemSettings()['security.session_lifetime_hours'];
+    if (sessionStr !== undefined) {
+      const trimmed = String(sessionStr).trim();
+      const sessionLifetime = trimmed === '' ? NaN : Number(trimmed);
+      if (!Number.isFinite(sessionLifetime) || sessionLifetime < 1 || sessionLifetime > 8760) {
+        this.toast.error(this.uiI18n.translate('settings.validation.session_lifetime'));
+        return;
+      }
+    }
+
+    const quotaStr = this.systemSettings()['storage.default_user_quota_mb'];
+    if (quotaStr !== undefined) {
+      const trimmed = String(quotaStr).trim();
+      const quota = trimmed === '' ? NaN : Number(trimmed);
+      if (!Number.isFinite(quota) || quota < 100 || quota > 102400) {
+        this.toast.error(this.uiI18n.translate('settings.validation.quota'));
+        return;
+      }
+    }
+
     this.isSaving.set(true);
     this.api.patch('/settings/system', this.systemSettings()).subscribe({
       next: () => {
@@ -937,6 +1155,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
     this.api.patch('/settings/user', this.userSettings()).subscribe({
       next: () => {
         this.isSaving.set(false);
+        const theme = this.userSettings()['user.theme'];
+        if (theme === 'light' || theme === 'dark' || theme === 'system') {
+          this.themeService.setTheme(theme);
+        }
         this.toast.success(this.i18n.translate('common.saved'));
       },
       error: () => this.isSaving.set(false)
@@ -1010,8 +1232,138 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  isTabAvailable(tab: string): boolean {
+    switch (tab) {
+      case 'general':
+      case 'security':
+      case 'storage':
+      case 'languages':
+        return this.canManageSystemSettings();
+      case 'preferences':
+        return true;
+      case 'search':
+        return this.canViewSearchSettings();
+      case 'navigation':
+        return this.canViewNavigationSettings();
+      default:
+        return false;
+    }
+  }
+
+  setTab(tab: 'general' | 'security' | 'storage' | 'preferences' | 'languages' | 'search' | 'navigation'): void {
+    if (!this.isTabAvailable(tab)) return;
+    this.activeTab = tab;
+    if (this.router && this.route) {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
+  }
+
+  onTabKeydown(event: KeyboardEvent, currentTab: string): void {
+    const tabs: Array<'general' | 'security' | 'storage' | 'preferences' | 'languages' | 'search' | 'navigation'> = [
+      'general', 'security', 'storage', 'preferences', 'languages', 'search', 'navigation'
+    ];
+    const availableTabs = tabs.filter(t => this.isTabAvailable(t));
+    const currentIndex = availableTabs.indexOf(currentTab as any);
+    if (currentIndex === -1) return;
+
+    let targetIndex = -1;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      targetIndex = (currentIndex + 1) % availableTabs.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      targetIndex = (currentIndex - 1 + availableTabs.length) % availableTabs.length;
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      targetIndex = 0;
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      targetIndex = availableTabs.length - 1;
+    }
+
+    if (targetIndex >= 0) {
+      const targetTab = availableTabs[targetIndex];
+      this.setTab(targetTab);
+      const tabElement = document.getElementById(`settings-${targetTab}-tab`);
+      if (tabElement) tabElement.focus();
+    }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleGlobalKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      if (['general', 'security', 'storage'].includes(this.activeTab)) {
+        if (this.canUpdateSystemSettings() && !this.isSaving()) {
+          this.saveSystemSettings();
+        }
+      } else if (this.activeTab === 'preferences') {
+        if (!this.isSaving()) {
+          this.saveUserSettings();
+        }
+      }
+    }
+  }
+
+  formatSessionHours(hours: string | number | undefined): string {
+    if (hours === undefined || hours === '') return '';
+    const num = Number(hours);
+    if (!Number.isFinite(num) || num <= 0) return '';
+    const days = Math.floor(num / 24);
+    const remHours = num % 24;
+    const h = this.i18n.translate('settings.unit_hours_short') || 'h';
+    const d = this.i18n.translate('settings.unit_days_short') || 'd';
+    if (days === 0) return `${num} ${h}`;
+    if (remHours === 0) return `${num} ${h} (${days} ${d})`;
+    return `${num} ${h} (${days} ${d} ${remHours} ${h})`;
+  }
+
+  formatQuotaMb(mb: string | number | undefined): string {
+    if (mb === undefined || mb === '') return '';
+    const num = Number(mb);
+    if (!Number.isFinite(num) || num <= 0) return '';
+    const mbUnit = this.i18n.translate('settings.unit_mb') || 'MB';
+    const gbUnit = this.i18n.translate('settings.unit_gb') || 'GB';
+    if (num >= 1024) {
+      const gb = (num / 1024).toFixed(1).replace(/\.0$/, '');
+      return `${num} ${mbUnit} (~${gb} ${gbUnit})`;
+    }
+    return `${num} ${mbUnit}`;
+  }
+
+  isCustomTimezone(tz: string | undefined): boolean {
+    if (!tz) return false;
+    const known = [
+      'Asia/Tashkent', 'Asia/Samarkand', 'Asia/Almaty', 'Asia/Bishkek',
+      'Asia/Dushanbe', 'Asia/Ashgabat', 'Asia/Baku', 'Europe/Moscow',
+      'Europe/Istanbul', 'Europe/Berlin', 'Europe/London', 'UTC'
+    ];
+    return !known.includes(tz);
+  }
+
+  isCustomDateFormat(df: string | undefined): boolean {
+    if (!df) return false;
+    const known = [
+      'dd.MM.yyyy HH:mm', 'yyyy-MM-dd HH:mm', 'MM/dd/yyyy hh:mm a',
+      'dd.MM.yyyy', 'dd/MM/yyyy HH:mm'
+    ];
+    return !known.includes(df);
+  }
+
   saveNewLanguage() {
-    if (!this.newLangCode || !this.newLangName) return;
+    const rawCode = this.newLangCode.trim().toLowerCase();
+    const rawName = this.newLangName.trim();
+    if (!rawCode || !rawName) return;
+
+    if (!/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(rawCode)) {
+      this.toast.error(this.uiI18n.translate('settings.validation.lang_code'));
+      return;
+    }
 
     let dict: Record<string, string> = {};
     if (this.newLangJson) {
@@ -1023,11 +1375,16 @@ export class SettingsComponent implements OnInit, OnDestroy {
       }
     }
 
-    const name = this.newLangName;
-    this.i18n.registerLanguage(this.newLangCode, name, dict).subscribe({
+    this.isAddingLang.set(true);
+    this.i18n.registerLanguage(rawCode, rawName, dict).pipe(
+      finalize(() => this.isAddingLang.set(false))
+    ).subscribe({
       next: () => {
         this.isAddLangModalOpen.set(false);
-        this.toast.success(this.uiI18n.translate('settings.language_added', { name }));
+        this.toast.success(this.uiI18n.translate('settings.language_added', { name: rawName }));
+      },
+      error: () => {
+        this.toast.error(this.uiI18n.translate('common.error'));
       }
     });
   }

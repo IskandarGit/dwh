@@ -2,6 +2,7 @@ package com.greenwhite.dwh.instance.report.service;
 
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.md.service.MdScopeService;
+import com.greenwhite.dwh.instance.report.repository.ReportRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,44 +22,51 @@ public class ReportService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             .withZone(ZoneId.of("UTC"));
 
-    private final JdbcClient jdbcClient;
+    private final ReportRepository reportRepository;
     private final MdScopeService scopeService;
 
-    public ReportService(JdbcClient jdbcClient, MdScopeService scopeService) {
-        this.jdbcClient = jdbcClient;
+    @org.springframework.beans.factory.annotation.Autowired
+    public ReportService(ReportRepository reportRepository, MdScopeService scopeService) {
+        this.reportRepository = reportRepository;
         this.scopeService = scopeService;
     }
 
+    public ReportService(JdbcClient jdbcClient, MdScopeService scopeService) {
+        this(new ReportRepository(jdbcClient), scopeService);
+    }
+
     public void exportTasksCsv(OutputStream outputStream, Long currentUserId) throws IOException {
-        var query = scopedTasksQuery(currentUserId);
+        if (currentUserId == null) {
+            throw ApiException.unauthorized("Требуется авторизация для экспорта задач");
+        }
+        var scope = scopeService.filterForTasks(currentUserId);
         // UTF-8 BOM so Microsoft Excel automatically recognizes Russian UTF-8
         outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
 
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
         writer.println("ID;Заголовок;Проект;Приоритет;Статус;Срок;Дата создания;Автор");
 
-        query.query(rs -> {
-            long id = rs.getLong("id");
-            String title = escapeCsv(rs.getString("title"));
-            String project = escapeCsv(rs.getString("project_name"));
-            String priority = mapPriority(rs.getString("priority"));
-            String status = escapeCsv(rs.getString("status_name"));
-            var endTime = rs.getTimestamp("end_time");
-            var createdAt = rs.getTimestamp("created_at");
-            String reporter = escapeCsv(rs.getString("reporter_name"));
-
-            String endTimeStr = endTime != null ? DATE_FMT.format(endTime.toInstant()) : "—";
-            String createdStr = createdAt != null ? DATE_FMT.format(createdAt.toInstant()) : "—";
+        reportRepository.streamScopedTasks(scope, row -> {
+            String title = escapeCsv(row.title());
+            String project = escapeCsv(row.projectName());
+            String priority = mapPriority(row.priority());
+            String status = escapeCsv(row.statusName());
+            String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
+            String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
+            String reporter = escapeCsv(row.reporterName());
 
             writer.printf("%d;%s;%s;%s;%s;%s;%s;%s%n",
-                    id, title, project, priority, status, endTimeStr, createdStr, reporter);
+                    row.id(), title, project, priority, status, endTimeStr, createdStr, reporter);
         });
 
         writer.flush();
     }
 
     public void exportTasksExcelXml(OutputStream outputStream, Long currentUserId) throws IOException {
-        var query = scopedTasksQuery(currentUserId);
+        if (currentUserId == null) {
+            throw ApiException.unauthorized("Требуется авторизация для экспорта задач");
+        }
+        var scope = scopeService.filterForTasks(currentUserId);
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
 
         writer.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
@@ -101,21 +109,17 @@ public class ReportService {
         writer.println("    <Cell><Data ss:Type=\"String\">Автор</Data></Cell>");
         writer.println("   </Row>");
 
-        query.query(rs -> {
-            long id = rs.getLong("id");
-            String title = escapeXml(rs.getString("title"));
-            String project = escapeXml(rs.getString("project_name"));
-            String priority = mapPriority(rs.getString("priority"));
-            String status = escapeXml(rs.getString("status_name"));
-            var endTime = rs.getTimestamp("end_time");
-            var createdAt = rs.getTimestamp("created_at");
-            String reporter = escapeXml(rs.getString("reporter_name"));
-
-            String endTimeStr = endTime != null ? DATE_FMT.format(endTime.toInstant()) : "—";
-            String createdStr = createdAt != null ? DATE_FMT.format(createdAt.toInstant()) : "—";
+        reportRepository.streamScopedTasks(scope, row -> {
+            String title = escapeXml(row.title());
+            String project = escapeXml(row.projectName());
+            String priority = mapPriority(row.priority());
+            String status = escapeXml(row.statusName());
+            String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
+            String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
+            String reporter = escapeXml(row.reporterName());
 
             writer.println("   <Row ss:StyleID=\"Row\">");
-            writer.printf("    <Cell><Data ss:Type=\"Number\">%d</Data></Cell>%n", id);
+            writer.printf("    <Cell><Data ss:Type=\"Number\">%d</Data></Cell>%n", row.id());
             writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", title);
             writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", project);
             writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", priority);
@@ -130,31 +134,6 @@ public class ReportService {
         writer.println(" </Worksheet>");
         writer.println("</Workbook>");
         writer.flush();
-    }
-
-    private JdbcClient.StatementSpec scopedTasksQuery(Long currentUserId) {
-        // Scope helpers allow null for internal system readers; a user export must fail closed.
-        if (currentUserId == null) {
-            throw ApiException.unauthorized("Требуется авторизация для экспорта задач");
-        }
-        var scope = scopeService.filterForTasks(currentUserId);
-        var query = jdbcClient.sql("""
-                select
-                    t.id,
-                    t.title,
-                    coalesce(p.name, '—') as project_name,
-                    t.priority,
-                    coalesce(s.name, 'Новая') as status_name,
-                    t.end_time,
-                    t.created_at,
-                    coalesce(u.name, '—') as reporter_name
-                from ms_tasks t
-                left join ms_task_projects p on p.id = t.project_id
-                left join ms_task_statuses s on s.id = t.status_id
-                left join md_users u on u.id = t.reporter_id
-                where 1=1
-                """ + scope.sql() + " order by t.id desc");
-        return scope.bindsUserId() ? query.param("scopeUserId", scope.userId()) : query;
     }
 
     private String escapeCsv(String value) {
