@@ -34,6 +34,12 @@ public class MdRoleController {
         return ResponseEntity.ok(roleService.listRoles());
     }
 
+    @GetMapping("/roles/user-counts")
+    @RequiresPermission(form = MdPref.FORM_ROLES, action = "view")
+    public ResponseEntity<java.util.Map<Long, Integer>> getRoleUserCounts() {
+        return ResponseEntity.ok(roleService.countUsersPerRole());
+    }
+
     @PostMapping("/roles")
     @RequiresPermission(form = MdPref.FORM_ROLES, action = "create")
     public ResponseEntity<MdRoleRepository.RoleRecord> createRole(@Valid @RequestBody CreateRoleDto body) {

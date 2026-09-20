@@ -636,6 +636,14 @@ describe('TasksComponent asynchronous detail and editing state', () => {
     expect(fixture.nativeElement.querySelector('.empty-state-cell')?.textContent).toContain('Новая задача');
   });
 
+  it('keeps empty-list recovery outside the horizontally scrolling table', async () => {
+    const { fixture } = await createControlledFixture();
+    const empty = fixture.nativeElement.querySelector('.empty-state-cell') as HTMLElement;
+    expect(empty).not.toBeNull();
+    expect(empty.closest('.table-wrapper')).toBeNull();
+    expect(empty.querySelector('button')?.textContent).toContain('Новая задача');
+  });
+
   it('removes task drag affordances and handlers without update permission', async () => {
     const { fixture, component } = await createControlledFixture({ canUpdate: false });
     component.viewMode = 'kanban';
@@ -1174,5 +1182,42 @@ describe('TasksComponent asynchronous detail and editing state', () => {
     const responsible = fixture.nativeElement.querySelector('ui-searchable-select button[aria-label="Ответственный"]') as HTMLButtonElement;
     expect(responsible.textContent).toContain('Fresh Name');
     expect(responsible.textContent).not.toContain('Old Name');
+  });
+
+  it('updates priority via PATCH and applies toast and local updates', async () => {
+    const { component, api } = await createControlledFixture();
+    component.tasks.set([task(42)]);
+    component.updatePriority(42, 'critical');
+    expect(api.patch).toHaveBeenCalledWith('/tasks/42', { priority: 'critical' });
+    expect(component.tasks()[0].priority).toBe('critical');
+  });
+
+  it('passes preset parameters to loadTasks when smart view presets are selected', async () => {
+    const { component, api } = await createControlledFixture();
+    component.setPreset('overdue');
+    expect(api.get).toHaveBeenCalledWith('/tasks', expect.objectContaining({ overdue: true }));
+  });
+
+  it('calculates deadline badges correctly for overdue, today, tomorrow, and future', async () => {
+    const { component } = await createControlledFixture();
+    component.statuses.set([{ id: 1, name: 'В работе', orderNo: 1, isTerminal: false }]);
+
+    const overdueInfo = component.getDeadlineInfo(new Date(Date.now() - 86400000 * 2).toISOString(), 1);
+    expect(overdueInfo.state).toBe('overdue');
+    expect(overdueInfo.label).toContain('Просрочено');
+
+    const todayInfo = component.getDeadlineInfo(new Date().toISOString(), 1);
+    expect(todayInfo.state).toBe('today');
+    expect(todayInfo.label).toContain('Сегодня');
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowInfo = component.getDeadlineInfo(tomorrow.toISOString(), 1);
+    expect(tomorrowInfo.state).toBe('tomorrow');
+    expect(tomorrowInfo.label).toBe('Завтра');
+
+    const noneInfo = component.getDeadlineInfo(null, 1);
+    expect(noneInfo.state).toBe('none');
+    expect(noneInfo.label).toBe('—');
   });
 });

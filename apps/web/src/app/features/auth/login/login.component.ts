@@ -13,6 +13,7 @@ import { ThemeService } from '../../../core/services/theme.service';
 type LoginStep = 'credentials' | 'otp' | 'must_change_password';
 type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
 
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -20,6 +21,22 @@ type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
     TranslatePipe,CommonModule, FormsModule, UiButtonComponent, UiModalComponent],
   template: `
     <main class="login-wrapper">
+      <div class="login-top-bar">
+        <div class="lang-selector-login">
+          <span class="material-symbols-outlined lang-icon" aria-hidden="true">language</span>
+          <select
+            id="login-language-select"
+            class="lang-select-login"
+            [attr.aria-label]="'settings.yazyk_interfeysa' | t"
+            [value]="i18n.currentLang()"
+            (change)="onLanguageChange($event)"
+          >
+            <option *ngFor="let lang of i18n.languages()" [value]="lang.code">
+              {{ lang.code.toUpperCase() }} — {{ lang.name }}
+            </option>
+          </select>
+        </div>
+      </div>
       <div class="login-card">
         <div class="login-header">
           <div class="brand-lockup" role="img" aria-label="SmartupCMS">
@@ -293,17 +310,51 @@ type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
       min-height: 100dvh;
       width: 100%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       background-color: var(--bg-app);
       padding: 16px;
+      position: relative;
+    }
+
+    .login-top-bar {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .lang-selector-login {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 4px 10px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .lang-selector-login .lang-icon {
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+
+    .lang-select-login {
+      border: none;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      font-family: inherit;
     }
 
     .login-card {
-      width: 100%;
-      max-width: 380px;
-      background-color: var(--bg-surface);
-      border: 1px solid var(--border-color);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-overlay);
       padding: 32px 28px;
@@ -507,10 +558,18 @@ type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
   `]
 })
 export class LoginComponent {
-  private readonly uiI18n = inject(I18nService);
+  readonly i18n = inject(I18nService);
+  private readonly uiI18n = this.i18n;
   private readonly injector = inject(Injector);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+
+  onLanguageChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    if (select?.value && select.value !== this.i18n.currentLang()) {
+      this.i18n.setLanguage(select.value, false).subscribe();
+    }
+  }
   login = '';
   password = '';
   otpCode = '';

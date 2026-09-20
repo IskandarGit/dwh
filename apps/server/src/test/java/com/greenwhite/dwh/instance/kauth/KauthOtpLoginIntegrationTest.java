@@ -102,8 +102,24 @@ class KauthOtpLoginIntegrationTest {
                 new com.greenwhite.dwh.instance.kauth.service.KauthCredentialGuard(new KauthSessionRepository(jdbc),
                         new com.greenwhite.dwh.instance.kauth.repository.KauthApiTokenRepository(jdbc)));
 
-        authService = new KauthAuthService(
+        var scopes = new com.greenwhite.dwh.instance.md.service.MdScopeService(
+                new com.greenwhite.dwh.instance.md.repository.MdScopeRepository(jdbc),
+                new com.greenwhite.dwh.instance.md.repository.MdOrgUnitRepository(jdbc),
+                new com.greenwhite.dwh.instance.md.service.MdPermissionService(new com.greenwhite.dwh.instance.md.repository.MdPermissionRepository(jdbc)),
+                auditLogService);
+        var userService = new com.greenwhite.dwh.instance.md.service.MdUserService(
                 userRepository,
+                new com.greenwhite.dwh.instance.md.repository.MdRoleRepository(jdbc),
+                new com.greenwhite.dwh.instance.md.service.MdCustomFieldService(new com.greenwhite.dwh.instance.md.repository.MdCustomFieldRepository(jdbc, mapper), auditLogService),
+                new KauthPasswordHasher(),
+                new PasswordValidator(),
+                Mockito.mock(com.greenwhite.dwh.instance.md.service.UserSessionInvalidator.class),
+                Mockito.mock(com.greenwhite.dwh.instance.search.SearchChangePublisher.class),
+                auditLogService,
+                scopes);
+
+        authService = new KauthAuthService(
+                userService,
                 new KauthSessionRepository(jdbc),
                 new KauthLoginAttemptRepository(jdbc),
                 otpCodeRepository,

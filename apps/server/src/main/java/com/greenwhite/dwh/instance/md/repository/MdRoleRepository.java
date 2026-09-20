@@ -189,6 +189,18 @@ public class MdRoleRepository {
         }
     }
 
+    public java.util.Map<Long, Integer> countUsersPerRole() {
+        return jdbcClient.sql("""
+                select role_id, count(*) as cnt
+                from md_user_roles ur
+                join md_users u on u.id = ur.user_id and u.state = 'A'
+                group by role_id
+                """)
+                .query((rs, rowNum) -> java.util.Map.entry(rs.getLong("role_id"), rs.getInt("cnt")))
+                .list()
+                .stream()
+                .collect(Collectors.toMap(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
+    }
 
     public record RoleRecord(
             Long id,

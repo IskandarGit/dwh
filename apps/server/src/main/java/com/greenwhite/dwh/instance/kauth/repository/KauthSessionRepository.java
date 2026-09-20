@@ -115,6 +115,17 @@ public class KauthSessionRepository {
 
 
 
+    public void closeOtherSessions(Long userId, Long currentSessionId) {
+        jdbcClient.sql("""
+                update kauth_sessions
+                set closed_at = now()
+                where user_id = :userId and id <> :currentSessionId and closed_at is null
+                """)
+                .param("userId", userId)
+                .param("currentSessionId", currentSessionId)
+                .update();
+    }
+
     public List<SessionRecord> findActiveByUserId(Long userId) {
         return jdbcClient.sql(SELECT + " where c.user_id = :userId and " + ACTIVE + " order by c.last_seen_at desc")
                 .param("userId", userId)
@@ -125,7 +136,7 @@ public class KauthSessionRepository {
     public record SessionRecord(
             Long id,
             Long userId,
-            String tokenHash,
+            @JsonIgnore String tokenHash,
             String ip,
             String userAgent,
             String deviceInfo,

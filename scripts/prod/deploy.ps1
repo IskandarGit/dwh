@@ -28,12 +28,35 @@ try {
     Write-Host '[3/7] Creating the mandatory pre-migration backup when data exists...' -ForegroundColor Yellow
     $postgresId = & docker compose -f $ComposeFile --env-file $EnvFile ps -a -q postgres
     if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect PostgreSQL.' }
-    if (-not [string]::IsNullOrWhiteSpace(($postgresId -join ''))) {
+
+    $hasExistingData = -not [string]::IsNullOrWhiteSpace(($postgresId -join ''))
+    if (-not $hasExistingData) {
+        try {
+            $configJsonText = & docker compose -f $ComposeFile --env-file $EnvFile config --format json 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($configJsonText -join ''))) {
+                $config = $configJsonText | ConvertFrom-Json
+                $postgresVolume = $config.volumes.'postgres-data'.name
+                if (-not [string]::IsNullOrWhiteSpace($postgresVolume)) {
+                    & docker volume inspect $postgresVolume 2>$null | Out-Null
+                    if ($LASTEXITCODE -eq 0) {
+                        $hasExistingData = $true
+                    }
+                }
+            }
+        }
+        catch {
+            # In case config or volume inspect fails, proceed with container status
+        }
+    }
+
+    if ($hasExistingData) {
+        Write-Host 'Existing PostgreSQL data detected; ensuring service is up for pre-migration backup...' -ForegroundColor Yellow
+        Invoke-Compose up -d --wait --wait-timeout $HealthTimeoutSeconds postgres
         & (Join-Path $PSScriptRoot 'backup.ps1') -ComposeFile $ComposeFile -EnvFile $EnvFile
         if ($LASTEXITCODE -ne 0) { throw 'Pre-migration backup failed.' }
     }
     else {
-        Write-Host 'No existing PostgreSQL container found; treating this as an initial deployment.'
+        Write-Host 'No existing PostgreSQL container or volume found; treating this as an initial deployment.'
     }
 
     Write-Host '[4/7] Starting dependencies...' -ForegroundColor Yellow

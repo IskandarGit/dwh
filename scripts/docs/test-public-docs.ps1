@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $requiredFiles = @(
@@ -88,7 +88,7 @@ foreach ($relativePath in $retiredTermDocs) {
         continue
     }
 
-    $content = Get-Content -LiteralPath $absolutePath -Raw
+    $content = Get-Content -LiteralPath $absolutePath -Raw -Encoding UTF8
     $compatibility = $retiredIdentifierCompatibility[$relativePath]
     $hasCompatibilityNote = $null -ne $compatibility -and
         @($compatibility.Markers | Where-Object { -not $content.Contains($_) }).Count -eq 0
@@ -107,7 +107,7 @@ $supersededAdrs = @(
     'docs/adr/ADR-0007-fleet-strategy.md'
 )
 foreach ($relativePath in $supersededAdrs) {
-    $content = Get-Content -LiteralPath (Join-Path $repoRoot $relativePath) -Raw
+    $content = Get-Content -LiteralPath (Join-Path $repoRoot $relativePath) -Raw -Encoding UTF8
     if ($content -notmatch 'Заменено ADR-0014') {
         $errors.Add("Historical ADR is not explicitly superseded: $relativePath")
     }
@@ -123,7 +123,7 @@ $partiallySupersededAdrs = @(
     'docs/adr/ADR-0011-provider-spi.md'
 )
 foreach ($relativePath in $partiallySupersededAdrs) {
-    $content = Get-Content -LiteralPath (Join-Path $repoRoot $relativePath) -Raw
+    $content = Get-Content -LiteralPath (Join-Path $repoRoot $relativePath) -Raw -Encoding UTF8
     if ($content -notmatch 'Частично заменено ADR-0014|Частично заменён ADR-0014') {
         $errors.Add("Historical ADR is not explicitly partially superseded: $relativePath")
     }
@@ -157,7 +157,7 @@ foreach ($relativePath in $markdownFiles) {
         continue
     }
 
-    $content = Get-Content -LiteralPath $absolutePath -Raw
+    $content = Get-Content -LiteralPath $absolutePath -Raw -Encoding UTF8
     foreach ($match in [regex]::Matches($content, '!?\[[^\]]*\]\(([^)]+)\)')) {
         $target = $match.Groups[1].Value.Trim()
         if ($target -match '(?i)^(?:[a-z][a-z0-9+.-]*:|//|#)') {
@@ -174,10 +174,16 @@ foreach ($relativePath in $markdownFiles) {
             $resolved = [System.IO.Path]::GetFullPath(
                 (Join-Path (Split-Path $absolutePath -Parent) $decodedPath)
             )
-            $trackedTarget = [System.IO.Path]::GetRelativePath($repoRoot, $resolved).Replace('\', '/')
+            if ($null -ne [System.IO.Path].GetMethod('GetRelativePath', [type[]]@([string], [string]))) {
+                $trackedTarget = [System.IO.Path]::GetRelativePath($repoRoot, $resolved).Replace('\', '/')
+            } else {
+                $repoUri = [System.Uri]($repoRoot.TrimEnd('\', '/') + '/')
+                $targetUri = [System.Uri]$resolved
+                $trackedTarget = [System.Uri]::UnescapeDataString($repoUri.MakeRelativeUri($targetUri).ToString()).Replace('\', '/')
+            }
         }
         catch {
-            $errors.Add("Invalid relative link in ${relativePath}: $target")
+            $errors.Add("Invalid relative link in ${relativePath}: $target ($($_.Exception.Message))")
             continue
         }
 

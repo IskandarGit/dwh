@@ -36,7 +36,8 @@ SmartupCMS — самостоятельно размещаемая платфо�
   проверяемые релизные артефакты.
 
 В состав продукта входят модули идентификации и доступа, организации и
-пользователей, задач, комментариев и настраиваемых полей, файлов, поиска,
+пользователей, задач, комментариев и настраиваемых полей, заметок (`ms/note`),
+реестра модулей и настраиваемой навигации (`md/navigation`), файлов, поиска,
 уведомлений, webhook и локальных объявлений, аудита и событий безопасности, а
 также системного администрирования.
 
@@ -44,9 +45,11 @@ SmartupCMS — самостоятельно размещаемая платфо�
 к каждой установке, и являются приблизительными: до 100 установок,
 500 зарегистрированных пользователей суммарно, 100 одновременно активных
 пользователей суммарно и 50 ГБ загружаемых файлов в месяц суммарно.
-Распределение пиков по установкам и
-измеренная цель задержки/SLO не подтверждены и остаются пробелами подготовки
-релиза. Горизонт запуска составляет четыре месяца от утверждённой базовой точки
+Целевой показатель доступности (SLO) утверждён на уровне 99.9% доступности
+сервиса. В качестве целевого объектного хранилища для файлов и записей на
+клиентских установках поддерживаются MinIO (S3-совместимое) или локальный
+диск (`local_disk`); канал уведомлений SMTP настраивается независимо per-deployment.
+Горизонт запуска составляет четыре месяца от утверждённой базовой точки
 планирования; точная календарная дата не подтверждена.
 
 В продукт не входят Control Plane, общая база для нескольких организаций,
@@ -57,7 +60,7 @@ SmartupCMS — самостоятельно размещаемая платфо�
 В управляемой Smartup инфраструктуре внешний DNS/TLS/security edge должен
 работать через Cloudflare, а объектное хранилище — через Cloudflare R2. На
 инфраструктуре клиента оператор может использовать собственный edge и любой
-проверенный `local_disk` или S3-совместимый provider, не изменяя продуктовую
+проверенный `local_disk` или S3-совместимый provider (включая MinIO), не изменяя продуктовую
 модель.
 
 ## 2. Правила трассируемости
@@ -157,6 +160,20 @@ SmartupCMS — самостоятельно размещаемая платфо�
 | `FR-OSS-02` | Система должна использовать один и тот же продуктовый runtime для self-hosted и Smartup-managed установок; различаться могут инфраструктурная конфигурация и услуги эксплуатации. | `README.md`; `docs/adr/ADR-0014-unified-open-source-runtime.md`; `scripts/architecture/test-unified-boundaries.ps1` | Контракт границ подтверждает единственные application runtimes `apps/server` и `apps/web` и отсутствие отдельного managed/control-plane продукта. |
 | `FR-OSS-03` | Система должна запускаться и выполнять функции без runtime licensing callback, remote enrollment или phone-home. | `apps/server/src/main/resources/db/migration/V019__unified_open_source_core.sql`; `docs/adr/ADR-0014-unified-open-source-runtime.md`; `scripts/security/test-no-default-egress.ps1` | Миграционный тест подтверждает удаление активного license state; чистая установка и no-egress тест проходят без внешней регистрации. |
 
+### 3.10. Реестр модулей и настраиваемая навигация
+
+| ID | Требование («Должна») | Подтверждение в репозитории | Метод приёмки |
+|---|---|---|---|
+| `FR-MOD-01` | Система должна предоставлять реестр модулей (`md_module_registry`) с возможностью включения, отключения и проверки активности модулей через серверный guard и API. | `apps/server/src/main/java/com/greenwhite/dwh/instance/md/controller/ModuleRegistryController.java`; `apps/server/src/main/java/com/greenwhite/dwh/instance/md/service/ModuleRegistryService.java`; `apps/server/src/main/resources/db/migration/V028__module_registry_and_reference_module.sql` | Интеграционный тест проверяет регистрацию модуля, переключение флага активности и серверный запрет доступа к деактивированному модулю. |
+| `FR-MOD-02` | Система должна позволять администратору настраивать иерархические элементы навигации (`md_navigation_items`) с привязкой к правам и ролям. | `apps/server/src/main/java/com/greenwhite/dwh/instance/md/controller/NavigationItemController.java`; `apps/server/src/main/java/com/greenwhite/dwh/instance/md/service/NavigationItemService.java`; `apps/server/src/main/resources/db/migration/V032__custom_navigation_items.sql` | API-тест проверяет сохранение порядка, родительских связей и фильтрацию навигационного меню по правам текущего пользователя. |
+| `FR-MOD-03` | Система должна поддерживать расширенные настраиваемые поля для дополнительных бизнес-сущностей с сохранением аудита изменений. | `apps/server/src/main/resources/db/migration/V029__expand_custom_fields_entities.sql`; `apps/server/src/main/java/com/greenwhite/dwh/instance/md/service/MdCustomFieldService.java` | Интеграционный тест проверяет запись и чтение кастомных полей для расширенных сущностей и запись audit trail. |
+
+### 3.11. Заметки и персональные записи
+
+| ID | Требование («Должна») | Подтверждение в репозитории | Метод приёмки |
+|---|---|---|---|
+| `FR-NOTE-01` | Система должна предоставлять модуль персональных заметок (`ms_notes`) с поддержкой создания, редактирования, тегов, разметки Markdown, row-level изоляции (`SELF` scope) и полнотекстового поиска с фонетическим сопоставлением. | `apps/server/src/main/java/com/greenwhite/dwh/instance/ms/note/`; `apps/server/src/main/resources/db/migration/V030__search_notes_and_phonetics.sql`; `apps/server/src/test/java/com/greenwhite/dwh/instance/ms/note/` | Интеграционный тест подтверждает изоляцию заметок между пользователями, индексацию в Typesense и корректный поиск по тексту и тегам. |
+
 ## 4. Данные и жизненный цикл
 
 | ID | Требование («Должна») | Подтверждение в репозитории | Метод приёмки |
@@ -232,7 +249,8 @@ SmartupCMS — самостоятельно размещаемая платфо�
 
 ## 7. Открытые решения подготовки релиза
 
-Из репозитория невозможно подтвердить числовой SLO и целевые p95 API/page,
+Целевой показатель доступности (SLO) сервиса утверждён на уровне 99.9%
+доступности. Из репозитория невозможно подтвердить целевые p95 API/page,
 юридически обязательные сроки хранения, production-домены, ответственных за
 инциденты и распределение пиковой нагрузки по отдельным установкам. Также
 installation-specific решениями остаются RPO/RTO, provider region, хранение
@@ -242,7 +260,7 @@ age identity и ответственный за rollback/go-no-go. Эти зна
 
 | Пробел | Обязательное решение до production | Закрывающий критерий |
 |---|---|---|
-| Нагрузка и SLO | Утвердить распределение 500 registered/100 active/50 ГБ в месяц по установкам, dataset, p95/p99/error/saturation thresholds и владельца. | `NFR-PERF-01`, `NFR-PERF-02`, `AC-12` |
+| Нагрузка и задержки | SLO доступности 99.9% утверждён; утвердить распределение 500 registered/100 active/50 ГБ в месяц по установкам, dataset, p95/p99/error/saturation thresholds и владельца. | `NFR-PERF-01`, `NFR-PERF-02`, `AC-12` |
 | Privacy и retention | Назначить controller/processor, правовое основание, сроки по классам, DSAR/delete/hold и владельцев. | `NFR-DATA-05`, `AC-12` |
 | Production topology | Зафиксировать domain, TLS edge, storage/backup provider regions и доступ к age identity. | `NFR-SEC-04`, `AC-08`, `AC-12` |
 | Operations | Назначить incident contacts/on-call, alert transport, RPO/RTO и владельца rollback/go-no-go. | `NFR-OBS-02`, `NFR-REL-04`, `AC-12` |

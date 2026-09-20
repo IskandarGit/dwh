@@ -39,6 +39,13 @@ public final class SearchCollectionSchema {
                 fields.add(text("phone", true));
                 fields.add(Map.of("name", "state", "type", "string", "facet", true));
             }
+            case "NOTE" -> {
+                fields.add(number("note_id", false));
+                fields.add(text("title", false));
+                fields.add(text("content_md", true));
+                fields.add(text("color", true));
+                fields.add(Map.of("name", "is_pinned", "type", "bool", "optional", true));
+            }
             default -> throw new IllegalArgumentException("Unknown projection type");
         }
         fields.add(Map.of("name", "_projection_revision", "type", "int64", "index", false, "sort", false));
@@ -47,6 +54,7 @@ public final class SearchCollectionSchema {
             List<String> naturalLanguage = switch (entityType) {
                 case "TASK" -> List.of("title", "description_markdown", "status_name", "project_name");
                 case "PROJECT" -> List.of("name", "description");
+                case "NOTE" -> List.of("title", "content_md");
                 default -> List.of("name");
             };
             fields.replaceAll(field -> {

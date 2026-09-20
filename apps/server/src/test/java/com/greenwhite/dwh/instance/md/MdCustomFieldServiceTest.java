@@ -74,4 +74,51 @@ class MdCustomFieldServiceTest {
         assertThatThrownBy(() -> service.validateAttributes("TASK", Map.of("cost", "not_a_number")))
                 .isInstanceOf(ApiException.class);
     }
+
+    @Test
+    @DisplayName("Валидация select должна проверять допустимость значения по options_json")
+    void shouldValidateSelectOptions() {
+        when(customFieldRepository.findByEntityType("TASK")).thenReturn(List.of(
+                new MdCustomFieldRepository.CustomFieldRecord(
+                        1L, "TASK", "priority_level", "Уровень", "select", false, null, "[\"low\", \"medium\", \"high\"]", 0, Instant.now()
+                )
+        ));
+
+        assertThatCode(() -> service.validateAttributes("TASK", Map.of("priority_level", "medium")))
+                .doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> service.validateAttributes("TASK", Map.of("priority_level", "super_critical")))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Ошибка валидации динамических атрибутов");
+    }
+
+    @Test
+    @DisplayName("Валидация string должна проверять ограничение длины")
+    void shouldRejectTooLongString() {
+        when(customFieldRepository.findByEntityType("NOTE")).thenReturn(List.of(
+                new MdCustomFieldRepository.CustomFieldRecord(
+                        1L, "NOTE", "memo", "Заметка", "string", false, null, "[]", 0, Instant.now()
+                )
+        ));
+
+        String longStr = "x".repeat(4001);
+        assertThatThrownBy(() -> service.validateAttributes("NOTE", Map.of("memo", longStr)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    @DisplayName("Создание поля должно отклонять зарезервированные имена и некорректный slug")
+    void shouldRejectInvalidOrReservedCode() {
+        assertThatThrownBy(() -> service.createField("TASK", "id", "Идентификатор", "number", false, null, null, 0))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("зарезервирован");
+
+        assertThatThrownBy(() -> service.createField("TASK", "invalid code!", "Невалидный", "string", false, null, null, 0))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Код поля должен начинаться с буквы");
+
+        assertThatThrownBy(() -> service.createField("TASK", "valid_code", "Валидный", "unknown_type", false, null, null, 0))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Недопустимый тип поля");
+    }
 }

@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { Injectable, untracked } from '@angular/core';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ProblemDetail } from '../models/common.models';
@@ -22,6 +22,25 @@ export class ApiService {
     private i18n: I18nService
   ) {}
 
+  private getXsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private getHeaders(): HttpHeaders {
+    let headers = new HttpHeaders();
+    const lang = untracked(() => this.i18n?.currentLang ? this.i18n.currentLang() : null);
+    if (lang) {
+      headers = headers.set('Accept-Language', lang);
+    }
+    const xsrf = this.getXsrfToken();
+    if (xsrf) {
+      headers = headers.set('X-XSRF-TOKEN', xsrf);
+    }
+    return headers;
+  }
+
   get<T>(path: string, params?: Record<string, any>, options: ApiRequestOptions = {}): Observable<T> {
     let httpParams = new HttpParams();
     if (params) {
@@ -34,6 +53,7 @@ export class ApiService {
 
     return this.http.get<T>(`${this.baseUrl}${path}`, {
       params: httpParams,
+      headers: this.getHeaders(),
       withCredentials: true
     }).pipe(
       catchError(err => this.handleError(err, options))
@@ -42,33 +62,37 @@ export class ApiService {
 
   post<T>(path: string, body?: any, options: ApiRequestOptions = {}): Observable<T> {
     return this.http.post<T>(`${this.baseUrl}${path}`, body || {}, {
+      headers: this.getHeaders(),
       withCredentials: true
     }).pipe(
       catchError(err => this.handleError(err, options))
     );
   }
 
-  patch<T>(path: string, body?: any): Observable<T> {
+  patch<T>(path: string, body?: any, options: ApiRequestOptions = {}): Observable<T> {
     return this.http.patch<T>(`${this.baseUrl}${path}`, body || {}, {
+      headers: this.getHeaders(),
       withCredentials: true
     }).pipe(
-      catchError(err => this.handleError(err))
+      catchError(err => this.handleError(err, options))
     );
   }
 
   put<T>(path: string, body?: any, options: ApiRequestOptions = {}): Observable<T> {
     return this.http.put<T>(`${this.baseUrl}${path}`, body || {}, {
+      headers: this.getHeaders(),
       withCredentials: true
     }).pipe(
       catchError(err => this.handleError(err, options))
     );
   }
 
-  delete<T>(path: string): Observable<T> {
+  delete<T>(path: string, options: ApiRequestOptions = {}): Observable<T> {
     return this.http.delete<T>(`${this.baseUrl}${path}`, {
+      headers: this.getHeaders(),
       withCredentials: true
     }).pipe(
-      catchError(err => this.handleError(err))
+      catchError(err => this.handleError(err, options))
     );
   }
 

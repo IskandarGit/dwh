@@ -63,8 +63,17 @@ public final class TypesenseSearchMapper {
             case "TASK" -> task(hit, document);
             case "PROJECT" -> project(hit, document);
             case "USER" -> user(hit, document);
+            case "NOTE" -> note(hit, document);
             default -> throw TypesenseException.invalidResponse();
         };
+    }
+
+    private SearchHit note(JsonNode hit, JsonNode document) {
+        long id = requiredDocumentId(document, "note_id");
+        String title = requiredText(document, "title");
+        String fallback = optionalText(document, "content_md");
+        return new SearchHit("NOTE", Long.toString(id), title,
+                snippet(hit, fallback), "/notes?id=" + id);
     }
 
     private SearchHit task(JsonNode hit, JsonNode document) {

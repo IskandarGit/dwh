@@ -60,7 +60,7 @@ import { TranslatePipe } from '../../core/services/i18n.service';
     .btn-md {
       padding: 6px 14px;
       font-size: 13px;
-      height: 34px;
+      height: var(--control-height);
     }
 
     .btn-lg {
@@ -76,7 +76,7 @@ import { TranslatePipe } from '../../core/services/i18n.service';
     /* Variants */
     .btn-primary {
       background-color: var(--primary);
-      color: var(--text-inverse);
+      color: var(--on-primary);
     }
     .btn-primary:hover:not(:disabled) {
       background-color: var(--primary-hover);
@@ -135,6 +135,10 @@ import { TranslatePipe } from '../../core/services/i18n.service';
 
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 767px) {
+      .btn-md { min-height: var(--control-touch-height); }
     }
   `]
 })

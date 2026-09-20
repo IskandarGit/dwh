@@ -10,8 +10,10 @@ import com.greenwhite.dwh.instance.md.repository.MdUserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -57,6 +59,7 @@ public class MdUserService {
             Map<String, Object> attributes, boolean is2faEnabled, boolean forcePasswordChange,
             List<Long> roleIds, Long createdBy) {
 
+        scopeService.acquireMutationLock();
         if (userRepository.existsByLogin(login)) {
             throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Пользователь с таким логином уже существует");
         }
@@ -178,6 +181,9 @@ public class MdUserService {
                            Map<String, Object> attributes, Boolean is2faEnabled,
                            List<Long> roleIds, Long modifiedBy) {
 
+        if (roleIds != null) {
+            scopeService.acquireMutationLock();
+        }
         var existingUser = getUserById(userId);
 
         if (phone != null && !phone.isBlank() && !phone.equals(existingUser.phone())) {
@@ -266,6 +272,32 @@ public class MdUserService {
     }
 
     @Transactional
+    public void setForcePasswordChange(Long targetUserId, boolean force, Long currentUserId) {
+        var targetUser = getUserById(targetUserId);
+        userRepository.setForcePasswordChange(targetUserId, force, currentUserId);
+        if (force) {
+            sessionInvalidator.invalidateAllAccess(targetUserId);
+        }
+        searchChangePublisher.changed("USER", targetUserId);
+        auditLogService.logChange("md_users", String.valueOf(targetUserId), "U",
+                List.of("force_password_change"),
+                Map.of("force_password_change", targetUser.forcePasswordChange()),
+                Map.of("force_password_change", force));
+    }
+
+    @Transactional
+    public void reset2fa(Long targetUserId, Long currentUserId) {
+        var targetUser = getUserById(targetUserId);
+        userRepository.set2faEnabled(targetUserId, false, currentUserId);
+        sessionInvalidator.invalidateAllAccess(targetUserId);
+        searchChangePublisher.changed("USER", targetUserId);
+        auditLogService.logChange("md_users", String.valueOf(targetUserId), "U",
+                List.of("is_2fa_enabled"),
+                Map.of("is_2fa_enabled", targetUser.is2faEnabled()),
+                Map.of("is_2fa_enabled", false));
+    }
+
+    @Transactional
     public void anonymizeUser(Long targetUserId, Long currentUserId) {
         var targetUser = getUserById(targetUserId);
 
@@ -288,6 +320,69 @@ public class MdUserService {
                 Map.of("name", "Deleted User " + targetUserId, "state", "P"));
     }
 
+    public record AuthUser(
+            Long id,
+            String name,
+            String login,
+            String email,
+            String phone,
+            String passwordHash,
+            String state,
+            Long managerId,
+            String language,
+            String timezone,
+            UUID avatarFileId,
+            Map<String, Object> attributes,
+            boolean is2faEnabled,
+            boolean forcePasswordChange,
+            long authenticationVersion,
+            Instant createdAt,
+            Instant modifiedAt
+    ) {
+        public static AuthUser from(MdUserRepository.UserRecord u) {
+            return new AuthUser(
+                    u.id(), u.name(), u.login(), u.email(), u.phone(), u.passwordHash(),
+                    u.state(), u.managerId(), u.language(), u.timezone(), u.avatarFileId(),
+                    u.attributes(), u.is2faEnabled(), u.forcePasswordChange(),
+                    u.authenticationVersion(), u.createdAt(), u.modifiedAt()
+            );
+        }
 
+        public MdUserView toView(List<Long> roleIds) {
+            return new MdUserView(
+                    id, name, login, email, phone, state, managerId, language,
+                    timezone, avatarFileId, attributes, is2faEnabled, forcePasswordChange,
+                    roleIds != null ? roleIds : List.of(), createdAt, modifiedAt
+            );
+        }
 
+        public MdUserView toView() {
+            return toView(List.of());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AuthUser> findAuthUserByLogin(String login) {
+        return userRepository.findByLogin(login).map(AuthUser::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AuthUser> findAuthUserById(Long userId) {
+        return userRepository.findById(userId).map(AuthUser::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AuthUser> findAuthUserByEmail(String email) {
+        return userRepository.findByEmail(email).map(AuthUser::from);
+    }
+
+    @Transactional
+    public void setPasswordForReset(Long userId, String newPasswordHash) {
+        userRepository.updatePassword(userId, newPasswordHash);
+    }
+
+    @Transactional
+    public void incrementAuthenticationVersion(Long userId) {
+        userRepository.incrementAuthenticationVersion(userId);
+    }
 }

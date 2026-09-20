@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal, computed } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Observable, Subscription, forkJoin } from 'rxjs';
 import { UiButtonComponent } from '../../shared/ui/ui-button.component';
 import { UiBadgeComponent } from '../../shared/ui/ui-badge.component';
@@ -42,11 +43,34 @@ export interface UserWorkload {
   completedTasks: number;
 }
 
+export type WorkloadSortColumn = 'name' | 'login' | 'assigned' | 'completed' | 'efficiency';
+export type SortDirection = 'asc' | 'desc';
+
+export interface ChartPoint {
+  x: number;
+  yCreated: number;
+  yCompleted: number;
+  label: string;
+  date: string;
+  created: number;
+  completed: number;
+}
+
+export interface YAxisTick {
+  y: number;
+  value: number;
+}
+
 @Component({
   selector: 'app-analytics',
   standalone: true,
   imports: [
-    TranslatePipe,CommonModule, FormsModule, UiBadgeComponent],
+    TranslatePipe,
+    CommonModule,
+    FormsModule,
+    UiBadgeComponent,
+    UiButtonComponent
+  ],
   template: `
     <div class="analytics-container">
       <!-- Header -->
@@ -88,25 +112,26 @@ export interface UserWorkload {
             </button>
           </div>
 
-          <button
-            type="button"
-            class="btn btn-secondary"
-            (click)="exportReport()"
+          <ui-button
+            variant="secondary"
+            size="sm"
+            icon="download"
+            (onClick)="exportReport()"
             [title]="'analytics.eksport_spiska_zadach_v_excel' | t"
           >
-            <span class="material-symbols-outlined" aria-hidden="true">download</span>
-            <span>{{ 'analytics.eksport' | t }}</span>
-          </button>
+            {{ 'analytics.eksport' | t }}
+          </ui-button>
 
-          <button
-            type="button"
-            class="btn btn-secondary"
-            (click)="loadAll()"
-            [disabled]="loading()"
+          <ui-button
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            [loading]="loading()"
+            [title]="'common.refresh' | t"
+            (onClick)="loadAll()"
           >
-            <span class="material-symbols-outlined" [class.spin]="loading()" aria-hidden="true">refresh</span>
-            <span>{{ 'common.refresh' | t }}</span>
-          </button>
+            {{ 'common.refresh' | t }}
+          </ui-button>
         </div>
       </div>
 
@@ -201,7 +226,15 @@ export interface UserWorkload {
 
           <!-- SVG Area / Line Chart -->
           <div class="svg-chart-container" *ngIf="trends().length > 0"
-            role="region" tabindex="0" [attr.aria-label]="'analytics.dinamika_potoka_zadach' | t">
+            role="region" tabindex="0" [attr.aria-label]="'analytics.dinamika_potoka_zadach' | t"
+            (mouseleave)="clearHover()">
+            <!-- Y Axis numeric tick values -->
+            <div class="chart-y-axis" aria-hidden="true">
+              <span *ngFor="let tick of yAxisTicks()" class="y-axis-tick font-mono" [style.top.px]="tick.y - 7">
+                {{ tick.value }}
+              </span>
+            </div>
+
             <svg class="trend-svg" viewBox="0 0 700 240" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="createdGrad" x1="0" y1="0" x2="0" y2="1">
@@ -215,10 +248,12 @@ export interface UserWorkload {
               </defs>
 
               <!-- Gridlines -->
-              <line x1="40" y1="40" x2="680" y2="40" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
-              <line x1="40" y1="90" x2="680" y2="90" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
-              <line x1="40" y1="140" x2="680" y2="140" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
-              <line x1="40" y1="190" x2="680" y2="190" stroke="var(--border-subtle)"/>
+              <g class="gridlines">
+                <line x1="40" y1="40" x2="680" y2="40" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
+                <line x1="40" y1="90" x2="680" y2="90" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
+                <line x1="40" y1="140" x2="680" y2="140" stroke="var(--border-subtle)" stroke-dasharray="3,3"/>
+                <line x1="40" y1="190" x2="680" y2="190" stroke="var(--border-subtle)"/>
+              </g>
 
               <!-- Area Fills -->
               <path [attr.d]="createdAreaPath()" fill="url(#createdGrad)"/>
@@ -228,10 +263,28 @@ export interface UserWorkload {
               <path [attr.d]="createdLinePath()" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>
               <path [attr.d]="completedLinePath()" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round"/>
 
+              <!-- Hover guideline -->
+              <line *ngIf="hoveredPoint() as hp"
+                [attr.x1]="hp.x" y1="40"
+                [attr.x2]="hp.x" y2="190"
+                stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="4,4"
+              />
+
               <!-- Data Dots -->
-              <g *ngFor="let pt of chartPoints(); let i = index">
-                <circle [attr.cx]="pt.x" [attr.cy]="pt.yCreated" r="3.5" fill="var(--bg-surface)" stroke="var(--primary)" stroke-width="2"/>
-                <circle [attr.cx]="pt.x" [attr.cy]="pt.yCompleted" r="3.5" fill="var(--bg-surface)" stroke="var(--success)" stroke-width="2"/>
+              <g *ngFor="let pt of chartPoints(); let i = index"
+                class="chart-point-group"
+                (mouseenter)="setHoveredPoint(pt, i)"
+                (focus)="setHoveredPoint(pt, i)"
+              >
+                <!-- Hit area for easy hovering -->
+                <rect [attr.x]="pt.x - 12" y="30" width="24" height="170" fill="transparent" class="hit-area" />
+
+                <circle [attr.cx]="pt.x" [attr.cy]="pt.yCreated" [attr.r]="hoverIndex() === i ? 5.5 : 3.5" fill="var(--bg-surface)" stroke="var(--primary)" stroke-width="2">
+                  <title>{{ pt.date }}: {{ 'analytics.sozdano' | t }}: {{ pt.created }}</title>
+                </circle>
+                <circle [attr.cx]="pt.x" [attr.cy]="pt.yCompleted" [attr.r]="hoverIndex() === i ? 5.5 : 3.5" fill="var(--bg-surface)" stroke="var(--success)" stroke-width="2">
+                  <title>{{ pt.date }}: {{ 'analytics.zaversheno' | t }}: {{ pt.completed }}</title>
+                </circle>
                 <!-- X axis date labels for some points -->
                 <text
                   *ngIf="shouldShowDateLabel(i, chartPoints().length)"
@@ -246,6 +299,21 @@ export interface UserWorkload {
                 </text>
               </g>
             </svg>
+
+            <!-- Floating Tooltip Card -->
+            <div *ngIf="hoveredPoint() as hp" class="chart-tooltip-floating" [style.left.px]="getTooltipLeft(hp.x)">
+              <div class="tooltip-date font-mono">{{ hp.date }}</div>
+              <div class="tooltip-values">
+                <div class="tooltip-val">
+                  <span class="tooltip-dot" style="background-color: var(--primary);"></span>
+                  <span>{{ 'analytics.sozdano' | t }}: <strong>{{ hp.created }}</strong></span>
+                </div>
+                <div class="tooltip-val">
+                  <span class="tooltip-dot" style="background-color: var(--success);"></span>
+                  <span>{{ 'analytics.zaversheno' | t }}: <strong>{{ hp.completed }}</strong></span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div *ngIf="trends().length === 0 && !loading() && !error()" class="empty-chart">
@@ -261,27 +329,48 @@ export interface UserWorkload {
               <h2 class="card-title">{{ 'analytics.progress_po_proektam' | t }}</h2>
               <p class="card-subtitle">{{ 'analytics.statusy_i_procent_vypolneniya' | t }}</p>
             </div>
+            <!-- Quick Project Filter -->
+            <div class="project-search-box" *ngIf="projects().length > 3">
+              <span class="material-symbols-outlined search-ico" aria-hidden="true">search</span>
+              <input
+                type="text"
+                class="search-mini-input"
+                [placeholder]="'analytics.poisk_proekta' | t"
+                [attr.aria-label]="'analytics.poisk_proekta' | t"
+                [ngModel]="searchProjectQuery()"
+                (ngModelChange)="searchProjectQuery.set($event)"
+              />
+              <button
+                *ngIf="searchProjectQuery()"
+                type="button"
+                class="clear-mini-btn"
+                (click)="searchProjectQuery.set('')"
+                [attr.aria-label]="'common.clear' | t"
+              >
+                <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+              </button>
+            </div>
           </div>
 
-          <div class="project-list" *ngIf="projects().length > 0">
-            <div *ngFor="let p of projects()" class="project-item">
+          <div class="project-list" *ngIf="filteredProjects().length > 0">
+            <div *ngFor="let p of filteredProjects()" class="project-item clickable" (click)="navigateToProject(p.projectId)" [title]="'projects.open_project' | t">
               <div class="project-info-row">
                 <div class="project-name-group">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">folder</span>
+                  <span class="material-symbols-outlined" style="font-size: 18px;" [style.color]="getProgressColor(p.progressPercent)">folder</span>
                   <span class="project-name">{{ p.projectName }}</span>
                 </div>
                 <div class="project-stats">
-                  <span class="project-pct">{{ p.progressPercent }}%</span>
-                  <span class="project-tasks-count">({{ p.completedTasks }}/{{ p.totalTasks }})</span>
+                  <span class="project-pct" [style.color]="getProgressColor(p.progressPercent)">{{ p.progressPercent }}%</span>
+                  <span class="project-tasks-count font-mono">({{ p.completedTasks }}/{{ p.totalTasks }})</span>
                 </div>
               </div>
               <div class="progress-bar-bg">
-                <div class="progress-bar-fill" [style.width.%]="p.progressPercent"></div>
+                <div class="progress-bar-fill" [style.width.%]="p.progressPercent" [style.background-color]="getProgressColor(p.progressPercent)"></div>
               </div>
             </div>
           </div>
 
-          <div *ngIf="projects().length === 0 && !loading() && !error()" class="empty-chart">
+          <div *ngIf="filteredProjects().length === 0 && !loading() && !error()" class="empty-chart">
             <span class="material-symbols-outlined" style="font-size: 32px; color: var(--text-light);">folder_open</span>
             <p>{{ 'analytics.aktivnye_proekty_ne_naydeny' | t }}</p>
           </div>
@@ -290,10 +379,32 @@ export interface UserWorkload {
 
       <!-- Bottom Grid: Team Workload Table -->
       <div class="table-card" style="margin-top: 20px;">
-        <div class="card-header-row" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
+        <div class="card-header-row" style="padding: 14px 20px; border-bottom: 1px solid var(--border-color);">
           <div>
             <h2 class="card-title">{{ 'analytics.utilizaciya_i_zagruzka_komandy' | t }}</h2>
             <p class="card-subtitle">{{ 'analytics.raspredelenie_aktivnyh_i_vypolnennyh_zadach_po_i' | t }}</p>
+          </div>
+
+          <!-- Quick User Filter -->
+          <div class="user-search-box" *ngIf="workload().length > 0">
+            <span class="material-symbols-outlined search-ico" aria-hidden="true">search</span>
+            <input
+              type="text"
+              class="search-mini-input"
+              [placeholder]="'analytics.poisk_sotrudnika' | t"
+              [attr.aria-label]="'analytics.poisk_sotrudnika' | t"
+              [ngModel]="searchUserQuery()"
+              (ngModelChange)="searchUserQuery.set($event)"
+            />
+            <button
+              *ngIf="searchUserQuery()"
+              type="button"
+              class="clear-mini-btn"
+              (click)="searchUserQuery.set('')"
+              [attr.aria-label]="'common.clear' | t"
+            >
+              <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+            </button>
           </div>
         </div>
 
@@ -301,18 +412,55 @@ export interface UserWorkload {
           <table>
             <thead>
               <tr>
-                <th style="width: 240px;">{{ 'analytics.sotrudnik' | t }}</th>
-                <th>{{ 'analytics.login' | t }}</th>
-                <th>{{ 'analytics.naznacheno_zadach' | t }}</th>
-                <th>{{ 'analytics.zaversheno' | t }}</th>
-                <th>{{ 'analytics.effektivnost' | t }}</th>
+                <th style="width: 240px;" class="th-sort">
+                  <button type="button" class="sort-button" (click)="changeWorkloadSort('name')" [attr.aria-pressed]="workloadSortColumn() === 'name'">
+                    {{ 'analytics.sotrudnik' | t }}
+                    <span class="material-symbols-outlined sort-ico" *ngIf="workloadSortColumn() === 'name'">
+                      {{ workloadSortDir() === 'asc' ? 'north' : 'south' }}
+                    </span>
+                  </button>
+                </th>
+                <th class="th-sort">
+                  <button type="button" class="sort-button" (click)="changeWorkloadSort('login')" [attr.aria-pressed]="workloadSortColumn() === 'login'">
+                    {{ 'analytics.login' | t }}
+                    <span class="material-symbols-outlined sort-ico" *ngIf="workloadSortColumn() === 'login'">
+                      {{ workloadSortDir() === 'asc' ? 'north' : 'south' }}
+                    </span>
+                  </button>
+                </th>
+                <th class="th-sort">
+                  <button type="button" class="sort-button" (click)="changeWorkloadSort('assigned')" [attr.aria-pressed]="workloadSortColumn() === 'assigned'">
+                    {{ 'analytics.naznacheno_zadach' | t }}
+                    <span class="material-symbols-outlined sort-ico" *ngIf="workloadSortColumn() === 'assigned'">
+                      {{ workloadSortDir() === 'asc' ? 'north' : 'south' }}
+                    </span>
+                  </button>
+                </th>
+                <th class="th-sort">
+                  <button type="button" class="sort-button" (click)="changeWorkloadSort('completed')" [attr.aria-pressed]="workloadSortColumn() === 'completed'">
+                    {{ 'analytics.zaversheno' | t }}
+                    <span class="material-symbols-outlined sort-ico" *ngIf="workloadSortColumn() === 'completed'">
+                      {{ workloadSortDir() === 'asc' ? 'north' : 'south' }}
+                    </span>
+                  </button>
+                </th>
+                <th class="th-sort">
+                  <button type="button" class="sort-button" (click)="changeWorkloadSort('efficiency')" [attr.aria-pressed]="workloadSortColumn() === 'efficiency'">
+                    {{ 'analytics.effektivnost' | t }}
+                    <span class="material-symbols-outlined sort-ico" *ngIf="workloadSortColumn() === 'efficiency'">
+                      {{ workloadSortDir() === 'asc' ? 'north' : 'south' }}
+                    </span>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let u of workload()">
+              <tr *ngFor="let u of filteredWorkload()">
                 <td>
                   <div class="user-cell">
-                    <div class="user-avatar-sm">{{ u.userName.charAt(0).toUpperCase() }}</div>
+                    <div class="user-avatar-sm" [style.background-color]="getAvatarBgColor(u.userName)">
+                      {{ getUserInitial(u.userName) }}
+                    </div>
                     <span class="user-name-text">{{ u.userName }}</span>
                   </div>
                 </td>
@@ -322,12 +470,20 @@ export interface UserWorkload {
                 <td style="font-weight: 600;">{{ u.assignedTasks }}</td>
                 <td class="text-success" style="font-weight: 600;">{{ u.completedTasks }}</td>
                 <td>
-                  <ui-badge [variant]="u.assignedTasks > 0 && (u.completedTasks / u.assignedTasks) >= 0.7 ? 'success' : 'neutral'">
-                    {{ u.assignedTasks > 0 ? ((u.completedTasks / u.assignedTasks) * 100 | number:'1.0-0') : 0 }}%
-                  </ui-badge>
+                  <div class="efficiency-cell">
+                    <ui-badge [variant]="u.assignedTasks > 0 && (u.completedTasks / u.assignedTasks) >= 0.7 ? 'success' : 'neutral'">
+                      {{ u.assignedTasks > 0 ? ((u.completedTasks / u.assignedTasks) * 100 | number:'1.0-0') : 0 }}%
+                    </ui-badge>
+                    <div class="eff-mini-bar-bg" *ngIf="u.assignedTasks > 0">
+                      <div class="eff-mini-bar-fill"
+                        [style.width.%]="getEfficiencyPercent(u)"
+                        [style.background-color]="(u.completedTasks / u.assignedTasks) >= 0.7 ? 'var(--success)' : 'var(--primary)'">
+                      </div>
+                    </div>
+                  </div>
                 </td>
               </tr>
-              <tr *ngIf="workload().length === 0 && !loading() && !error()">
+              <tr *ngIf="filteredWorkload().length === 0 && !loading() && !error()">
                 <td colspan="5" class="empty">
                   <span>{{ 'analytics.dannye_po_zagruzke_sotrudnikov_otsutstvuyut' | t }}</span>
                 </td>
@@ -647,6 +803,25 @@ export interface UserWorkload {
       position: relative;
     }
 
+    .chart-y-axis {
+      position: absolute;
+      left: 4px;
+      top: 0;
+      bottom: 0;
+      width: 32px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .y-axis-tick {
+      position: absolute;
+      right: 0;
+      font-size: 10px;
+      line-height: 1;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
     .trend-svg {
       display: block;
       width: 100%;
@@ -765,6 +940,58 @@ export interface UserWorkload {
       color: var(--primary-text);
       display: flex;
       align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .project-stats {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .project-pct {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .project-tasks-count {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background-color: var(--bg-hover);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--primary);
+      border-radius: 9999px;
+      transition: width 0.3s ease;
+    }
+
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .user-avatar-sm {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background-color: var(--primary-subtle);
+      color: var(--primary-text);
+      display: flex;
+      align-items: center;
       justify-content: center;
       font-size: 11px;
       font-weight: 700;
@@ -774,11 +1001,162 @@ export interface UserWorkload {
       font-weight: 600;
       color: var(--text-main);
     }
+
+    /* Table sorting headers */
+    .th-sort {
+      padding: 0 !important;
+    }
+    .sort-button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      letter-spacing: inherit;
+      padding: 8px 12px;
+      text-align: left;
+      text-transform: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+      transition: color 0.15s ease;
+    }
+    .sort-button:hover {
+      color: var(--primary);
+    }
+    .sort-button:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+      border-radius: var(--radius-xs);
+    }
+    .sort-ico {
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    /* Mini search inputs */
+    .user-search-box, .project-search-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 2px 8px;
+      height: 28px;
+      transition: border-color 0.15s ease;
+    }
+    .user-search-box:focus-within, .project-search-box:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+    .search-ico {
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+    .search-mini-input {
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 12px;
+      color: var(--text-main);
+      width: 130px;
+    }
+    .clear-mini-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      padding: 0;
+    }
+    .clear-mini-btn:hover {
+      color: var(--text-main);
+    }
+
+    /* Floating tooltip card for SVG chart */
+    .chart-tooltip-floating {
+      position: absolute;
+      top: 10px;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      padding: 6px 10px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 10;
+      transition: left 0.08s ease-out;
+    }
+    .tooltip-date {
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .tooltip-values {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tooltip-val {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-main);
+    }
+    .tooltip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    /* Clickable project */
+    .project-item.clickable {
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: var(--radius-sm);
+      transition: background-color 0.15s ease;
+    }
+    .project-item.clickable:hover {
+      background-color: var(--bg-hover);
+    }
+
+    /* Efficiency cell mini bar */
+    .efficiency-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .eff-mini-bar-bg {
+      width: 50px;
+      height: 5px;
+      border-radius: 9999px;
+      background-color: var(--bg-hover);
+      overflow: hidden;
+    }
+    .eff-mini-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.2s ease;
+    }
+
+    .hit-area {
+      cursor: pointer;
+    }
+
+    .chart-point-group:focus-visible circle {
+      stroke-width: 3;
+      stroke: var(--text-main);
+    }
   `]
 })
 export class AnalyticsComponent implements OnInit, OnDestroy {
   private readonly uiI18n = inject(I18nService);
   private http = inject(HttpClient);
+  private router = inject(Router);
   private activeRequest?: Subscription;
   private refreshRequired = true;
 
@@ -792,7 +1170,14 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
   selectedRange = '7d';
   displayedRange = '7d';
 
-  chartPoints = computed(() => {
+  searchUserQuery = signal('');
+  searchProjectQuery = signal('');
+  workloadSortColumn = signal<WorkloadSortColumn>('assigned');
+  workloadSortDir = signal<SortDirection>('desc');
+  hoveredPoint = signal<ChartPoint | null>(null);
+  hoverIndex = signal<number | null>(null);
+
+  chartPoints = computed<ChartPoint[]>(() => {
     const list = this.trends();
     if (list.length === 0) return [];
 
@@ -815,7 +1200,68 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
       const yCreated = bottomY - (d.createdCount / maxVal) * height;
       const yCompleted = bottomY - (d.completedCount / maxVal) * height;
       const label = d.date.substring(5); // MM-DD
-      return { x, yCreated, yCompleted, label, created: d.createdCount, completed: d.completedCount };
+      return { x, yCreated, yCompleted, label, date: d.date, created: d.createdCount, completed: d.completedCount };
+    });
+  });
+
+  yAxisTicks = computed<YAxisTick[]>(() => {
+    const list = this.trends();
+    if (list.length === 0) return [];
+    let maxVal = 1;
+    for (const d of list) {
+      if (d.createdCount > maxVal) maxVal = d.createdCount;
+      if (d.completedCount > maxVal) maxVal = d.completedCount;
+    }
+    return [
+      { y: 40, value: maxVal },
+      { y: 90, value: Math.round((maxVal * 2) / 3) },
+      { y: 140, value: Math.round(maxVal / 3) },
+      { y: 190, value: 0 }
+    ];
+  });
+
+  filteredProjects = computed(() => {
+    const query = this.searchProjectQuery().trim().toLowerCase();
+    const list = this.projects();
+    if (!query) return list;
+    return list.filter(p => p.projectName.toLowerCase().includes(query));
+  });
+
+  filteredWorkload = computed(() => {
+    const query = this.searchUserQuery().trim().toLowerCase();
+    let list = this.workload();
+    if (query) {
+      list = list.filter(u =>
+        u.userName.toLowerCase().includes(query) ||
+        u.userLogin.toLowerCase().includes(query)
+      );
+    }
+    const col = this.workloadSortColumn();
+    const dir = this.workloadSortDir() === 'asc' ? 1 : -1;
+
+    return [...list].sort((a, b) => {
+      let diff = 0;
+      switch (col) {
+        case 'name':
+          diff = a.userName.localeCompare(b.userName);
+          break;
+        case 'login':
+          diff = a.userLogin.localeCompare(b.userLogin);
+          break;
+        case 'assigned':
+          diff = a.assignedTasks - b.assignedTasks;
+          break;
+        case 'completed':
+          diff = a.completedTasks - b.completedTasks;
+          break;
+        case 'efficiency': {
+          const effA = a.assignedTasks > 0 ? a.completedTasks / a.assignedTasks : 0;
+          const effB = b.assignedTasks > 0 ? b.completedTasks / b.assignedTasks : 0;
+          diff = effA - effB;
+          break;
+        }
+      }
+      return diff !== 0 ? diff * dir : a.userName.localeCompare(b.userName);
     });
   });
 
@@ -863,8 +1309,63 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
     else this.loadTrends();
   }
 
-  exportReport(): void {
-    window.open('/api/v1/reports/tasks/export?format=xlsx', '_blank');
+  setHoveredPoint(pt: ChartPoint, idx: number): void {
+    this.hoveredPoint.set(pt);
+    this.hoverIndex.set(idx);
+  }
+
+  clearHover(): void {
+    this.hoveredPoint.set(null);
+    this.hoverIndex.set(null);
+  }
+
+  getTooltipLeft(x: number): number {
+    return Math.max(10, Math.min(x - 60, 560));
+  }
+
+  changeWorkloadSort(col: WorkloadSortColumn): void {
+    if (this.workloadSortColumn() === col) {
+      this.workloadSortDir.update(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.workloadSortColumn.set(col);
+      this.workloadSortDir.set(col === 'name' || col === 'login' ? 'asc' : 'desc');
+    }
+  }
+
+  getEfficiencyPercent(u: UserWorkload): number {
+    if (u.assignedTasks <= 0) return 0;
+    return Math.min(100, Math.round((u.completedTasks / u.assignedTasks) * 100));
+  }
+
+  getProgressColor(pct: number): string {
+    if (pct >= 100) return 'var(--success)';
+    if (pct >= 50) return 'var(--primary)';
+    if (pct > 0) return '#f59e0b';
+    return 'var(--text-muted)';
+  }
+
+  getAvatarBgColor(name: string): string {
+    const colors = [
+      '#4338ca', '#0369a1', '#047857', '#b45309',
+      '#6d28d9', '#be185d', '#0f766e', '#c2410c'
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  getUserInitial(name: string): string {
+    return (name || '').trim().charAt(0).toUpperCase() || '?';
+  }
+
+  navigateToProject(projectId: number): void {
+    this.router.navigate(['/tasks'], { queryParams: { project: projectId } });
+  }
+
+  exportReport(format: 'xlsx' | 'csv' = 'xlsx'): void {
+    window.open(`/api/v1/reports/tasks/export?format=${format}`, '_blank');
   }
 
   shouldShowDateLabel(index: number, total: number): boolean {

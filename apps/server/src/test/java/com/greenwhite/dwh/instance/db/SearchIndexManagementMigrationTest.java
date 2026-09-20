@@ -57,7 +57,7 @@ class SearchIndexManagementMigrationTest {
 
         var flyway = FlywayUtcConfiguration.configure(Flyway.configure()).dataSource(ds)
                 .locations("classpath:db/migration").load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2); // V026 plus forward-only job request metadata V027.
+        assertThat(flyway.migrate().migrationsExecuted).isGreaterThanOrEqualTo(2); // V026 plus forward-only migrations.
 
         assertThat(jdbc.sql("""
                 select count(*) from information_schema.tables

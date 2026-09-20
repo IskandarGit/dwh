@@ -6,7 +6,7 @@ export function translateTest(
 ): string {
   const template = PACKAGED_RUSSIAN[key] ?? key;
   if (!params) return template;
-  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name: string) =>
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder: string, name: string) =>
     Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
   );
 }

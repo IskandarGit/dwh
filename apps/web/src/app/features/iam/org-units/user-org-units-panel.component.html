@@ -1,0 +1,69 @@
+<section class="panel" [attr.aria-label]="'iam.org_units.user_panel_title' | t">
+  <h3>{{ 'iam.org_units.user_panel_title' | t }}</h3>
+  @if (!can('view')) {
+    <p role="alert">{{ 'iam.org_units.forbidden' | t }}</p>
+  } @else {
+    <section class="card" [attr.aria-labelledby]="'assigned-title-' + userId">
+      <div class="heading">
+        <div><h4 [id]="'assigned-title-' + userId">{{ 'iam.org_units.assignments_title' | t }}</h4>
+          <p class="help">{{ 'iam.org_units.assignments_help' | t }}</p></div>
+        <ui-button data-action="retry-assignments" variant="secondary" [disabled]="pending || dirty || assignmentsLoading" (onClick)="reloadAssignments()">{{ 'iam.org_units.retry' | t }}</ui-button>
+      </div>
+      @if (treeLoading || assignmentsLoading) { <p role="status">{{ 'iam.org_units.assignments_loading' | t }}</p> }
+      @if (treeError) {
+        <div role="alert"><p>{{ treeError.detail || ('iam.org_units.load_error' | t) }}</p>
+          <ui-button data-action="retry-assignment-tree" variant="secondary" [disabled]="pending || treeLoading" (onClick)="reloadTree()">{{ 'iam.org_units.retry' | t }}</ui-button>
+        </div>
+      }
+      @if (assignmentsError) { <p role="alert">{{ assignmentsError.detail || ('iam.org_units.assignments_load_error' | t) }}</p> }
+      @if (assignmentsLoaded) {
+        @if (!can('assign')) { <p role="status">{{ 'iam.org_units.assignments_view_only' | t }}</p> }
+        @if (inactiveAssignments.length) { <p class="warning" role="status">{{ 'iam.org_units.inactive_assignment_warning' | t }}</p> }
+        @if (unresolvedAssignmentIds.length) {
+          <p class="warning" role="status">{{ 'iam.org_units.unknown_assignment_warning' | t:{ids: unresolvedAssignmentIds.join(', ')} }}</p>
+        }
+        <app-org-unit-tree [units]="units" [multiple]="true" [checkedIds]="selectedOrgUnitIds()"
+          [disabled]="pending || !can('assign')" (toggleUnit)="toggleAssignment($event)" />
+        @if (!units.length && treeLoaded) { <p>{{ 'iam.org_units.empty' | t }}</p> }
+        <div class="legacy">
+          <h5>{{ 'iam.org_units.legacy_title' | t }}</h5>
+          <p>{{ legacyOrgUnitId === null ? ('iam.org_units.legacy_none' | t) : unitLabel(legacyOrgUnitId) }}</p>
+          <p class="help">{{ 'iam.org_units.legacy_help' | t }}</p>
+        </div>
+        @if (saveError) { <p role="alert">{{ saveError.detail || ('iam.org_units.assignments_save_error' | t) }}</p> }
+        <div class="actions">
+          @if (can('assign')) {
+            <ui-button variant="secondary" [disabled]="pending || !dirty" (onClick)="cancelEdits()">{{ 'iam.org_units.cancel' | t }}</ui-button>
+            <ui-button data-action="save-assignments" [loading]="pending" [disabled]="!dirty" (onClick)="save()">{{ 'iam.org_units.save' | t }}</ui-button>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="card" [attr.aria-labelledby]="'scope-title-' + userId">
+      <div class="heading"><h4 [id]="'scope-title-' + userId">{{ 'iam.org_units.effective_scope_title' | t }}</h4>
+        <ui-button variant="secondary" [disabled]="pending || scopeLoading" (onClick)="reloadScope()">{{ 'iam.org_units.retry' | t }}</ui-button></div>
+      <p class="help">{{ 'iam.org_units.effective_scope_help' | t }}</p>
+      @if (scopeLoading) { <p role="status">{{ 'iam.data_scope.loading' | t }}</p> }
+      @if (scopeError) {
+        <p role="alert">{{ (savedRefreshFailed ? 'iam.data_scope.saved_refresh_error' : 'iam.data_scope.load_error') | t }} {{ scopeError.detail }}</p>
+      }
+      @if (scopeLoaded && effectiveScope; as scope) {
+        <dl><dt>{{ 'iam.data_scope.rule' | t }}</dt><dd>{{ scopeRuleKey() | t }}</dd></dl>
+        @if (scope.visibleOrgUnitIds.length) {
+          <h5>{{ 'iam.data_scope.visible_units' | t }}</h5>
+          <ul class="visible">@for (id of scope.visibleOrgUnitIds; track id) { <li>{{ unitLabel(id) }}</li> }</ul>
+        } @else { <p>{{ emptyScopeKey() | t }}</p> }
+      }
+    </section>
+  }
+</section>
+@if (can('view')) {
+  <ui-modal [isOpen]="discard.open()" [title]="'iam.org_units.discard_title' | t" (close)="discard.cancel()">
+    <p body>{{ 'iam.org_units.assignments_discard_warning' | t }}</p>
+    <div footer class="actions">
+      <ui-button variant="secondary" (onClick)="discard.cancel()">{{ 'iam.org_units.keep_editing' | t }}</ui-button>
+      <ui-button variant="danger" (onClick)="discard.confirm()">{{ 'iam.org_units.discard' | t }}</ui-button>
+    </div>
+  </ui-modal>
+}

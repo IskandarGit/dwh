@@ -7,7 +7,7 @@ import com.greenwhite.dwh.instance.kauth.repository.KauthOtpCodeRepository;
 import com.greenwhite.dwh.instance.kauth.repository.KauthPasswordResetRepository;
 import com.greenwhite.dwh.instance.kauth.repository.KauthSessionRepository;
 import com.greenwhite.dwh.instance.md.pref.MdPref;
-import com.greenwhite.dwh.instance.md.repository.MdUserRepository;
+import com.greenwhite.dwh.instance.md.service.MdUserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +21,7 @@ public class KauthAuthService {
     private static final int MAX_FAILED_ATTEMPTS_PER_IP = 10;
     private static final int MAX_FAILED_ATTEMPTS_PER_USER = 5;
 
-    private final MdUserRepository userRepository;
+    private final MdUserService userService;
     private final KauthSessionRepository sessionRepository;
     private final KauthLoginAttemptRepository loginAttemptRepository;
     private final KauthOtpCodeRepository otpCodeRepository;
@@ -34,7 +34,7 @@ public class KauthAuthService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public KauthAuthService(
-            MdUserRepository userRepository,
+            MdUserService userService,
             KauthSessionRepository sessionRepository,
             KauthLoginAttemptRepository loginAttemptRepository,
             KauthOtpCodeRepository otpCodeRepository,
@@ -44,7 +44,7 @@ public class KauthAuthService {
             com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService,
             KauthChannelService channelService,
             KauthOtpSender otpSender) {
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.sessionRepository = sessionRepository;
         this.loginAttemptRepository = loginAttemptRepository;
         this.otpCodeRepository = otpCodeRepository;
@@ -75,7 +75,7 @@ public class KauthAuthService {
             throw ApiException.locked(ErrorCode.LOGIN_LOCKED, "Учётная запись временно заблокирована из-за частых ошибок ввода пароля");
         }
 
-        var userOpt = userRepository.findByLogin(login);
+        var userOpt = userService.findAuthUserByLogin(login);
         if (userOpt.isEmpty()) {
             loginAttemptRepository.recordAttempt(login, ip, false, "USER_NOT_FOUND");
             auditLogService.logSecurityEvent("LOGIN_FAILED", null, ip, userAgent, java.util.Map.of("login", login, "reason", "USER_NOT_FOUND"));
@@ -158,7 +158,7 @@ public class KauthAuthService {
             throw ApiException.badRequest(ErrorCode.OTP_INVALID, "Неверный код подтверждения");
         }
 
-        var user = userRepository.findById(userId)
+        var user = userService.findAuthUserById(userId)
                 .orElseThrow(() -> ApiException.badRequest(ErrorCode.OTP_INVALID, "Некорректный OTP токен"));
         if (!MdPref.STATE_ACTIVE.equals(user.state()) || user.authenticationVersion() != otp.authenticationVersion()
                 || !otpCodeRepository.consume(otp.id(), userId, otp.authenticationVersion(), "login")) {
@@ -182,7 +182,7 @@ public class KauthAuthService {
 
     @Transactional
     public void requestPasswordReset(String email) {
-        userRepository.findByEmail(email).ifPresent(user -> {
+        userService.findAuthUserByEmail(email).ifPresent(user -> {
             String code = String.format("%06d", secureRandom.nextInt(1000000));
             String codeHash = KauthPasswordHasher.sha256(code);
             passwordResetRepository.create(user.id(), codeHash, Instant.now().plusSeconds(900));
@@ -195,7 +195,7 @@ public class KauthAuthService {
         var reset = passwordResetRepository.findActiveByCodeHash(codeHash)
                 .orElseThrow(() -> ApiException.badRequest(ErrorCode.RESET_CODE_INVALID, "Неверный или просроченный код сброса пароля"));
 
-        var user = userRepository.findById(reset.userId())
+        var user = userService.findAuthUserById(reset.userId())
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.USER_NOT_FOUND, "Пользователь не найден"));
 
         passwordValidator.validate(newPassword, user.login());
@@ -203,7 +203,7 @@ public class KauthAuthService {
         passwordResetRepository.markAsUsed(reset.id());
 
         String newHash = passwordHasher.hashPassword(newPassword);
-        userRepository.updatePassword(reset.userId(), newHash);
+        userService.setPasswordForReset(reset.userId(), newHash);
         sessionRepository.closeAllUserSessions(reset.userId());
     }
 
@@ -219,14 +219,14 @@ public class KauthAuthService {
             boolean isOtpRequired,
             String otpToken,
             String rawSessionCookie,
-            MdUserRepository.UserRecord user,
+            MdUserService.AuthUser user,
             KauthSessionRepository.SessionRecord session
     ) {
         public static LoginResult requires2fa(String otpToken, Long userId) {
             return new LoginResult(true, otpToken, null, null, null);
         }
 
-        public static LoginResult success(String rawSessionCookie, MdUserRepository.UserRecord user, KauthSessionRepository.SessionRecord session) {
+        public static LoginResult success(String rawSessionCookie, MdUserService.AuthUser user, KauthSessionRepository.SessionRecord session) {
             return new LoginResult(false, null, rawSessionCookie, user, session);
         }
     }

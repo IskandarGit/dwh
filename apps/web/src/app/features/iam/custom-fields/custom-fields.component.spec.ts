@@ -9,6 +9,7 @@ import { CustomFieldsComponent } from './custom-fields.component';
 
 describe('CustomFieldsComponent', () => {
   async function createFixture(initialFields: CustomField[] = []) {
+    const toast = { success: vi.fn(), error: vi.fn() };
     const api = {
       get: vi.fn(() => of(initialFields)),
       post: vi.fn(() => of({})),
@@ -20,12 +21,12 @@ describe('CustomFieldsComponent', () => {
       imports: [CustomFieldsComponent],
       providers: [
         { provide: ApiService, useValue: api },
-        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+        { provide: ToastService, useValue: toast },
         { provide: PermissionService, useValue: { hasPermission: () => true } }
       ]
     }).compileComponents();
 
-    return { fixture: TestBed.createComponent(CustomFieldsComponent), api };
+    return { fixture: TestBed.createComponent(CustomFieldsComponent), api, toast };
   }
 
   it('opens creation from ui-button and labels every modal control', async () => {
@@ -107,7 +108,7 @@ describe('CustomFieldsComponent', () => {
       orderNo: 10,
       createdAt: '2026-08-30T00:00:00Z'
     };
-    const { fixture } = await createFixture([field]);
+    const { fixture, api, toast } = await createFixture([field]);
     fixture.detectChanges();
 
     const region = fixture.nativeElement.querySelector('.table-wrapper[role="region"]') as HTMLElement;
@@ -119,5 +120,86 @@ describe('CustomFieldsComponent', () => {
     remove.click();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Удалить динамическое поле «Бюджет»');
+
+    fixture.componentInstance.confirmDeleteField();
+    expect(api.delete).toHaveBeenCalledWith('/custom-fields/8');
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('filters fields by search query and clears search', async () => {
+    const fields: CustomField[] = [
+      { id: 1, entityType: 'USER', code: 'skype_id', name: 'Skype ID', fieldType: 'string', isRequired: false, orderNo: 1, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 2, entityType: 'TASK', code: 'cost_usd', name: 'Стоимость USD', fieldType: 'number', isRequired: true, orderNo: 2, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 3, entityType: 'USER', code: 'telegram_handle', name: 'Telegram Handle', fieldType: 'string', isRequired: false, orderNo: 3, createdAt: '2026-09-01T00:00:00Z' }
+    ];
+
+    const { fixture } = await createFixture(fields);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.filteredFields).toHaveLength(3);
+
+    // Filter by 'telegram'
+    fixture.componentInstance.searchQuery = 'telegram';
+    fixture.componentInstance.applyFilter();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.filteredFields).toHaveLength(1);
+    expect(fixture.componentInstance.filteredFields[0].code).toBe('telegram_handle');
+
+    // Clear search
+    fixture.componentInstance.clearSearch();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.filteredFields).toHaveLength(3);
+  });
+
+  it('filters by entity tab and displays accurate tab counts', async () => {
+    const fields: CustomField[] = [
+      { id: 1, entityType: 'USER', code: 'skype_id', name: 'Skype ID', fieldType: 'string', isRequired: false, orderNo: 1, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 2, entityType: 'TASK', code: 'cost_usd', name: 'Стоимость USD', fieldType: 'number', isRequired: true, orderNo: 2, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 3, entityType: 'USER', code: 'telegram_handle', name: 'Telegram Handle', fieldType: 'string', isRequired: false, orderNo: 3, createdAt: '2026-09-01T00:00:00Z' }
+    ];
+
+    const { fixture } = await createFixture(fields);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.getEntityCount('ALL')).toBe(3);
+    expect(fixture.componentInstance.getEntityCount('USER')).toBe(2);
+    expect(fixture.componentInstance.getEntityCount('TASK')).toBe(1);
+    expect(fixture.componentInstance.getEntityCount('PROJECT')).toBe(0);
+
+    fixture.componentInstance.filterByEntity('TASK');
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.filteredFields).toHaveLength(1);
+    expect(fixture.componentInstance.filteredFields[0].code).toBe('cost_usd');
+  });
+
+  it('sorts fields by orderNo ascending then by name', async () => {
+    const fields: CustomField[] = [
+      { id: 1, entityType: 'USER', code: 'field_b', name: 'Поле Б', fieldType: 'string', isRequired: false, orderNo: 30, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 2, entityType: 'USER', code: 'field_a', name: 'Поле А', fieldType: 'string', isRequired: false, orderNo: 10, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 3, entityType: 'USER', code: 'field_c', name: 'Поле В', fieldType: 'string', isRequired: false, orderNo: 20, createdAt: '2026-09-01T00:00:00Z' }
+    ];
+
+    const { fixture } = await createFixture(fields);
+    fixture.detectChanges();
+
+    const orderedCodes = fixture.componentInstance.filteredFields.map(f => f.code);
+    expect(orderedCodes).toEqual(['field_a', 'field_c', 'field_b']);
+  });
+
+  it('sanitizes code input to lowercase and replaces spaces with underscores', async () => {
+    const { fixture } = await createFixture();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openCreateModal();
+    fixture.detectChanges();
+
+    const input = { value: 'My Special Code' } as HTMLInputElement;
+    const event = { target: input } as unknown as Event;
+
+    fixture.componentInstance.onCodeInput(event);
+    expect(fixture.componentInstance.formData.code).toBe('my_special_code');
   });
 });

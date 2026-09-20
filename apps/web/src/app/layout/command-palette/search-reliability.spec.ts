@@ -101,7 +101,7 @@ describe('Reliable search through the real HTTP adapter and template', () => {
     await vi.advanceTimersByTimeAsync(120);
     const old = http.expectOne(req => req.url === '/api/v1/search');
     const category = fixture.nativeElement.querySelector('#search-category') as HTMLSelectElement;
-    expect(Array.from(category.options).map(option => option.value)).toEqual(['ALL', 'TASK', 'PROJECT', 'USER']);
+    expect(Array.from(category.options).map(option => option.value)).toEqual(['ALL', 'TASK', 'PROJECT', 'USER', 'NOTE']);
     category.value = 'PROJECT'; category.dispatchEvent(new Event('change'));
     expect(old.cancelled).toBe(true);
     await vi.advanceTimersByTimeAsync(120);

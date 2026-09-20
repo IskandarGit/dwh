@@ -114,7 +114,7 @@ public class KauthApiTokenRepository {
             Long userId,
             String name,
             String tokenPrefix,
-            String tokenHash,
+            @JsonIgnore String tokenHash,
             Instant expiresAt,
             Instant createdAt,
             Instant lastUsedAt,

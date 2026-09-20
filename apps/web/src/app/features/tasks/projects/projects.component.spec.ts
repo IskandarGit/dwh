@@ -532,7 +532,7 @@ describe('ProjectsComponent UI contracts', () => {
       Array.from({ length: 21 }, (_, index) => project(index + 1, index === 20 ? 'P' : 'A')),
       []
     ];
-    api.get.mockImplementation((url: string) => of(url.endsWith('/stats') ? [] : responses.shift() ?? []));
+    api.get.mockImplementation((url: string) => url.includes('/custom-fields') ? of([]) : of(url.endsWith('/stats') ? [] : responses.shift() ?? []));
     const { fixture } = await createFixture({ api });
     const component = fixture.componentInstance;
 
@@ -556,7 +556,7 @@ describe('ProjectsComponent UI contracts', () => {
     const listReads = [first, retry];
     const api = emptyApi();
     api.get.mockImplementation((url: string): Observable<Project[] | ProjectTaskStats[]> =>
-      url.endsWith('/stats') ? of([]) : (listReads.shift() ?? of([]))
+      url.includes('/custom-fields') ? of([]) : (url.endsWith('/stats') ? of([]) : (listReads.shift() ?? of([])))
     );
     const { fixture } = await createFixture({ api });
 
@@ -751,7 +751,10 @@ describe('ProjectsComponent UI contracts', () => {
     const listReads = [firstList, latestList, afterDestroyList];
     const statsReads = [firstStats, latestStats, afterDestroyStats];
     const api = emptyApi();
-    api.get.mockImplementation((url: string) => url.endsWith('/stats') ? statsReads.shift()! : listReads.shift()!);
+    api.get.mockImplementation((url: string) => {
+      if (url.includes('/custom-fields')) return of([]);
+      return url.endsWith('/stats') ? statsReads.shift()! : listReads.shift()!;
+    });
     const { fixture } = await createFixture({ api });
     const component = fixture.componentInstance;
 

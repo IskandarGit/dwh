@@ -37,7 +37,12 @@ export class PermissionService {
     'notify.inbox': ['notify.inbox', 'notifications'],
     'notifications': ['notify.inbox', 'notifications'],
     'platform.webhooks': ['platform.webhooks', 'webhooks'],
-    'webhooks': ['platform.webhooks', 'webhooks']
+    'webhooks': ['platform.webhooks', 'webhooks'],
+    'platform.modules': ['platform.modules', 'modules'],
+    'modules': ['platform.modules', 'modules'],
+    'platform.navigation': ['platform.navigation', 'navigation'],
+    'navigation': ['platform.navigation', 'navigation'],
+    'notes': ['notes']
   };
 
   setPermissions(perms: string[], version: number = 1) {
@@ -81,6 +86,10 @@ export class PermissionService {
 
   canDelete(form: string): boolean {
     return this.hasPermission(form, 'delete');
+  }
+
+  canManage(form: string): boolean {
+    return this.hasPermission(form, 'manage');
   }
 }
 

@@ -96,6 +96,22 @@ public class MsNotificationRepository {
                 .update();
     }
 
+    public boolean hasRecentNotification(Long userId, String sourceCode, Instant since) {
+        return Boolean.TRUE.equals(jdbcClient.sql("""
+                select exists(
+                    select 1 from ms_notifications
+                    where user_id = :userId
+                      and source_code = :sourceCode
+                      and created_at >= :since
+                )
+                """)
+                .param("userId", userId)
+                .param("sourceCode", sourceCode)
+                .param("since", java.sql.Timestamp.from(since))
+                .query(Boolean.class)
+                .single());
+    }
+
     public record NotificationRecord(
             Long id,
             Long userId,

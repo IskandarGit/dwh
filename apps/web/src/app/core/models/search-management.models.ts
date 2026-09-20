@@ -1,6 +1,6 @@
 import { SearchResult } from './search.models';
 
-export type SearchEntityType = 'TASK' | 'PROJECT' | 'USER';
+export type SearchEntityType = 'TASK' | 'PROJECT' | 'USER' | 'NOTE';
 export type SearchSchemaProfile = 'MIXED' | 'RU';
 export type SearchJobAction = 'CHECK' | 'REBUILD' | 'ROLLBACK';
 export type SearchJobState = 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'ACTIVATING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
@@ -17,7 +17,13 @@ export interface SearchQueryPolicy {
   requestsPerMinute: number;
   burst: number;
   schemaProfile: SearchSchemaProfile;
-  fields: Record<SearchEntityType, SearchFieldPolicy[]>;
+  fields: {
+    TASK: SearchFieldPolicy[];
+    PROJECT: SearchFieldPolicy[];
+    USER: SearchFieldPolicy[];
+    NOTE?: SearchFieldPolicy[];
+    [key: string]: SearchFieldPolicy[] | undefined;
+  };
 }
 
 export interface SearchSettingsSnapshot {

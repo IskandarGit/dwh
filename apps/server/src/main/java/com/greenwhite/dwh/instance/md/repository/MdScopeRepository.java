@@ -28,6 +28,12 @@ public class MdScopeRepository {
         this.jdbcClient = jdbcClient;
     }
 
+    /** Database-local IAM scope writer ordering; released by the caller's transaction. */
+    public void lockScopeMutation() {
+        jdbcClient.sql("select pg_advisory_xact_lock(129632, 1)")
+                .query((rs, rowNum) -> true).single();
+    }
+
     // ------------------------------------------------------------------ роли
 
     public void setRoleRule(Long roleId, String rule) {
@@ -47,6 +53,13 @@ public class MdScopeRepository {
                 .query(String.class)
                 .optional()
                 .orElse("ALL");
+    }
+
+    public boolean roleExists(Long roleId) {
+        return jdbcClient.sql("select exists (select 1 from md_roles where id = :roleId)")
+                .param("roleId", roleId)
+                .query(Boolean.class)
+                .single();
     }
 
     // ----------------------------------------------------------- пользователь
@@ -185,23 +198,32 @@ public class MdScopeRepository {
 
     /** Пользователи роли — кому нужно пересчитать скоуп после смены её правила. */
     public List<Long> getUserIdsByRole(Long roleId) {
-        return jdbcClient.sql("select user_id from md_user_roles where role_id = :roleId")
+        return jdbcClient.sql("select user_id from md_user_roles where role_id = :roleId order by user_id")
                 .param("roleId", roleId)
                 .query(Long.class)
                 .list();
     }
 
-    /** Пользователи, стоящие в узле или под ним — после изменения дерева. */
+    /** Users assigned to this node, its descendants, or its ancestors (including managers). */
     public List<Long> getUserIdsAffectedByUnit(Long orgUnitId) {
         return jdbcClient.sql("""
                         with recursive subtree as (
                             select id from md_org_units where id = :unitId
                             union
                             select c.id from md_org_units c join subtree s on c.parent_id = s.id
+                        ), ancestors as (
+                            select id, parent_id from md_org_units where id = :unitId
+                            union
+                            select p.id, p.parent_id from md_org_units p join ancestors a on p.id = a.parent_id
+                        ), affected_units as (
+                            select id from subtree
+                            union
+                            select id from ancestors
                         )
                         select distinct uou.user_id
                         from md_user_org_units uou
-                        join subtree s on s.id = uou.org_unit_id
+                        join affected_units s on s.id = uou.org_unit_id
+                        order by uou.user_id
                         """)
                 .param("unitId", orgUnitId)
                 .query(Long.class)

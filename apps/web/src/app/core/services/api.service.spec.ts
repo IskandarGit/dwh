@@ -9,6 +9,25 @@ import { ApiService } from './api.service';
 import { ToastService } from './toast.service';
 
 describe('ApiService localized Problem Details', () => {
+  it.each(['PATCH', 'DELETE'] as const)('%s keeps default toast and allows inline ownership', method => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ApiService);
+    const http = TestBed.inject(HttpTestingController);
+    const toast = vi.spyOn(TestBed.inject(ToastService), 'error');
+    for (const inline of [false, true]) {
+      let failure: unknown;
+      const request = method === 'PATCH'
+        ? api.patch('/iam/org-units/7', { name: 'New' }, inline ? { notifyError: false } : undefined)
+        : api.delete('/iam/org-units/7', inline ? { notifyError: false } : undefined);
+      request.subscribe({ error: (error: unknown) => failure = error });
+      http.expectOne(req => req.method === method && req.url === '/api/v1/iam/org-units/7')
+        .flush({ code: 'CONFLICT', detail: 'Conflict detail' }, { status: 409, statusText: 'Conflict' });
+      expect(failure).toMatchObject({ status: 409, code: 'CONFLICT', detail: 'Conflict detail' });
+      expect(toast).toHaveBeenCalledTimes(1);
+    }
+    http.verify();
+  });
+
   it('lets PUT callers own a conflict locally without losing its status or detail', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     let failure: unknown;

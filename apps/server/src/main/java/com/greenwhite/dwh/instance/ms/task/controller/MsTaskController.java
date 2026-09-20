@@ -8,6 +8,7 @@ import com.greenwhite.dwh.instance.ms.task.pref.MsTaskPref;
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskMemberRepository;
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskRepository;
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskStatusRepository;
+
 import com.greenwhite.dwh.instance.ms.task.repository.MsTaskTypeRepository;
 import com.greenwhite.dwh.instance.ms.task.service.MsTaskService;
 import jakarta.validation.Valid;
@@ -41,17 +42,18 @@ public class MsTaskController {
             @RequestParam(name = "status_id", required = false) Long statusId,
             @RequestParam(name = "priority", required = false) String priority,
             @RequestParam(name = "search", required = false) String search,
-            @RequestParam(name = "hide_terminal", required = false) Boolean hideTerminal) {
+            @RequestParam(name = "hide_terminal", required = false) Boolean hideTerminal,
+            @RequestParam(name = "assigned_user_id", required = false) Long assignedUserId,
+            @RequestParam(name = "reporter_id", required = false) Long reporterId,
+            @RequestParam(name = "overdue", required = false) Boolean overdue) {
 
         return ResponseEntity.ok(taskService.listTasks(
                 limit, cursor, projectId, statusId, priority, search, hideTerminal,
-                SecurityContext.getCurrentUserId()));
+                assignedUserId, reporterId, overdue, SecurityContext.getCurrentUserId()));
     }
-
 
     // =========================================================================
     // Statuses API
-    // =========================================================================
     @GetMapping("/statuses")
     @RequiresPermission(form = MsTaskPref.FORM_TASKS, action = "view")
     public ResponseEntity<List<MsTaskStatusRepository.StatusRecord>> listStatuses() {

@@ -1,0 +1,53 @@
+<section class="panel" [attr.aria-label]="'iam.data_scope.role_panel_title' | t">
+  <h3>{{ 'iam.data_scope.role_panel_title' | t }}</h3>
+  @if (!can('view')) {
+    <p role="alert">{{ 'iam.org_units.forbidden' | t }}</p>
+  } @else {
+    <div class="heading">
+      <p class="help">{{ 'iam.data_scope.role_help' | t }}</p>
+      <ui-button variant="secondary" [disabled]="pending || loading || dirty" (onClick)="reload()">{{ 'iam.org_units.retry' | t }}</ui-button>
+    </div>
+    @if (loading) { <p role="status">{{ 'iam.data_scope.loading' | t }}</p> }
+    @if (loadError) { <p role="alert">{{ (savedRefreshFailed ? 'iam.data_scope.saved_refresh_error' : 'iam.data_scope.load_error') | t }} {{ loadError.detail }}</p> }
+    @if (loaded) {
+      @if (!can('assign')) { <p role="status">{{ 'iam.data_scope.view_only' | t }}</p> }
+      <fieldset [disabled]="pending || !can('assign')">
+        <legend class="sr-only">{{ 'iam.data_scope.rule' | t }}</legend>
+        @for (option of options; track option.value) {
+          <label class="option" [for]="'role-scope-' + roleId + '-' + option.value">
+            <input [id]="'role-scope-' + roleId + '-' + option.value" type="radio" [name]="'role-scope-' + roleId"
+              [value]="option.value" [checked]="selectedRule() === option.value" [disabled]="pending || !can('assign')" (change)="selectRule(option.value)">
+            <span><strong>{{ option.labelKey | t }}</strong><small>{{ option.descriptionKey | t }}</small></span>
+          </label>
+        }
+      </fieldset>
+      <p class="warning">{{ 'iam.data_scope.widest_rule_warning' | t }}</p>
+      @if (saveError) { <p role="alert">{{ saveError.detail || ('iam.data_scope.save_error' | t) }}</p> }
+      @if (can('assign')) {
+        <div class="actions">
+          <ui-button variant="secondary" [disabled]="pending || !dirty" (onClick)="cancelEdits()">{{ 'iam.org_units.cancel' | t }}</ui-button>
+          <ui-button data-action="save-rule" [loading]="pending" [disabled]="!dirty || confirmationOpen" (onClick)="save()">{{ 'iam.org_units.save' | t }}</ui-button>
+        </div>
+      }
+    }
+  }
+</section>
+@if (can('view')) {
+  <ui-modal [isOpen]="confirmationOpen" [title]="'iam.data_scope.change_title' | t" [dismissible]="!pending" (close)="closeConfirmation()">
+    <div body data-rule-confirm>
+      <p>{{ 'iam.data_scope.change_warning' | t:{previous: (originalRuleKey() | t), next: (selectedRuleKey() | t)} }}</p>
+      <p>{{ 'iam.data_scope.widest_rule_warning' | t }}</p>
+    </div>
+    <div footer class="actions">
+      <ui-button variant="secondary" [disabled]="pending" (onClick)="closeConfirmation()">{{ 'iam.org_units.cancel' | t }}</ui-button>
+      <ui-button [loading]="pending" (onClick)="confirmSave()">{{ 'iam.org_units.confirm_save' | t }}</ui-button>
+    </div>
+  </ui-modal>
+  <ui-modal [isOpen]="discard.open()" [title]="'iam.data_scope.discard_title' | t" (close)="discard.cancel()">
+    <p body>{{ 'iam.data_scope.discard_warning' | t }}</p>
+    <div footer class="actions">
+      <ui-button variant="secondary" (onClick)="discard.cancel()">{{ 'iam.org_units.keep_editing' | t }}</ui-button>
+      <ui-button variant="danger" (onClick)="discard.confirm()">{{ 'iam.org_units.discard' | t }}</ui-button>
+    </div>
+  </ui-modal>
+}

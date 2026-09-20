@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -339,7 +340,7 @@ public class TypesenseClient {
             Map<String, String> collections,
             SearchQueryPolicy policy) {
         if (!properties.enabled()) throw TypesenseException.uninitialized();
-        List<String> requestedTypes = requestedTypes(entityType);
+        List<String> requestedTypes = requestedTypes(entityType, collections);
         List<Map<String, Object>> searches = requestedTypes.stream()
                 .map(type -> searchRequest(query, type, limit, collections, policy))
                 .toList();
@@ -358,11 +359,17 @@ public class TypesenseClient {
         }
     }
 
-    private static List<String> requestedTypes(String entityType) {
+    private static List<String> requestedTypes(String entityType, Map<String, String> collections) {
         String normalized = entityType == null ? "ALL" : entityType.toUpperCase(Locale.ROOT);
+        if (normalized.equals("ALL")) {
+            List<String> types = new ArrayList<>(List.of("TASK", "PROJECT", "USER"));
+            if (collections != null && collections.containsKey("NOTE") && !collections.get("NOTE").isBlank()) {
+                types.add("NOTE");
+            }
+            return List.copyOf(types);
+        }
         return switch (normalized) {
-            case "ALL" -> List.of("TASK", "PROJECT", "USER");
-            case "TASK", "PROJECT", "USER" -> List.of(normalized);
+            case "TASK", "PROJECT", "USER", "NOTE" -> List.of(normalized);
             default -> throw TypesenseException.uninitialized();
         };
     }

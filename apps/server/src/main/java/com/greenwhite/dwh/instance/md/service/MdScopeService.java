@@ -4,14 +4,18 @@ import com.greenwhite.dwh.core.error.ErrorCode;
 import com.greenwhite.dwh.instance.audit.service.AuditLogService;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.common.security.ScopeFilter;
+import com.greenwhite.dwh.instance.md.dto.MdOrgUnitDtos.RoleRule;
+import com.greenwhite.dwh.instance.md.dto.MdOrgUnitDtos.UserAssignments;
 import com.greenwhite.dwh.instance.md.repository.MdOrgUnitRepository;
 import com.greenwhite.dwh.instance.md.repository.MdScopeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Скоуп данных: кто какие строки видит (ADR-0013).
@@ -52,8 +56,16 @@ public class MdScopeService {
 
     // ------------------------------------------------------- правило у роли
 
+    /** Acquire before source rows or per-user materializations are changed. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void acquireMutationLock() {
+        scopeRepository.lockScopeMutation();
+    }
+
     @Transactional
     public void setRoleRule(Long roleId, String rule) {
+        acquireMutationLock();
+        requireRole(roleId);
         String normalized = normalize(rule);
         String before = scopeRepository.getRoleRule(roleId);
 
@@ -73,11 +85,25 @@ public class MdScopeService {
         return scopeRepository.getRoleRule(roleId);
     }
 
+    @Transactional(readOnly = true)
+    public RoleRule getRoleScopeRule(Long roleId) {
+        requireRole(roleId);
+        return new RoleRule(roleId, scopeRepository.getRoleRule(roleId));
+    }
+
     // -------------------------------------------------- позиция пользователя
 
     @Transactional
     public void assignUserOrgUnits(Long userId, List<Long> orgUnitIds) {
-        List<Long> requested = orgUnitIds != null ? orgUnitIds : List.of();
+        acquireMutationLock();
+        requireUser(userId);
+        if (orgUnitIds == null) {
+            throw validation("Список подразделений обязателен; для снятия всех назначений передайте пустой массив");
+        }
+        for (Long unitId : orgUnitIds) {
+            requirePositiveId(unitId, "Идентификатор подразделения");
+        }
+        List<Long> requested = List.copyOf(new TreeSet<>(orgUnitIds));
         for (Long unitId : requested) {
             orgUnitRepository.findById(unitId).orElseThrow(() ->
                     ApiException.notFound(ErrorCode.NOT_FOUND, "Узел оргструктуры не найден: " + unitId));
@@ -100,6 +126,7 @@ public class MdScopeService {
      */
     @Transactional
     public String recalculateFor(Long userId) {
+        acquireMutationLock();
         String rule = scopeRepository.recalculateEffectiveScope(userId);
         permissionService.recalculateEffectivePermissions(userId);
         return rule;
@@ -107,14 +134,22 @@ public class MdScopeService {
 
     @Transactional
     public void recalculateForRole(Long roleId) {
+        acquireMutationLock();
         for (Long userId : scopeRepository.getUserIdsByRole(roleId)) {
             recalculateFor(userId);
         }
     }
 
-    /** После изменения дерева пересчитываются все, кто стоит в узле или под ним. */
+    /** Users on either side of a tree mutation must be captured while holding the mutation lock. */
+    @Transactional(readOnly = true)
+    public List<Long> getUserIdsAffectedByUnit(Long orgUnitId) {
+        return scopeRepository.getUserIdsAffectedByUnit(orgUnitId);
+    }
+
+    /** Refresh users assigned inside the branch or on its ancestors. */
     @Transactional
     public void recalculateForUnitSubtree(Long orgUnitId) {
+        acquireMutationLock();
         for (Long userId : scopeRepository.getUserIdsAffectedByUnit(orgUnitId)) {
             recalculateFor(userId);
         }
@@ -122,7 +157,17 @@ public class MdScopeService {
 
     @Transactional(readOnly = true)
     public UserScope getUserScope(Long userId) {
+        requireUser(userId);
         return new UserScope(scopeRepository.getUserRule(userId), scopeRepository.getEffectiveScope(userId));
+    }
+
+    @Transactional(readOnly = true)
+    public UserAssignments getUserAssignments(Long userId) {
+        requireUser(userId);
+        return new UserAssignments(
+                userId,
+                scopeRepository.getUserOrgUnitIds(userId).stream().sorted().toList(),
+                scopeRepository.findUserOrgUnit(userId).orElse(null));
     }
 
     // ------------------------------------------------------- применение в SQL
@@ -196,6 +241,30 @@ public class MdScopeService {
                     "Неизвестное правило видимости: " + rule + ". Допустимо: " + VALID_RULES);
         }
         return normalized;
+    }
+
+    private void requireUser(Long userId) {
+        requirePositiveId(userId, "Идентификатор пользователя");
+        if (!scopeRepository.userExists(userId)) {
+            throw ApiException.notFound(ErrorCode.NOT_FOUND, "Пользователь не найден: " + userId);
+        }
+    }
+
+    private void requireRole(Long roleId) {
+        requirePositiveId(roleId, "Идентификатор роли");
+        if (!scopeRepository.roleExists(roleId)) {
+            throw ApiException.notFound(ErrorCode.NOT_FOUND, "Роль не найдена: " + roleId);
+        }
+    }
+
+    private static void requirePositiveId(Long id, String field) {
+        if (id == null || id <= 0) {
+            throw validation(field + " должен быть положительным числом");
+        }
+    }
+
+    private static ApiException validation(String message) {
+        return ApiException.badRequest(ErrorCode.VALIDATION_FAILED, message);
     }
 
     public record UserScope(String rule, Set<Long> visibleOrgUnitIds) {}

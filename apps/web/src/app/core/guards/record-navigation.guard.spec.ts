@@ -16,6 +16,9 @@ describe('Record routes with the actual router and actual templates', () => {
     const requests = new Map<string, Subject<any>>();
     const api = {
       get: vi.fn((path: string) => {
+        if (/^\/iam\/org-units\/users\/\d+\/scope$/.test(path)) {
+          return of({ rule: 'ALL', visibleOrgUnitIds: [] });
+        }
         if (/\/(?:tasks|projects|users)\/\d+(?:\/comments)?$/.test(path)) {
           const response = new Subject<any>(); requests.set(path, response); return response.asObservable();
         }

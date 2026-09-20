@@ -40,6 +40,7 @@ export interface UserSession {
   createdAt: string;
   lastSeenAt: string;
   closedAt?: string;
+  current?: boolean;
 }
 
 export interface ApiToken {
@@ -56,4 +57,26 @@ export interface ApiToken {
 export interface CreatedTokenResponse {
   record: ApiToken;
   rawSecretToken: string;
+}
+
+export interface LoginAttemptRecord {
+  id: number;
+  login: string;
+  ip: string;
+  isSuccess: boolean;
+  failureReason?: string;
+  attemptAt: string;
+}
+
+export interface UserSecuritySummary {
+  userId: number;
+  login: string;
+  is2faEnabled: boolean;
+  forcePasswordChange: boolean;
+  passwordChangedAt?: string;
+  createdAt: string;
+  authVersion: number;
+  activeSessionsCount: number;
+  activeSessions: UserSession[];
+  recentLoginAttempts: LoginAttemptRecord[];
 }

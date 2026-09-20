@@ -72,11 +72,18 @@ public class MsTaskRepository {
     public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
                                       String priority, String search, Boolean hideTerminal) {
         return listTasks(limit, afterId, projectId, statusId, priority, search, hideTerminal,
-                ScopeFilter.unrestricted());
+                null, null, null, ScopeFilter.unrestricted());
     }
 
     public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
                                       String priority, String search, Boolean hideTerminal, ScopeFilter scope) {
+        return listTasks(limit, afterId, projectId, statusId, priority, search, hideTerminal,
+                null, null, null, scope);
+    }
+
+    public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
+                                      String priority, String search, Boolean hideTerminal,
+                                      Long assignedUserId, Long reporterId, Boolean overdue, ScopeFilter scope) {
         StringBuilder sql = new StringBuilder("""
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
@@ -104,6 +111,15 @@ public class MsTaskRepository {
         if (search != null && !search.isBlank()) {
             sql.append(" and (t.title ilike :search or t.description_markdown ilike :search)");
         }
+        if (assignedUserId != null) {
+            sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind in ('R', 'E'))");
+        }
+        if (reporterId != null) {
+            sql.append(" and (t.reporter_id = :reporterId or t.created_by = :reporterId)");
+        }
+        if (Boolean.TRUE.equals(overdue)) {
+            sql.append(" and t.end_time is not null and t.end_time < now() and t.status_id not in (select id from ms_task_statuses where is_terminal = true)");
+        }
 
         sql.append(" order by t.id asc limit :limit");
 
@@ -115,6 +131,8 @@ public class MsTaskRepository {
         if (statusId != null) query.param("statusId", statusId);
         if (priority != null && !priority.isBlank()) query.param("priority", priority);
         if (search != null && !search.isBlank()) query.param("search", "%" + search.trim() + "%");
+        if (assignedUserId != null) query.param("assignedUserId", assignedUserId);
+        if (reporterId != null) query.param("reporterId", reporterId);
 
         return query.query(this::mapRecord).list();
     }
@@ -425,6 +443,27 @@ public class MsTaskRepository {
             Instant beginTime,
             Instant endTime
     ) {}
+
+    public record TaskDeadlineCandidate(long taskId, String title, long userId) {}
+
+    public List<TaskDeadlineCandidate> findUpcomingDeadlines(java.time.Duration window) {
+        return jdbcClient.sql("""
+                select distinct t.id as task_id, t.title, tm.user_id
+                from ms_tasks t
+                join ms_task_statuses s on s.id = t.status_id and s.is_terminal = false
+                join ms_task_members tm on tm.task_id = t.id
+                where t.end_time is not null
+                  and t.end_time > now()
+                  and t.end_time <= now() + cast(:windowSeconds || ' seconds' as interval)
+                """)
+                .param("windowSeconds", window.toSeconds())
+                .query((rs, rowNum) -> new TaskDeadlineCandidate(
+                        rs.getLong("task_id"),
+                        rs.getString("title"),
+                        rs.getLong("user_id")
+                ))
+                .list();
+    }
 
     public record TaskUpdateData(
             Long projectId,

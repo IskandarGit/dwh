@@ -36,15 +36,12 @@ docker compose run --rm migrate
    timestamp/status, наличие зашифрованного artifact и совпадение его SHA-256 с
    sidecar в настроенном local/S3 target. Запишите эту проверку в release
    evidence до запуска миграции.
-3. Если данные сохранены в volume, но PostgreSQL container отсутствует, не
-   запускайте deploy: восстановите ожидаемую привязку container к volume в
-   оператор-контролируемой процедуре, подтвердите данные и только затем создайте
-   backup.
-
-Это обязательная компенсация известного ограничения текущих `deploy.ps1` и
-`deploy.sh`: scripts обнаруживают существующую БД только через
-`docker compose ... ps -a -q postgres`. Сохранённый volume без container они
-могут принять за initial deployment и пропустить backup.
+3. Убедитесь, что production Compose и storage volumes доступны.
+   `deploy.ps1` и `deploy.sh` автоматически проверяют как наличие активного
+   PostgreSQL container, так и именованного volume `postgres-data`. При
+   обнаружении существующих данных скрипт гарантированно запускает PostgreSQL
+   в изолированном режиме и создаёт обязательный pre-migration backup до запуска
+   Flyway.
 
 После успешного preflight используйте документированный fail-closed сценарий,
 а не запускайте Flyway вручную:
@@ -54,9 +51,9 @@ docker compose run --rm migrate
 ```
 
 Сценарий проверяет production Compose, получает образы выбранного release tag,
-повторно создаёт pre-migration backup, когда обнаруживает существующий
-PostgreSQL container, запускает зависимости, применяет миграции и только затем
-запускает сервер с readiness проверкой. Linux-оператор использует эквивалентный
+создаёт pre-migration backup при наличии существующего PostgreSQL container или
+volume, запускает зависимости, применяет миграции и только затем запускает
+сервер с readiness проверкой. Linux-оператор использует эквивалентный
 `scripts/prod/deploy.sh`, как описано в руководстве по развёртыванию.
 
 ## Правила авторинга

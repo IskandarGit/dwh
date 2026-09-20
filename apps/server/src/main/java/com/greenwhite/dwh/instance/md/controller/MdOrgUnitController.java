@@ -1,12 +1,15 @@
 package com.greenwhite.dwh.instance.md.controller;
 
 import com.greenwhite.dwh.instance.common.annotation.RequiresPermission;
+import com.greenwhite.dwh.instance.md.dto.MdOrgUnitDtos;
 import com.greenwhite.dwh.instance.md.pref.MdPref;
 import com.greenwhite.dwh.instance.md.repository.MdOrgUnitRepository;
 import com.greenwhite.dwh.instance.md.service.MdOrgUnitService;
 import com.greenwhite.dwh.instance.md.service.MdScopeService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -61,7 +64,7 @@ public class MdOrgUnitController {
     @PatchMapping("/{id}")
     @RequiresPermission(form = MdPref.FORM_ORG_UNITS, action = "update")
     public ResponseEntity<Void> update(@PathVariable("id") Long id, @RequestBody UpdateOrgUnitDto body) {
-        orgUnitService.update(id, body.parentId(), body.name(), body.kind(), body.state(), body.orderNo());
+        orgUnitService.update(id, body.parentIdPresent, body.parentId, body.name, body.kind, body.state, body.orderNo);
         return ResponseEntity.noContent().build();
     }
 
@@ -72,11 +75,26 @@ public class MdOrgUnitController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Явные назначения сотрудника и отдельная legacy-привязка. */
+    @GetMapping("/users/{userId}")
+    @RequiresPermission(form = MdPref.FORM_ORG_UNITS, action = "view")
+    public ResponseEntity<MdOrgUnitDtos.UserAssignments> getUserAssignments(
+            @PathVariable("userId") Long userId) {
+        return ResponseEntity.ok(scopeService.getUserAssignments(userId));
+    }
+
+    /** Явное правило роли; отсутствие строки у существующей роли означает ALL. */
+    @GetMapping("/roles/{roleId}/rule")
+    @RequiresPermission(form = MdPref.FORM_ORG_UNITS, action = "view")
+    public ResponseEntity<MdOrgUnitDtos.RoleRule> getRoleRule(@PathVariable("roleId") Long roleId) {
+        return ResponseEntity.ok(scopeService.getRoleScopeRule(roleId));
+    }
+
     /** Позиция сотрудника в дереве — полная замена набора узлов. */
     @PutMapping("/users/{userId}")
     @RequiresPermission(form = MdPref.FORM_ORG_UNITS, action = "assign")
     public ResponseEntity<Void> assignUser(@PathVariable("userId") Long userId,
-                                           @RequestBody AssignUnitsDto body) {
+                                           @Valid @RequestBody AssignUnitsDto body) {
         scopeService.assignUserOrgUnits(userId, body.orgUnitIds());
         return ResponseEntity.noContent().build();
     }
@@ -105,15 +123,28 @@ public class MdOrgUnitController {
             int orderNo
     ) {}
 
-    public record UpdateOrgUnitDto(
-            Long parentId,
-            String name,
-            String kind,
-            String state,
-            Integer orderNo
-    ) {}
+    public static class UpdateOrgUnitDto {
+        private boolean parentIdPresent;
+        private Long parentId;
+        private String name;
+        private String kind;
+        private String state;
+        private Integer orderNo;
 
-    public record AssignUnitsDto(List<Long> orgUnitIds) {}
+        public void setParentId(Long parentId) {
+            this.parentIdPresent = true;
+            this.parentId = parentId;
+        }
+
+        public void setName(String name) { this.name = name; }
+        public void setKind(String kind) { this.kind = kind; }
+        public void setState(String state) { this.state = state; }
+        public void setOrderNo(Integer orderNo) { this.orderNo = orderNo; }
+    }
+
+    public record AssignUnitsDto(
+            @NotNull List<@NotNull @Positive Long> orgUnitIds
+    ) {}
 
     public record ScopeRuleDto(@NotBlank String rule) {}
 }

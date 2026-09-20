@@ -48,4 +48,34 @@ public class KauthLoginAttemptRepository {
                 .query(Integer.class)
                 .single();
     }
+
+    public record LoginAttemptRecord(
+            Long id,
+            String login,
+            String ip,
+            boolean isSuccess,
+            String failureReason,
+            Instant attemptAt
+    ) {}
+
+    public java.util.List<LoginAttemptRecord> findRecentAttemptsForLogin(String login, int limit) {
+        return jdbcClient.sql("""
+                select id, login, host(ip) as ip, is_success, failure_reason, attempt_at
+                from kauth_login_attempts
+                where lower(login) = lower(:login)
+                order by attempt_at desc, id desc
+                limit :limit
+                """)
+                .param("login", login)
+                .param("limit", limit)
+                .query((rs, rowNum) -> new LoginAttemptRecord(
+                        rs.getLong("id"),
+                        rs.getString("login"),
+                        rs.getString("ip"),
+                        rs.getBoolean("is_success"),
+                        rs.getString("failure_reason"),
+                        rs.getTimestamp("attempt_at").toInstant()
+                ))
+                .list();
+    }
 }
