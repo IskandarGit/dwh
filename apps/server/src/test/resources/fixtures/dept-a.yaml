@@ -36,3 +36,24 @@ loads:
     period_from: 2026-02-01
     period_to: 2026-02-28
     format: v1
+# анкета по устройству налогового файла клиента А: над шапкой 3 строки заголовка, шапка в строке 4, итоговая строка; значения TEST
+formats:
+  - code: fmt.a.tax
+    name: Soliq tushumlari TEST
+    owner_org: Tashkilot A TEST
+    periodicity: month
+    sla_days: 15
+    file_kind: xlsx
+    match_columns_by: header
+    valid_from: 2026-01-01
+    sheets:
+      - sheet_name: Солиқ
+        header_row: 4
+        total_row_marker: Жами
+        columns:
+          - {name: "Т/р", field: row_no, type: integer, required: false}
+          - {name: "СТИР", field: object_key, type: object_key, required: true, key_mask: "^[0-9]{9}$", key_pad_length: 9, key_pad_max: 1}
+          - {name: "Корхона номи", field: org_name, type: text, required: true}
+          - {name: "Ҳудуд", field: region, type: ref_code, required: true, ref_book: region}
+          - {name: "Ҳисобланган солиқ (млн сўм)", field: tax_accrued, type: number, required: true, source_unit: u_test_a, base_unit: u_test_b}
+          - {name: "Тўланган солиқ (минг сўм)", field: tax_paid, type: number, required: false, source_unit: u_test_b, base_unit: u_test_b}

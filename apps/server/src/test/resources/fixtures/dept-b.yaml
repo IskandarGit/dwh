@@ -33,3 +33,40 @@ loads:
     period_from: 2026-04-01
     period_to: 2026-04-30
     format: "2.0"
+# анкеты по устройству реестра клиента Б: шапка в строке 1, ключ 14 или 9 цифр в одной колонке, коды справочников, даты, кириллица;
+# вторая — CSV по позициям; значения TEST
+formats:
+  - code: fmt.b.platform
+    name: Platforma bazasi TEST
+    owner_org: Muassasa B TEST
+    owner_contact: test@example.invalid
+    periodicity: quarter
+    sla_days: 30
+    file_kind: xlsx
+    match_columns_by: header
+    valid_from: 2026-03-01
+    sheets:
+      - sheet_name: База
+        header_row: 1
+        columns:
+          - {name: "ЖШШИР / СТИР", field: object_key, type: object_key, required: true, key_mask: "^([0-9]{14}|[0-9]{9})$"}
+          - {name: "Субъект номи", field: subject_name, type: text, required: true}
+          - {name: "Вилоят коди", field: region_code, type: ref_code, required: true, ref_book: ref.b.region}
+          - {name: "Фаолият тури", field: activity_code, type: ref_code, required: false, ref_book: ref.b.activity}
+          - {name: "Рўйхатга олинган сана", field: registered_on, type: date, required: true}
+          - {name: "Ҳажм", field: volume, type: number, required: false, source_unit: unit-b2, base_unit: unit.b1}
+  - code: fmt.b.csv
+    name: Qo'shimcha CSV TEST
+    owner_org: Muassasa B TEST
+    periodicity: adhoc
+    sla_days: 0
+    file_kind: csv
+    encoding: utf-8
+    delimiter: ";"
+    match_columns_by: position
+    valid_from: 2026-03-01
+    sheets:
+      - header_row: 1
+        columns:
+          - {file_position: 1, name: "Код субъекта", field: object_key, type: object_key, required: true, key_mask: "^[0-9]{9}$"}
+          - {file_position: 3, name: "Сумма", field: amount, type: integer, required: true, source_unit: unit_b3, base_unit: unit_b3}

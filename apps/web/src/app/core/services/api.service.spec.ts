@@ -102,4 +102,26 @@ describe('ApiService localized Problem Details', () => {
     });
     expect(toast.error).not.toHaveBeenCalled();
   });
+
+  it('passes field errors of problem+json to the caller', async () => {
+    const http = {
+      get: vi.fn(() => throwError(() => new HttpErrorResponse({
+        status: 422,
+        url: '/api/v1/test',
+        error: {
+          code: 'validation_failed',
+          detail: 'UPL_FORMAT_INVALID',
+          errors: [{ field: 'sheets[0].columns[1].keyMask', code: 'UPL_KEY_MASK_REQUIRED', message: 'x' }]
+        }
+      })))
+    } as unknown as HttpClient;
+    const service = new ApiService(http, { error: vi.fn() } as unknown as ToastService,
+      { translate: (key: string) => key } as I18nService);
+
+    await expect(firstValueFrom(service.get('/test', undefined, { notifyError: false }))).rejects.toMatchObject({
+      status: 422,
+      detail: 'UPL_FORMAT_INVALID',
+      errors: [{ field: 'sheets[0].columns[1].keyMask', code: 'UPL_KEY_MASK_REQUIRED', message: 'x' }]
+    });
+  });
 });

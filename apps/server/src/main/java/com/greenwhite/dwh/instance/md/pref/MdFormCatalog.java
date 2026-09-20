@@ -107,6 +107,12 @@ public final class MdFormCatalog {
         forms.put("audit.log", new FormMeta("audit", "Аудит и security-журнал", ordered(
                 "view", "Просмотр журналов")));
 
+        forms.put("upl.sources", new FormMeta("upl", "Manbalar va formatlar", ordered(
+                "view", "Ko'rish",
+                "create", "Yaratish",
+                "edit", "Tahrirlash",
+                "publish", "E'lon qilish")));
+
         forms.put("tasks.projects", new FormMeta("ms.task", "Проекты", ordered(
                 "view", "Просмотр проектов",
                 "create", "Создание проекта",
