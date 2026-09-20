@@ -173,3 +173,12 @@ dwh:
 logging:
   pattern:
     level: "%5p [traceparent=%X{traceparent}] [client=%X{client_code}]"
+
+# Основа fnd — вторая база pg-dwh (промпт 02 п.18, AC-36). Значений по умолчанию нет намеренно:
+# без переменных окружения старт красный, а без таймаута — красный даже при заданном url. Имена — как в local-up.cmd.
+app:
+  dwh:
+    url: ${APP_DWH_URL}
+    username: ${APP_DWH_USERNAME}
+    password: ${APP_DWH_PASSWORD}
+    connect-timeout: ${APP_DWH_CONNECT_TIMEOUT}
