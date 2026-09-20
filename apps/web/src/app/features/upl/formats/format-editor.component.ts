@@ -945,8 +945,8 @@ export class FormatEditorComponent implements RecordNavigationPage {
       column.refBookCode = null;
       cleared = true;
     }
+    this.errors.set([]);
     if (cleared) {
-      this.errors.set([]);
       this.toast.info(this.i18n.translate('upl.format.cleared'));
     }
   }

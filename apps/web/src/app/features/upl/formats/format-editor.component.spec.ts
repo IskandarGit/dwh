@@ -388,6 +388,36 @@ describe('FormatEditorComponent', () => {
     expect(one(fixture, 'upl-tab-error')).toBeNull();
   });
 
+  it('drops the error summary when a column type changes and nothing was filled', async () => {
+    const { fixture, component } = await createFixture({
+      saveError: {
+        status: 422,
+        code: 'validation_failed',
+        detail: 'UPL_FORMAT_INVALID',
+        errors: [{ field: 'sheets[0].columns[0].keyMask', code: 'UPL_KEY_MASK_REQUIRED', message: 'x' }]
+      }
+    });
+
+    addValidColumn(fixture);
+    click(one(fixture, 'upl-save'));
+    fixture.detectChanges();
+    expect(one(fixture, 'upl-errors-summary')).not.toBeNull();
+
+    const column = component.model.sheets[0].columns[0];
+    column.sourceUnit = null;
+    column.baseUnit = null;
+    column.keyMask = null;
+    column.keyPadLength = null;
+    column.keyPadMax = null;
+    column.refBookCode = null;
+    column.dataType = 'text';
+    component.onTypeChange(column);
+    fixture.detectChanges();
+
+    expect(one(fixture, 'upl-errors-summary')).toBeNull();
+    expect(one(fixture, 'upl-tab-error')).toBeNull();
+  });
+
   it('names the field in the error summary address', async () => {
     const { fixture } = await createFixture({
       saveError: {
