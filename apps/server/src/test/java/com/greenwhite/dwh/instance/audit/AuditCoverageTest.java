@@ -56,7 +56,12 @@ class AuditCoverageTest {
             "KauthApiTokenService",   // выдача и отзыв токена — тоже security_events
             "SearchService",          // индексация, производная от уже пожурналированных данных
             "SearchChangePublisher",  // производные ревизии; бизнес-мутацию журналирует владелец
-            "MsNotificationService"   // доставка оповещений, а не изменение данных
+            "MsNotificationService",  // доставка оповещений, а не изменение данных
+            // аудит — триггерами основы (fnd_audit_enable, V100): актор через app.user_id, строка audit_log на каждую I/U/D
+            "FndLoadService",
+            "FndUnitService",
+            "FndVersioning",
+            "UplSourceService"
     );
 
     @Test

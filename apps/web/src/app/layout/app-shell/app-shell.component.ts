@@ -1430,6 +1430,7 @@ export class AppShellComponent implements OnDestroy {
     }
 
     workspaceItems.push(
+      { id: 'upl-sources', route: '/upl/sources', labelKey: 'nav.upl_sources', icon: 'table_view', permission: () => this.canViewSources() },
       { id: 'files', route: '/files', labelKey: 'layout.app_shell.fayly', titleKey: 'files.faylovoe_hranilische', icon: 'folder_open', permission: () => this.canViewFiles() },
       { id: 'analytics', route: '/analytics', labelKey: 'layout.app_shell.analitika', titleKey: 'analytics.analitika_i_dashbordy', icon: 'insights', permission: () => this.canViewAnalytics() },
       { id: 'notifications', route: '/notifications', labelKey: 'nav.notifications', icon: 'notifications', permission: () => this.canViewNotifications(), badge: () => this.notifService.unreadCount() }
@@ -1987,6 +1988,10 @@ export class AppShellComponent implements OnDestroy {
 
   canViewCustomFields(): boolean {
     return this.permService.canView('md.custom_fields') || this.permService.canView('system.custom_fields') || this.permService.canView('md_custom_fields');
+  }
+
+  canViewSources(): boolean {
+    return this.permService.canView('upl.sources');
   }
 
   canViewFiles(): boolean {

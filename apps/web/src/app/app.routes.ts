@@ -4,6 +4,7 @@ import { AppShellComponent } from './layout/app-shell/app-shell.component';
 import { permissionGuard } from './core/services/permission.service';
 import { projectRecordMatcher, taskRecordMatcher, userRecordMatcher } from './core/services/search-target';
 import { recordNavigationGuard } from './core/guards/record-navigation.guard';
+import { uplFormatMatcher, uplSourceMatcher } from './features/upl/upl-routes';
 
 import { moduleActiveGuard } from './core/guards/module-active.guard';
 
@@ -86,6 +87,23 @@ export const routes: Routes = [
         path: 'announcements',
         canActivate: [permissionGuard('platform.announcements', 'update')],
         loadComponent: () => import('./features/announcements/announcements.component').then(m => m.AnnouncementsComponent)
+      },
+      {
+        path: 'upl/sources',
+        pathMatch: 'full',
+        canActivate: [permissionGuard('upl.sources', 'view')],
+        loadComponent: () => import('./features/upl/sources/sources-list.component').then(m => m.SourcesListComponent)
+      },
+      {
+        matcher: uplFormatMatcher,
+        canActivate: [permissionGuard('upl.sources', 'view')],
+        canDeactivate: [recordNavigationGuard],
+        loadComponent: () => import('./features/upl/formats/format-editor.component').then(m => m.FormatEditorComponent)
+      },
+      {
+        matcher: uplSourceMatcher,
+        canActivate: [permissionGuard('upl.sources', 'view')],
+        loadComponent: () => import('./features/upl/sources/source-card.component').then(m => m.SourceCardComponent)
       },
       {
         path: 'notes',
