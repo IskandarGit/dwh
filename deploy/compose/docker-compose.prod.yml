@@ -117,14 +117,14 @@ services:
       APP_DWH_USERNAME: ${DB_USER:?DB_USER is required}
       APP_DWH_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       APP_DWH_CONNECT_TIMEOUT: ${APP_DWH_CONNECT_TIMEOUT:-5s}
-      DWH_DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-smartupcms}
-      DWH_DB_USER: ${MIGRATE_DB_USER:-smartupcms_migrator}
-      DWH_DB_PASSWORD: ${MIGRATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
+      DWH_MIGRATE_SCOPE: dwh
       DWH_DATA_DB_URL: jdbc:postgresql://postgres:5432/${DWH_DB_NAME:-smartupcms_dwh}
       DWH_DATA_DB_USER: ${DB_USER:?DB_USER is required}
       DWH_DATA_DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-    # ADR-0001, two databases: MigrateMain applies db/migration and db/dwh first, then the regular migrate profile runs
-    # (DwhSchemaVersionGate checks pg-dwh on every Spring context start). All arguments are inline: nothing is lost in sh -c.
+    # ADR-0001, two databases: MigrateMain applies db/dwh only (DWH_MIGRATE_SCOPE=dwh), then the regular migrate profile
+    # applies db/migration as before (SPRING_FLYWAY_TARGET and other Flyway settings keep working).
+    # DwhSchemaVersionGate checks pg-dwh on every Spring context start (the migrate profile included),
+    # so db/dwh has to be applied before the first context start. All arguments are inline: nothing is lost in sh -c.
     entrypoint: ["sh", "-c"]
     command:
       - >-
