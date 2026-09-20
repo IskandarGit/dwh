@@ -93,7 +93,7 @@ async function openPalette(page: Page, query: string, category: Category | 'ALL'
   await page.keyboard.press('ControlOrMeta+k');
   const palette = page.getByRole('dialog', { name: 'Глобальный поиск', exact: true });
   await expect(palette).toBeVisible();
-  await palette.getByLabel('Категория поиска').selectOption(category);
+  await palette.locator('select#search-category').selectOption(category);
   await palette.locator('input[role="combobox"]').fill(query);
   return palette;
 }

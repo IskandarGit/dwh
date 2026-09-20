@@ -110,8 +110,12 @@ try {
         }
     }
 
-    $traffic = @(& docker logs $monitorName 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $traffic = @(& docker logs $monitorName 2>&1 | ForEach-Object { "$_" })
+    $logsExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
+    if ($logsExit -ne 0) {
         throw "Could not read the runtime traffic capture."
     }
 

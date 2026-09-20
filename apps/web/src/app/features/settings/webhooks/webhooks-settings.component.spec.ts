@@ -51,7 +51,7 @@ describe('WebhooksSettingsComponent', () => {
           state: 'A',
           createdAt: '2026-09-18T12:00:00Z',
           createdBy: 1,
-          secretToken: 'whsec_sample_mock_token_abcdef'
+          secretToken: 'whsec_test_secret_key_12345'
         };
         return of(created);
       }),

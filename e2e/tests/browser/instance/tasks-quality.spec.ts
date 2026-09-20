@@ -349,7 +349,7 @@ test('kanban keeps visible filters and the 390px page contains horizontal overfl
   await expect(page.getByRole('region', { name: 'Канбан-доска задач' })).toBeVisible();
   const filterGroup = page.getByRole('group', { name: 'Фильтр по статусу' });
   await expect(filterGroup.getByRole('button', { name: 'Активные' })).toBeVisible();
-  await expect(filterGroup.getByRole('button', { name: 'Все' })).toBeVisible();
+  await expect(filterGroup.getByRole('button', { name: 'Все', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Новая задача' })).toBeVisible();
 
   await expect.poll(async () => page.evaluate(() => ({

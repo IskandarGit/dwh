@@ -66,7 +66,8 @@ public class MdUserService {
         if (userRepository.existsByEmail(email)) {
             throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Пользователь с таким email уже существует");
         }
-        if (phone != null && !phone.isBlank() && userRepository.existsByPhone(phone)) {
+        String normalizedPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
+        if (normalizedPhone != null && userRepository.existsByPhone(normalizedPhone)) {
             throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Активный пользователь с таким номером телефона уже существует");
         }
 
@@ -83,7 +84,7 @@ public class MdUserService {
                 : null;
 
         var user = userRepository.create(new MdUserRepository.UserCreateData(
-                name, login, email, phone, passwordHash, MdPref.STATE_ACTIVE,
+                name, login, email, normalizedPhone, passwordHash, MdPref.STATE_ACTIVE,
                 managerId, language, timezone, avatarFileId, attributes, is2faEnabled, forcePasswordChange
         ), createdBy);
 
@@ -186,8 +187,9 @@ public class MdUserService {
         }
         var existingUser = getUserById(userId);
 
-        if (phone != null && !phone.isBlank() && !phone.equals(existingUser.phone())) {
-            if (userRepository.existsByPhone(phone)) {
+        String normalizedPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
+        if (normalizedPhone != null && !normalizedPhone.equals(existingUser.phone())) {
+            if (userRepository.existsByPhone(normalizedPhone)) {
                 throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Активный пользователь с таким номером телефона уже существует");
             }
         }
@@ -197,7 +199,7 @@ public class MdUserService {
         }
 
         userRepository.update(userId, new MdUserRepository.UserUpdateData(
-                name, phone, managerId, language, timezone, avatarFileId, attributes, is2faEnabled
+                name, normalizedPhone, managerId, language, timezone, avatarFileId, attributes, is2faEnabled
         ), modifiedBy);
 
         if (roleIds != null) {

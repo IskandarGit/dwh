@@ -853,6 +853,7 @@
   "tasks.export_filters_not_applied": "Current filters are not applied: the export is generated for all tasks available to you.",
   "tasks.ochistit_poisk_zadach": "Clear task search",
   "tasks.filtr_po_statusu": "Filter by status",
+  "tasks.bystrye_filtry": "Quick filters",
   "tasks.tolko_aktivnye_zadachi_bez_vypolnennyh_i_otmenen": "Only active tasks (no completed or cancelled)",
   "tasks.vse_zadachi_vklyuchaya_zavershennye": "All tasks, including completed ones",
   "tasks.sbrosit_vse_filtry": "Reset all filters",

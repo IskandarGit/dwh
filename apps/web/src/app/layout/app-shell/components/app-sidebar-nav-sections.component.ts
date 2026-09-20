@@ -127,7 +127,7 @@ import { NavSection } from '../app-shell.models';
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #64748b;
+      color: #94a3b8;
       flex: 1;
     }
 
@@ -142,7 +142,7 @@ import { NavSection } from '../app-shell.models';
 
     .section-chevron {
       font-size: 16px;
-      color: #64748b;
+      color: #94a3b8;
       transition: transform 0.2s ease;
       line-height: 1;
     }

@@ -853,6 +853,7 @@
   "tasks.export_filters_not_applied": "Текущие фильтры не применяются: экспорт формируется по всем задачам, доступным вам.",
   "tasks.ochistit_poisk_zadach": "Очистить поиск задач",
   "tasks.filtr_po_statusu": "Фильтр по статусу",
+  "tasks.bystrye_filtry": "Быстрые фильтры",
   "tasks.tolko_aktivnye_zadachi_bez_vypolnennyh_i_otmenen": "Только активные задачи (без выполненных и отмененных)",
   "tasks.vse_zadachi_vklyuchaya_zavershennye": "Все задачи, включая завершенные",
   "tasks.sbrosit_vse_filtry": "Сбросить все фильтры",
