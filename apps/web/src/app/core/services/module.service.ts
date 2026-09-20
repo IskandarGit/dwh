@@ -21,6 +21,9 @@ export interface InstalledModule {
 
 const SYSTEM_MODULES = new Set(['iam', 'tasks', 'files', 'audit', 'search']);
 
+/** Modules with a built-in, permission-gated nav item: they must not be duplicated in the custom "Modules" section. */
+const BUILT_IN_NAV_MODULES = new Set(['notes', 'upl']);
+
 @Injectable({ providedIn: 'root' })
 export class ModuleService {
   private readonly api = inject(ApiService);
@@ -91,7 +94,7 @@ export class ModuleService {
 
   getActiveCustomModules(): InstalledModule[] {
     return this.modules().filter(
-      m => !m.isSystem && m.isActive && m.route && m.code.toLowerCase() !== 'notes'
+      m => !m.isSystem && m.isActive && m.route && !BUILT_IN_NAV_MODULES.has(m.code.toLowerCase())
     );
   }
 
