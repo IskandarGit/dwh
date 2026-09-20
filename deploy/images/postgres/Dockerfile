@@ -12,4 +12,6 @@ USER root
 RUN apk upgrade --no-cache \
     && rm -f /usr/local/bin/gosu
 
+COPY --chmod=0755 init-roles.sh /docker-entrypoint-initdb.d/01-init-roles.sh
+
 USER postgres

@@ -1,0 +1,47 @@
+.skip-link {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 3000;
+      transform: translateY(-160%);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      box-shadow: var(--shadow-overlay);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .app-layout {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* Main Wrapper */
+    .main-wrapper {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background-color: var(--bg-app);
+    }
+
+    .page-content {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    @media (max-width: 767px) {
+      .page-content {
+        padding: 12px;
+        overflow-x: hidden;
+      }
+    }

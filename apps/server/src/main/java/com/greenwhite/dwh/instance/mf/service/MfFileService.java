@@ -28,43 +28,65 @@ public class MfFileService {
     private final List<FileScanner> fileScanners;
     private final MfFileObjectLock objectLock;
     private final MdScopeService scopeService;
+    private final java.util.concurrent.Semaphore uploadLimiter;
 
+    public static final int DEFAULT_MAX_CONCURRENT_UPLOADS = 10;
+
+    @org.springframework.beans.factory.annotation.Autowired
     public MfFileService(MfFileMetadataService metadataService, StorageProvider storageProvider,
                          FileContentInspector contentInspector,
                          List<FileScanner> fileScanners,
                          MfFileObjectLock objectLock,
-                         MdScopeService scopeService) {
+                         MdScopeService scopeService,
+                         @org.springframework.beans.factory.annotation.Value("${dwh.files.max-concurrent-uploads:10}") int maxConcurrentUploads) {
         this.metadataService = metadataService;
         this.storageProvider = storageProvider;
         this.contentInspector = contentInspector;
         this.fileScanners = List.copyOf(fileScanners);
         this.objectLock = objectLock;
         this.scopeService = scopeService;
+        int permits = maxConcurrentUploads > 0 ? maxConcurrentUploads : DEFAULT_MAX_CONCURRENT_UPLOADS;
+        this.uploadLimiter = new java.util.concurrent.Semaphore(permits);
+    }
+
+    public MfFileService(MfFileMetadataService metadataService, StorageProvider storageProvider,
+                         FileContentInspector contentInspector,
+                         List<FileScanner> fileScanners,
+                         MfFileObjectLock objectLock,
+                         MdScopeService scopeService) {
+        this(metadataService, storageProvider, contentInspector, fileScanners, objectLock, scopeService, DEFAULT_MAX_CONCURRENT_UPLOADS);
     }
 
     public MfFileRepository.FileRecord uploadFile(String originalName, String mimeType, InputStream contentStream, long sizeBytes, Long createdBy) {
-        if (sizeBytes > MAX_FILE_SIZE) {
-            throw ApiException.badRequest(ErrorCode.FILE_SIZE_EXCEEDED, "Размер файла превышает лимит 50 МБ");
+        if (!uploadLimiter.tryAcquire()) {
+            throw ApiException.rateLimited("Превышен лимит одновременных загрузок файлов; пожалуйста, повторите попытку позже");
         }
-
-        validateFileExtension(originalName);
-        FileContentInspector.Inspection inspection = contentInspector.inspect(mimeType, contentStream);
-        String verifiedMimeType = inspection.verifiedMimeType();
-
-        metadataService.validateQuotaSnapshot(createdBy, sizeBytes);
-
-        String tempKey = "temp_" + UUID.randomUUID();
-        StoredFileMetadata stored = storageProvider.upload(
-                DEFAULT_BUCKET, tempKey, inspection.content(), sizeBytes, verifiedMimeType);
-        RuntimeException uploadFailure = null;
         try {
-            return publishQuarantinedFile(
-                    originalName, createdBy, tempKey, stored, verifiedMimeType);
-        } catch (RuntimeException failure) {
-            uploadFailure = failure;
-            throw failure;
+            if (sizeBytes > MAX_FILE_SIZE) {
+                throw ApiException.badRequest(ErrorCode.FILE_SIZE_EXCEEDED, "Размер файла превышает лимит 50 МБ");
+            }
+
+            validateFileExtension(originalName);
+            FileContentInspector.Inspection inspection = contentInspector.inspect(mimeType, contentStream);
+            String verifiedMimeType = inspection.verifiedMimeType();
+
+            metadataService.validateQuotaSnapshot(createdBy, sizeBytes);
+
+            String tempKey = "temp_" + UUID.randomUUID();
+            StoredFileMetadata stored = storageProvider.upload(
+                    DEFAULT_BUCKET, tempKey, inspection.content(), sizeBytes, verifiedMimeType);
+            RuntimeException uploadFailure = null;
+            try {
+                return publishQuarantinedFile(
+                        originalName, createdBy, tempKey, stored, verifiedMimeType);
+            } catch (RuntimeException failure) {
+                uploadFailure = failure;
+                throw failure;
+            } finally {
+                deleteQuarantinedObject(tempKey, uploadFailure);
+            }
         } finally {
-            deleteQuarantinedObject(tempKey, uploadFailure);
+            uploadLimiter.release();
         }
     }
 

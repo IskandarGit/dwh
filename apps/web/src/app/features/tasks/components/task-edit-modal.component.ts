@@ -199,6 +199,28 @@ import { User } from '../../../core/models/auth.models';
           </div>
         </div>
 
+        <!-- Executors Searchable Multi-Select Tags Input -->
+        <div class="form-group">
+          <div class="label-row">
+            <span class="clean-label">{{ 'tasks.soispolniteli' | t }}</span>
+          </div>
+          <ui-user-multi-select
+            [users]="executorUsers"
+            [selectedUserIds]="editForm.executorUserIds"
+            [ariaLabel]="'tasks.soispolniteli' | t"
+            (selectedUserIdsChange)="editForm.executorUserIds = $event"
+            [placeholder]="'tasks.nazhmite_dlya_dobavleniya_soispolniteley' | t"
+            [searchPlaceholder]="'tasks.poisk_sotrudnika' | t"
+            [remoteSearch]="true"
+            [loading]="executorLookupLoading"
+            [loadError]="executorLookupError"
+            [hasMore]="executorLookupHasMore"
+            (searchChange)="executorSearch.emit($event)"
+            (loadMore)="executorLoadMore.emit()"
+            (retry)="executorRetry.emit()"
+          ></ui-user-multi-select>
+        </div>
+
         <!-- Observers Searchable Multi-Select Tags Input -->
         <div class="form-group">
           <div class="label-row">
@@ -381,6 +403,10 @@ export class TaskEditModalComponent {
   @Input() responsibleLookupLoading = false;
   @Input() responsibleLookupError = false;
   @Input() responsibleLookupHasMore = false;
+  @Input() executorUsers: User[] = [];
+  @Input() executorLookupLoading = false;
+  @Input() executorLookupError = false;
+  @Input() executorLookupHasMore = false;
   @Input() observerUsers: User[] = [];
   @Input() observerLookupLoading = false;
   @Input() observerLookupError = false;
@@ -400,6 +426,9 @@ export class TaskEditModalComponent {
   @Output() responsibleSearch = new EventEmitter<string>();
   @Output() responsibleLoadMore = new EventEmitter<void>();
   @Output() responsibleRetry = new EventEmitter<void>();
+  @Output() executorSearch = new EventEmitter<string>();
+  @Output() executorLoadMore = new EventEmitter<void>();
+  @Output() executorRetry = new EventEmitter<void>();
   @Output() observerSearch = new EventEmitter<string>();
   @Output() observerLoadMore = new EventEmitter<void>();
   @Output() observerRetry = new EventEmitter<void>();

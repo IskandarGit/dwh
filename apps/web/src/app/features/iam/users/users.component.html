@@ -1,0 +1,167 @@
+<div class="users-view">
+      <!-- Minimal Header -->
+      <div class="view-header">
+        <div class="header-left">
+          <h1 class="view-title">{{ 'nav.users' | t }}</h1>
+          <span class="count-badge">{{ users().length }}</span>
+        </div>
+        <div class="header-right">
+          <ui-button
+            variant="secondary"
+            size="md"
+            icon="file_download"
+            [title]="'iam.eksport_v_csv' | t"
+            (onClick)="exportToCsv()"
+          >
+            {{ 'analytics.eksport' | t }}
+          </ui-button>
+          <ui-button
+            *ngIf="canCreateUser()"
+            variant="primary"
+            size="md"
+            icon="add"
+            (onClick)="openCreateModal()"
+          >
+            {{ 'iam.novyy_polzovatel' | t }}
+          </ui-button>
+        </div>
+      </div>
+
+      <!-- Toolbar and Active Filters (Delegated Component) -->
+      <app-user-filter-bar
+        [searchQuery]="searchQuery"
+        [selectedState]="selectedState"
+        [isFilterMenuOpen]="isFilterMenuOpen()"
+        [hasExtraFilters]="hasExtraFilters()"
+        [roles]="roles()"
+        [selectedRoleId]="selectedRoleId"
+        [selected2fa]="selected2fa"
+        [isLoading]="isLoading()"
+        [hasAnyActiveFilters]="hasAnyActiveFilters()"
+        [selectedRoleName]="getSelectedRoleName()"
+        (searchQueryChange)="searchQuery = $event"
+        (searchInput)="onSearchInput()"
+        (clearSearch)="clearSearch()"
+        (stateFilterChange)="setStateFilter($event)"
+        (toggleFilterMenu)="toggleFilterMenu($event)"
+        (resetExtraFilters)="resetExtraFilters()"
+        (roleFilterChange)="selectedRoleId = $event; loadUsers(true)"
+        (twoFactorFilterChange)="selected2fa = $event; loadUsers(true)"
+        (refresh)="loadUsers(true)"
+        (clearStateFilter)="clearStateFilter()"
+        (clearRoleFilter)="clearRoleFilter()"
+        (clear2faFilter)="clear2faFilter()"
+        (resetAllFilters)="resetAllFilters()"
+      ></app-user-filter-bar>
+
+      <!-- Minimal Data Table (Delegated Component) -->
+      <app-user-table-view
+        [users]="users()"
+        [paginatedUsers]="paginatedUsers()"
+        [totalItems]="sortedUsers().length"
+        [sortColumn]="sortColumn"
+        [sortDirection]="sortDirection"
+        [isLoading]="isLoading()"
+        [hasMore]="hasMore()"
+        [isLoadingMore]="isLoadingMore()"
+        [currentPage]="currentPage"
+        [pageSize]="pageSize"
+        [canUpdateUser]="canUpdateUser()"
+        [canBlockUser]="canBlockUser()"
+        [canUnblockUser]="canUnblockUser()"
+        [canDeleteUser]="canDeleteUser()"
+        [getUserInitial]="getUserInitialFn"
+        [getAvatarBgColor]="getAvatarBgColorFn"
+        [getUserRoleNames]="getUserRoleNamesFn"
+        [getManagerName]="getManagerNameFn"
+        (sortChange)="changeSort($event)"
+        (viewUser)="openViewModal($event)"
+        (editUser)="openEditModal($event)"
+        (toggleState)="toggleUserState($event.user, $event.action)"
+        (deleteUser)="openDeleteConfirmModal($event)"
+        (loadMore)="loadMore()"
+        (pageChange)="currentPage = $event"
+        (pageSizeChange)="pageSize = $event; currentPage = 1"
+      ></app-user-table-view>
+    </div>
+
+    <!-- Create User Modal (Delegated Component) -->
+    <app-user-create-modal
+      [isOpen]="isCreateModalOpen()"
+      [isSubmitting]="isSubmitting()"
+      [isCreateSubmitted]="isCreateSubmitted"
+      [createForm]="createForm"
+      [users]="users()"
+      [roles]="roles()"
+      [languages]="i18n.languages()"
+      [customFields]="customFields()"
+      [showPassword]="showPassword()"
+      [passwordStrength]="passwordStrength()"
+      [hasMinLength]="hasMinLength()"
+      [hasUpperAndLower]="hasUpperAndLower()"
+      [hasDigitsOrSymbols]="hasDigitsOrSymbols()"
+      [doesNotContainLogin]="doesNotContainLogin()"
+      [isRoleSelected]="isRoleSelectedInCreateFn"
+      (close)="isCreateModalOpen.set(false)"
+      (submit)="submitCreateUser()"
+      (toggleShowPassword)="showPassword.update(v => !v)"
+      (generatePassword)="generateSecurePassword()"
+      (copyPassword)="copyGeneratedPassword()"
+      (toggleRole)="toggleRoleInCreate($event)"
+    ></app-user-create-modal>
+
+    <!-- Edit User Modal (Delegated Component) -->
+    <app-user-edit-modal
+      [isOpen]="isEditModalOpen()"
+      [isSubmitting]="isSubmitting()"
+      [isEditSubmitted]="isEditSubmitted"
+      [editingUser]="editingUser"
+      [editForm]="editForm"
+      [roles]="roles()"
+      [languages]="i18n.languages()"
+      [customFields]="customFields()"
+      [getAvailableManagers]="getAvailableManagersFn"
+      [isRoleSelected]="isRoleSelectedInEditFn"
+      (close)="closeEditModal()"
+      (submit)="submitEditUser()"
+      (toggleRole)="toggleRoleInEdit($event)"
+    ></app-user-edit-modal>
+
+    <!-- User Detail, Delete and Security Modals (Delegated Component) -->
+    <app-user-detail-modal
+      [isOpen]="isViewModalOpen()"
+      [viewingUser]="viewingUser"
+      [routeRecordId]="routeRecordId()"
+      [recordLoading]="recordLoading()"
+      [recordError]="recordError()"
+      [recordNotFound]="recordNotFound()"
+      [activeViewTab]="activeViewTab()"
+      [isLoadingSecurity]="isLoadingSecurity()"
+      [userSecurity]="userSecurity()"
+      [isSecurityActionPending]="isSecurityActionPending()"
+      [canUpdateUser]="canUpdateUser()"
+      [canViewOrgUnits]="canViewOrgUnits()"
+      [safeRecordId]="safeRecordId"
+      [getUserInitial]="getUserInitialFn"
+      [getAvatarBgColor]="getAvatarBgColorFn"
+      [getUserRoleNames]="getUserRoleNamesFn"
+      [getManagerName]="getManagerNameFn"
+      [isDeleteModalOpen]="isDeleteModalOpen()"
+      [deletingUser]="deletingUser"
+      [isSubmitting]="isSubmitting()"
+      [isSecConfirmModalOpen]="isSecConfirmModalOpen()"
+      [secConfirmConfig]="secConfirmConfig"
+      (closeRecordView)="closeRecordView()"
+      (retryRecordView)="loadRecordView($event)"
+      (switchTab)="switchViewTab($event.tab, $event.userId)"
+      (openEdit)="openEditFromView()"
+      (forcePasswordChange)="forcePasswordChange($event)"
+      (reset2fa)="resetUser2fa($event)"
+      (terminateAllSessions)="terminateUserSessions($event)"
+      (terminateSingleSession)="terminateSingleSession($event.sessionId, $event.userId)"
+      (orgPanelBusy)="orgPanelBusy.set($event)"
+      (closeDeleteModal)="isDeleteModalOpen.set(false)"
+      (confirmDelete)="confirmDeleteUser()"
+      (closeSecConfirmModal)="isSecConfirmModalOpen.set(false)"
+      (confirmSecurityAction)="confirmSecurityAction()"
+    ></app-user-detail-modal>

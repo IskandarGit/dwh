@@ -205,11 +205,20 @@ public class AuditLogRepository {
 
     public AuditStats getAuditStats() {
         long totalLogs = jdbcClient.sql("select count(*) from audit_log").query(Long.class).single();
-        long totalSecEvents = jdbcClient.sql("select count(*) from security_events").query(Long.class).single();
-        long secEvents24h = jdbcClient.sql("select count(*) from security_events where created_at >= now() - interval '24 hours'").query(Long.class).single();
-        long failedLogins24h = jdbcClient.sql("select count(*) from security_events where event_type in ('LOGIN_FAILED', 'LOGIN_LOCKED', 'IP_RATE_LIMITED') and created_at >= now() - interval '24 hours'").query(Long.class).single();
+        var secStats = jdbcClient.sql("""
+                select
+                    count(*) as total_sec,
+                    count(*) filter (where created_at >= now() - interval '24 hours') as sec_24h,
+                    count(*) filter (where event_type in ('LOGIN_FAILED', 'LOGIN_LOCKED', 'IP_RATE_LIMITED')
+                                      and created_at >= now() - interval '24 hours') as failed_24h
+                from security_events
+                """).query((rs, rowNum) -> new long[] {
+                    rs.getLong("total_sec"),
+                    rs.getLong("sec_24h"),
+                    rs.getLong("failed_24h")
+                }).single();
 
-        return new AuditStats(totalLogs, totalSecEvents, secEvents24h, failedLogins24h);
+        return new AuditStats(totalLogs, secStats[0], secStats[1], secStats[2], Instant.now());
     }
 
     private AuditRecord mapAuditRecord(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
@@ -284,7 +293,12 @@ public class AuditLogRepository {
             long totalAuditLogs,
             long totalSecurityEvents,
             long securityEventsLast24h,
-            long failedLoginsLast24h
-    ) {}
+            long failedLoginsLast24h,
+            Instant computedAt
+    ) {
+        public AuditStats(long totalAuditLogs, long totalSecurityEvents, long securityEventsLast24h, long failedLoginsLast24h) {
+            this(totalAuditLogs, totalSecurityEvents, securityEventsLast24h, failedLoginsLast24h, Instant.now());
+        }
+    }
 }
 

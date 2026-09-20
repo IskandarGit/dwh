@@ -27,9 +27,9 @@ public class SearchFallbackRepository {
     public FallbackSearch search(String query, List<String> variants, String entityType, int limit) {
         List<String> activeVariants = (variants == null || variants.isEmpty()) ? List.of(query) : variants;
         String[] patterns = activeVariants.stream()
-                .map(v -> "%" + v.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%")
+                .map(v -> "%" + v.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
                 .toArray(String[]::new);
-        String primaryPattern = "%" + query.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        String primaryPattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
 
         List<FallbackGroup> groups = new ArrayList<>();
         for (String type : requestedTypes(entityType)) {

@@ -5,6 +5,8 @@ import com.greenwhite.dwh.instance.audit.service.AuditLogService;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.md.repository.NavigationItemRepository;
 import com.greenwhite.dwh.instance.md.repository.NavigationItemRepository.NavigationItemRecord;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,11 +102,13 @@ public class NavigationItemService {
     ) {}
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "navigationItems", key = "'all'")
     public List<NavigationItemView> getAllItems() {
         return navigationRepository.findAll().stream().map(NavigationItemView::from).toList();
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "navigationItems", key = "'active'")
     public List<NavigationItemView> getActiveItems() {
         return navigationRepository.findActive().stream().map(NavigationItemView::from).toList();
     }
@@ -120,6 +124,7 @@ public class NavigationItemService {
     }
 
     @Transactional
+    @CacheEvict(value = "navigationItems", allEntries = true)
     public NavigationItemView createItem(CreateNavigationItemCommand cmd, Long userId) {
         validateUrl(cmd.url());
         String code = cmd.code().trim().toLowerCase().replaceAll("[^a-z0-9_-]", "-");
@@ -165,6 +170,7 @@ public class NavigationItemService {
     }
 
     @Transactional
+    @CacheEvict(value = "navigationItems", allEntries = true)
     public NavigationItemView updateItem(Long id, UpdateNavigationItemCommand cmd, Long userId) {
         NavigationItemRecord existing = navigationRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Пункт навигации не найден: " + id));
@@ -211,6 +217,7 @@ public class NavigationItemService {
     }
 
     @Transactional
+    @CacheEvict(value = "navigationItems", allEntries = true)
     public NavigationItemView toggleState(Long id, Long userId) {
         NavigationItemRecord existing = navigationRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Пункт навигации не найден: " + id));
@@ -231,6 +238,7 @@ public class NavigationItemService {
     }
 
     @Transactional
+    @CacheEvict(value = "navigationItems", allEntries = true)
     public void deleteItem(Long id, Long userId) {
         NavigationItemRecord existing = navigationRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Пункт навигации не найден: " + id));

@@ -9,6 +9,7 @@ import { UiFileUploadComponent } from '../../../shared/ui/ui-file-upload.compone
 import { CustomField } from '../../../core/models/custom-field.models';
 import { Task, Project, TaskStatus, TaskType, TaskMember, TaskComment, TaskFile } from '../../../core/models/task.models';
 import { safeNumericRecordId } from '../../../core/services/search-target';
+import { groupMembersByRole, GroupedTaskMembers } from '../tasks.models';
 
 @Component({
   selector: 'app-task-detail-modal',
@@ -250,13 +251,79 @@ import { safeNumericRecordId } from '../../../core/services/search-target';
             <!-- Members Card -->
             <div class="side-card" *ngIf="taskMembers.length > 0">
               <h5 class="side-card-title">{{ 'tasks.uchastniki' | t }}</h5>
-              <div class="members-stack">
-                <div *ngFor="let m of taskMembers" class="member-stack-item">
-                  <span class="member-role-badge" [attr.data-role]="m.involveKind || m.involvementKind">
-                    {{ getInvolveKindLabel(m.involveKind || m.involvementKind) }}
-                  </span>
-                  <span class="member-name">{{ m.userName }}</span>
-                  <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+
+              <!-- Responsible (R) -->
+              <div class="member-role-group" *ngIf="groupedMembers.responsible as resp">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">person</span>
+                  <span>{{ 'task.responsible' | t }}</span>
+                </div>
+                <div class="member-stack-item member-highlighted">
+                  <span class="avatar-mini">{{ getInitials(resp.userName) }}</span>
+                  <div class="member-info">
+                    <span class="member-name">{{ resp.userName }}</span>
+                    <span class="member-login text-muted">&#64;{{ resp.userLogin }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Executors (E) -->
+              <div class="member-role-group" *ngIf="groupedMembers.executors.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">group</span>
+                  <span>{{ 'tasks.soispolniteli' | t }} ({{ groupedMembers.executors.length }})</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.executors" class="member-stack-item">
+                    <span class="avatar-mini avatar-executor">{{ getInitials(m.userName) }}</span>
+                    <div class="member-info">
+                      <span class="member-name">{{ m.userName }}</span>
+                      <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Observers (O) -->
+              <div class="member-role-group" *ngIf="groupedMembers.observers.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">visibility</span>
+                  <span>{{ 'tasks.nablyudateli' | t }} ({{ groupedMembers.observers.length }})</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.observers" class="member-stack-item member-observer">
+                    <span class="avatar-mini avatar-observer">{{ getInitials(m.userName) }}</span>
+                    <div class="member-info">
+                      <span class="member-name">{{ m.userName }}</span>
+                      <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Author (A) -->
+              <div class="member-role-group member-author-group" *ngIf="groupedMembers.author as auth">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">edit_note</span>
+                  <span>{{ 'tasks.avtor' | t }}</span>
+                </div>
+                <div class="member-stack-item member-author">
+                  <span class="member-name">{{ auth.userName }}</span>
+                  <span class="member-login text-muted">&#64;{{ auth.userLogin }}</span>
+                </div>
+              </div>
+
+              <!-- Others (if any) -->
+              <div class="member-role-group" *ngIf="groupedMembers.others.length > 0">
+                <div class="member-role-title">
+                  <span class="member-role-icon material-symbols-outlined">person_outline</span>
+                  <span>{{ 'tasks.uchastnik' | t }}</span>
+                </div>
+                <div class="members-stack">
+                  <div *ngFor="let m of groupedMembers.others" class="member-stack-item">
+                    <span class="member-name">{{ m.userName }}</span>
+                    <span class="member-login text-muted">&#64;{{ m.userLogin }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -290,255 +357,7 @@ import { safeNumericRecordId } from '../../../core/services/search-target';
       </div>
     </ui-modal>
   `,
-  styles: [`
-    .task-details-view { display: flex; flex-direction: column; gap: 14px; }
-    .ancestor-trail {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      font-size: 11px;
-      background-color: var(--bg-hover);
-      padding: 5px 10px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-color);
-    }
-    .trail-label { color: var(--text-muted); font-weight: 500; }
-    .anc-link {
-      border: 0;
-      background: transparent;
-      color: var(--primary);
-      cursor: pointer;
-      font: inherit;
-      padding: 0;
-      text-decoration: underline;
-    }
-    .anc-sep { color: var(--text-muted); }
-    .anc-current { font-weight: 600; color: var(--text-main); }
-    .overdue-banner {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      background-color: var(--danger-bg);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: var(--radius-sm);
-      color: var(--danger);
-      font-size: 12px;
-      font-weight: 500;
-    }
-    .overdue-banner .material-symbols-outlined { font-size: 18px; }
-    .details-2col-layout {
-      display: grid;
-      grid-template-columns: 1fr 280px;
-      gap: 16px;
-      align-items: start;
-    }
-    @media (max-width: 768px) {
-      .details-2col-layout { grid-template-columns: 1fr; }
-    }
-    .details-main-col { display: flex; flex-direction: column; gap: 16px; }
-    .detail-main-title { font-size: 18px; font-weight: 600; margin: 0; color: var(--text-main); line-height: 1.35; }
-    .detail-section { display: flex; flex-direction: column; gap: 6px; }
-    .section-header-between { display: flex; align-items: center; justify-content: space-between; }
-    .section-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin: 0; }
-    .description-card {
-      background-color: var(--bg-hover);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 10px 12px;
-    }
-    .empty-desc { font-style: italic; }
-    .add-subtask-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      border: 1px solid var(--border-color);
-      background-color: var(--bg-hover);
-      color: var(--primary);
-      padding: 2px 8px;
-      border-radius: var(--radius-xs);
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .add-subtask-btn .material-symbols-outlined { font-size: 14px; }
-    .add-subtask-btn:hover { border-color: var(--primary); }
-    .subtasks-list { display: flex; flex-direction: column; gap: 4px; }
-    .subtask-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      background-color: var(--bg-hover);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-xs);
-      cursor: pointer;
-      font-size: 12px;
-      font-family: inherit;
-      color: inherit;
-      text-align: left;
-      width: 100%;
-      transition: background 0.1s ease;
-    }
-    .subtask-row:hover { border-color: var(--primary); }
-    .subtask-title { flex: 1; font-weight: 500; }
-    .inline-status-badge { font-size: 11px; font-weight: 500; }
-    .status-label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-main); }
-    .no-subtasks-hint { font-size: 12px; font-style: italic; padding: 4px 0; }
-    .comments-section { border-top: 1px solid var(--border-color); padding-top: 12px; }
-    .comments-feed {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .comment-card {
-      background-color: var(--bg-hover);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .comment-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
-    .comment-author-badge { display: flex; align-items: center; gap: 5px; }
-    .avatar-mini {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background-color: var(--primary);
-      color: #fff;
-      font-size: 9px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .comment-author { font-weight: 600; color: var(--text-main); }
-    .comment-time { color: var(--text-muted); font-size: 10px; }
-    .comment-text { font-size: 12px; color: var(--text-main); }
-    .add-comment-box {
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-      margin-top: 6px;
-    }
-    .comment-textarea {
-      flex: 1;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      background-color: var(--bg-surface);
-      color: var(--text-main);
-      padding: 6px 8px;
-      font-size: 12px;
-      font-family: inherit;
-      outline: none;
-      resize: vertical;
-    }
-    .details-side-col { display: flex; flex-direction: column; gap: 12px; }
-    .side-card {
-      background-color: var(--bg-hover);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .side-card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin: 0; }
-    .side-prop-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
-    .prop-k { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
-    .prop-v { font-weight: 500; text-align: right; word-break: break-all; }
-    .members-stack { display: flex; flex-direction: column; gap: 4px; }
-    .member-stack-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      background-color: var(--bg-surface);
-      padding: 3px 6px;
-      border-radius: 3px;
-      border: 1px solid var(--border-color);
-    }
-    .member-role-badge {
-      font-size: 9px;
-      font-weight: 600;
-      padding: 1px 4px;
-      border-radius: 3px;
-      background-color: rgba(99,102,241,0.15);
-      color: var(--primary);
-    }
-    .member-role-badge[data-role="R"] { background-color: var(--warning-bg); color: var(--warning); }
-    .member-role-badge[data-role="O"] { background-color: rgba(14,165,233,0.15); color: #0284c7; }
-    .member-role-badge[data-role="A"] { background-color: rgba(16,185,129,0.15); color: var(--success); }
-    .attributes-stack { display: flex; flex-direction: column; gap: 4px; }
-    .attr-stack-item { display: flex; justify-content: space-between; font-size: 11px; }
-    .side-edit-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      height: 32px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-color);
-      background-color: var(--bg-surface);
-      color: var(--text-main);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .side-edit-btn:hover { border-color: var(--primary); color: var(--primary); }
-    .side-edit-btn .material-symbols-outlined { font-size: 16px; }
-    .font-mono { font-family: ui-monospace, monospace; }
-    .text-muted { color: var(--text-muted); }
-    .text-danger { color: var(--danger); }
-    .text-xs { font-size: 11px; }
-    .tabular-nums { font-variant-numeric: tabular-nums; }
-    .clean-select {
-      height: 26px;
-      padding: 1px 6px;
-      font-size: 11px;
-      font-weight: 500;
-      border-radius: 10px;
-      border: 1px solid var(--border-color);
-      background-color: var(--bg-surface);
-      color: var(--text-main);
-      cursor: pointer;
-      outline: none;
-    }
-    .clean-select:focus { border-color: var(--primary); }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .task-type-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 1px 6px;
-      border-radius: 4px;
-    }
-    .task-type-badge .type-icon { font-size: 13px; }
-    .priority-pill {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 7px;
-      border-radius: 10px;
-      display: inline-block;
-    }
-    .priority-pill[data-priority="critical"] { background-color: var(--danger-bg); color: var(--danger); }
-    .priority-pill[data-priority="high"] { background-color: var(--warning-bg); color: var(--warning); }
-    .priority-pill[data-priority="medium"] { background-color: var(--bg-hover); color: var(--text-muted); }
-    .priority-pill[data-priority="low"] { background-color: var(--bg-hover); color: var(--text-light); }
-  `]
+  styleUrl: './task-detail-modal.component.css'
 })
 export class TaskDetailModalComponent {
   readonly safeRecordId = safeNumericRecordId;
@@ -590,6 +409,10 @@ export class TaskDetailModalComponent {
   @Output() submitComment = new EventEmitter<void>();
 
   constructor(private readonly i18n: I18nService) {}
+
+  get groupedMembers(): GroupedTaskMembers {
+    return groupMembersByRole(this.taskMembers);
+  }
 
   getInvolveKindLabel(kind: string | undefined): string {
     switch (kind) {

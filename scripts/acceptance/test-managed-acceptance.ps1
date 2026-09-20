@@ -132,7 +132,8 @@ if (Test-Path -LiteralPath $releaseVerifierPath -PathType Leaf) {
 
 foreach ($script in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -Recurse -Filter '*.ps1') {
     try {
-        [scriptblock]::Create((Get-Content -LiteralPath $script.FullName -Raw)) | Out-Null
+        $scriptContent = [System.IO.File]::ReadAllText($script.FullName, [System.Text.Encoding]::UTF8)
+        [scriptblock]::Create($scriptContent) | Out-Null
     }
     catch {
         Add-ContractError "PowerShell syntax error in $($script.FullName): $($_.Exception.Message)"

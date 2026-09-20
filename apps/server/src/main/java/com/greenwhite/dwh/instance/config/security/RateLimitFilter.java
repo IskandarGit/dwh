@@ -2,6 +2,7 @@ package com.greenwhite.dwh.instance.config.security;
 
 import com.greenwhite.dwh.core.error.ErrorCode;
 import com.greenwhite.dwh.instance.audit.service.AuditLogService;
+import com.greenwhite.dwh.instance.common.security.ClientIpResolver;
 import com.greenwhite.dwh.instance.common.security.SecurityContext;
 import com.greenwhite.dwh.instance.search.service.SearchPolicyProvider;
 import com.greenwhite.dwh.instance.search.service.SearchRateBudget;
@@ -37,15 +38,31 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final SearchPolicyProvider searchPolicyProvider;
     private final AuditLogService auditLogService;
     private final ProblemDetailAuthHandlers problemWriter;
+    private final ClientIpResolver clientIpResolver;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
-    private com.greenwhite.dwh.instance.search.service.SearchMetrics searchMetrics=com.greenwhite.dwh.instance.search.service.SearchMetrics.unmetered();
+    private com.greenwhite.dwh.instance.search.service.SearchMetrics searchMetrics = com.greenwhite.dwh.instance.search.service.SearchMetrics.unmetered();
 
     @org.springframework.beans.factory.annotation.Autowired
-    public RateLimitFilter(RateLimitProperties props,RateLimitService service,SearchPolicyProvider policies,
-                           AuditLogService audit,ProblemDetailAuthHandlers problems,
+    public RateLimitFilter(RateLimitProperties props, RateLimitService service, SearchPolicyProvider policies,
+                           AuditLogService audit, ProblemDetailAuthHandlers problems,
+                           ClientIpResolver clientIpResolver,
                            java.util.Optional<com.greenwhite.dwh.instance.search.service.SearchMetrics> metrics) {
-        this(props,service,policies,audit,problems);
-        searchMetrics=metrics.orElseGet(com.greenwhite.dwh.instance.search.service.SearchMetrics::unmetered);
+        this(props, service, policies, audit, problems, clientIpResolver);
+        this.searchMetrics = metrics.orElseGet(com.greenwhite.dwh.instance.search.service.SearchMetrics::unmetered);
+    }
+
+    public RateLimitFilter(RateLimitProperties props,
+                           RateLimitService rateLimitService,
+                           SearchPolicyProvider searchPolicyProvider,
+                           AuditLogService auditLogService,
+                           ProblemDetailAuthHandlers problemWriter,
+                           ClientIpResolver clientIpResolver) {
+        this.props = props;
+        this.rateLimitService = rateLimitService;
+        this.searchPolicyProvider = searchPolicyProvider;
+        this.auditLogService = auditLogService;
+        this.problemWriter = problemWriter;
+        this.clientIpResolver = clientIpResolver != null ? clientIpResolver : new ClientIpResolver(null);
     }
 
     public RateLimitFilter(RateLimitProperties props,
@@ -53,11 +70,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                            SearchPolicyProvider searchPolicyProvider,
                            AuditLogService auditLogService,
                            ProblemDetailAuthHandlers problemWriter) {
-        this.props = props;
-        this.rateLimitService = rateLimitService;
-        this.searchPolicyProvider = searchPolicyProvider;
-        this.auditLogService = auditLogService;
-        this.problemWriter = problemWriter;
+        this(props, rateLimitService, searchPolicyProvider, auditLogService, problemWriter, new ClientIpResolver(null));
     }
 
     @Override
@@ -159,12 +172,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        // За обратным прокси (фаза P) сюда придёт заголовок от доверенного LB;
-        // до этого используем адрес соединения.
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return clientIpResolver.resolveClientIp(request);
     }
 }

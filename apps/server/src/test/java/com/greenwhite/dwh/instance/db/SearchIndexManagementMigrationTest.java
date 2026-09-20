@@ -144,7 +144,7 @@ class SearchIndexManagementMigrationTest {
     }
 
     private static List<String> snapshot(JdbcClient jdbc, String table) {
-        return jdbc.sql("select to_jsonb(t)::text from " + table + " t order by id")
+        return jdbc.sql("select (to_jsonb(t) - 'revision')::text from " + table + " t order by id")
                 .query(String.class).list();
     }
 }

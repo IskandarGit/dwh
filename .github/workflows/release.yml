@@ -73,6 +73,7 @@ jobs:
           ./scripts/release/verify-release.ps1
           ./scripts/prod/test-release-config.ps1
           ./scripts/prod/test-backup-status.ps1
+          ./scripts/security/test-secret-scan.ps1
           ./scripts/acceptance/test-managed-acceptance.ps1
 
   build:
@@ -151,6 +152,16 @@ jobs:
             org.opencontainers.image.licenses=Apache-2.0
           provenance: mode=max
           sbom: true
+
+      - name: Scan published image digest with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          version: v0.70.0
+          scan-type: image
+          image-ref: ${{ steps.reference.outputs.image_ref }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
 
       - name: Create GitHub provenance attestation
         id: attest
@@ -257,6 +268,7 @@ jobs:
           cp scripts/prod/deploy.sh scripts/prod/backup.sh scripts/prod/restore.sh \
             scripts/prod/deploy.ps1 scripts/prod/backup.ps1 scripts/prod/restore.ps1 \
             scripts/prod/backup-objects.ps1 scripts/prod/restore-combined.ps1 \
+            scripts/prod/rollback.sh scripts/prod/rollback.ps1 scripts/prod/test-recovery.ps1 \
             "dist/${bundle}/scripts/prod/"
           cp scripts/acceptance/invoke-managed-preflight.ps1 \
             scripts/acceptance/invoke-managed-host-check.ps1 \
@@ -264,7 +276,7 @@ jobs:
             scripts/acceptance/run-failure-scenario.ps1 \
             "dist/${bundle}/scripts/acceptance/"
           cp scripts/acceptance/load/*.js "dist/${bundle}/scripts/acceptance/load/"
-          cp scripts/release/verify-published-release.ps1 "dist/${bundle}/scripts/release/"
+          cp scripts/release/verify-published-release.ps1 scripts/release/test-release-gates.ps1 "dist/${bundle}/scripts/release/"
           cp deploy/acceptance/.env.managed.example \
             deploy/acceptance/runtime-metrics.example.json \
             "dist/${bundle}/deploy/acceptance/"

@@ -112,6 +112,44 @@ class IdempotencyFilterIntegrationTest {
         }
     }
 
+    @Test
+    @DisplayName("expired pending reservation is reclaimed and business operation executes")
+    void reclaimsExpiredPendingReservation() throws Exception {
+        UUID key = UUID.randomUUID();
+        // Insert an expired PENDING reservation (e.g. from crashed server 5 minutes ago)
+        jdbc.sql("""
+                insert into idempotency_keys
+                    (key, user_id, request_hash, state, reservation_token, created_at)
+                values
+                    (:key, null, 'oldhash', 'PENDING', :token, now() - interval '5 minutes')
+                """)
+                .param("key", key)
+                .param("token", UUID.randomUUID())
+                .update();
+
+        AtomicInteger executions = new AtomicInteger();
+        FilterChain businessOperation = (request, response) -> {
+            executions.incrementAndGet();
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            httpResponse.setStatus(HttpServletResponse.SC_CREATED);
+            httpResponse.setContentType("application/json");
+            httpResponse.getOutputStream().write("{\"reclaimed\":true}".getBytes(StandardCharsets.UTF_8));
+        };
+
+        MockHttpServletResponse response = invoke(key, businessOperation);
+
+        assertThat(executions.get()).isEqualTo(1);
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_CREATED);
+        assertThat(response.getContentAsString()).contains("\"reclaimed\":true");
+
+        // Verify key is now COMPLETED
+        var record = jdbc.sql("select state from idempotency_keys where key = :key")
+                .param("key", key)
+                .query((rs, rowNum) -> rs.getString("state"))
+                .single();
+        assertThat(record).isEqualTo("COMPLETED");
+    }
+
     private static MockHttpServletResponse invoke(UUID key, FilterChain chain) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/tasks/items");
         request.addHeader(IdempotencyFilter.HEADER_IDEMPOTENCY_KEY, key.toString());

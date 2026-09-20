@@ -15,6 +15,9 @@ $restoreShPath = Join-Path $PSScriptRoot 'restore.sh'
 $restorePsPath = Join-Path $PSScriptRoot 'restore.ps1'
 $backupObjectsPsPath = Join-Path $PSScriptRoot 'backup-objects.ps1'
 $restoreCombinedPsPath = Join-Path $PSScriptRoot 'restore-combined.ps1'
+$rollbackShPath = Join-Path $PSScriptRoot 'rollback.sh'
+$rollbackPsPath = Join-Path $PSScriptRoot 'rollback.ps1'
+$testRecoveryPsPath = Join-Path $PSScriptRoot 'test-recovery.ps1'
 
 function Assert-Matches([string]$Text, [string]$Pattern, [string]$Message) {
     if ($Text -notmatch $Pattern) { throw $Message }
@@ -41,6 +44,10 @@ Assert-DoesNotMatch $composeSource 'control-plane|web-cp|db-cp|migrate-cp|smartu
 Assert-Matches $composeSource 'internal:\s*true' 'The database network must be internal.'
 Assert-Matches $composeSource 'backup-status:/var/lib/smartupcms/backup:ro' 'The server must receive backup status read-only.'
 Assert-Matches $composeSource '/tmp:rw,nosuid,nodev,noexec' 'The generic server temporary directory must remain noexec.'
+Assert-Matches $composeSource '/tmp:rw,nosuid,nodev,noexec,size=1024m' 'The generic server temporary directory must be size-bounded.'
+Assert-Matches $composeSource 'resources:\s*limits:\s*cpus:\s*"2\.0"\s*memory:\s*1536M' 'The server common template must enforce 2 CPU and 1536M hard limit.'
+Assert-Matches $composeSource 'postgres:[\s\S]*resources:\s*limits:\s*cpus:\s*"2\.0"\s*memory:\s*1024M' 'PostgreSQL must enforce 2 CPU and 1024M hard limit.'
+Assert-Matches $composeSource 'clamav:[\s\S]*resources:\s*limits:\s*cpus:\s*"1\.0"\s*memory:\s*1536M' 'ClamAV must enforce 1 CPU and 1536M hard limit.'
 Assert-Matches $composeSource '/opt/smartupcms/jna:rw,nosuid,nodev,exec,size=16m,uid=10001,gid=10001,mode=0700' 'Argon2/JNA must have a private executable tmpfs owned by the non-root server user.'
 Assert-Matches $composeSource '/var/lib/nginx/tmp:rw,nosuid,nodev,noexec,uid=10001,gid=10001,mode=0700' 'NGINX temporary files must use a private non-executable tmpfs owned by the web user.'
 Assert-Matches $composeSource '/run/nginx:rw,nosuid,nodev,noexec,uid=10001,gid=10001,mode=0750' 'NGINX PID files must use a private non-executable tmpfs owned by the web user.'
@@ -65,7 +72,10 @@ Assert-Matches $restoreSh 'sha256sum' 'Bash restore must verify the encrypted ar
 Assert-Matches $restorePs 'Get-FileHash' 'PowerShell restore must verify the encrypted artifact checksum.'
 
 foreach ($scriptPath in @($deployPsPath, (Join-Path $PSScriptRoot 'backup.ps1'), $restorePsPath,
-        $backupObjectsPsPath, $restoreCombinedPsPath, (Join-Path $PSScriptRoot 'test-backup-status.ps1'))) {
+        $backupObjectsPsPath, $restoreCombinedPsPath, $rollbackPsPath, $testRecoveryPsPath,
+        (Join-Path $PSScriptRoot 'test-backup-status.ps1'),
+        (Join-Path $repoRoot 'scripts/release/test-release-gates.ps1'),
+        (Join-Path $repoRoot 'scripts/security/test-secret-scan.ps1'))) {
     [scriptblock]::Create((Get-Content -LiteralPath $scriptPath -Raw)) | Out-Null
 }
 
@@ -150,7 +160,7 @@ Assert-Matches ($nginxConfigOutput -join [Environment]::NewLine) `
 $bashSyntaxCheck = @'
 set -eu
 mkdir -p /tmp/release-scripts /tmp/backup-scripts
-for script in deploy.sh backup.sh restore.sh test-deploy-fail-closed.sh; do
+for script in deploy.sh backup.sh restore.sh rollback.sh test-deploy-fail-closed.sh; do
     sed 's/\r$//' "/release/$script" > "/tmp/release-scripts/$script"
 done
 for script in write-status.sh backup-loop.sh bootstrap-role.sh; do

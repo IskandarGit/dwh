@@ -76,6 +76,6 @@ class AuthenticationGenerationMigrationTest {
     }
 
     private static List<String> snapshot(JdbcClient jdbc, String table) {
-        return jdbc.sql("select (to_jsonb(t) - 'auth_version')::text from " + table + " t order by id").query(String.class).list();
+        return jdbc.sql("select (to_jsonb(t) - 'auth_version' - 'revision')::text from " + table + " t order by id").query(String.class).list();
     }
 }

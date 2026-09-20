@@ -113,7 +113,7 @@ describe('CustomFieldsComponent', () => {
 
     const region = fixture.nativeElement.querySelector('.table-wrapper[role="region"]') as HTMLElement;
     expect(region.tabIndex).toBe(0);
-    expect(fixture.componentInstance.filteredFields).toHaveLength(1);
+    expect(fixture.componentInstance.filteredFields()).toHaveLength(1);
     expect(fixture.componentInstance.canManage()).toBe(true);
     const remove = fixture.nativeElement.querySelector('button.action-btn.danger') as HTMLButtonElement;
     expect(remove?.getAttribute('aria-label')).toBe('Удалить Бюджет');
@@ -136,21 +136,20 @@ describe('CustomFieldsComponent', () => {
     const { fixture } = await createFixture(fields);
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredFields).toHaveLength(3);
+    expect(fixture.componentInstance.filteredFields()).toHaveLength(3);
 
     // Filter by 'telegram'
-    fixture.componentInstance.searchQuery = 'telegram';
-    fixture.componentInstance.applyFilter();
+    fixture.componentInstance.onSearchQueryChange('telegram');
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredFields).toHaveLength(1);
-    expect(fixture.componentInstance.filteredFields[0].code).toBe('telegram_handle');
+    expect(fixture.componentInstance.filteredFields()).toHaveLength(1);
+    expect(fixture.componentInstance.filteredFields()[0].code).toBe('telegram_handle');
 
     // Clear search
     fixture.componentInstance.clearSearch();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredFields).toHaveLength(3);
+    expect(fixture.componentInstance.filteredFields()).toHaveLength(3);
   });
 
   it('filters by entity tab and displays accurate tab counts', async () => {
@@ -171,8 +170,8 @@ describe('CustomFieldsComponent', () => {
     fixture.componentInstance.filterByEntity('TASK');
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredFields).toHaveLength(1);
-    expect(fixture.componentInstance.filteredFields[0].code).toBe('cost_usd');
+    expect(fixture.componentInstance.filteredFields()).toHaveLength(1);
+    expect(fixture.componentInstance.filteredFields()[0].code).toBe('cost_usd');
   });
 
   it('sorts fields by orderNo ascending then by name', async () => {
@@ -185,7 +184,7 @@ describe('CustomFieldsComponent', () => {
     const { fixture } = await createFixture(fields);
     fixture.detectChanges();
 
-    const orderedCodes = fixture.componentInstance.filteredFields.map(f => f.code);
+    const orderedCodes = fixture.componentInstance.filteredFields().map(f => f.code);
     expect(orderedCodes).toEqual(['field_a', 'field_c', 'field_b']);
   });
 
@@ -201,5 +200,33 @@ describe('CustomFieldsComponent', () => {
 
     fixture.componentInstance.onCodeInput(event);
     expect(fixture.componentInstance.formData.code).toBe('my_special_code');
+  });
+
+  it('validates reserved codes and rejects them', async () => {
+    const { fixture, toast } = await createFixture();
+    fixture.detectChanges();
+
+    fixture.componentInstance.openCreateModal();
+    fixture.componentInstance.formData.code = 'status';
+    fixture.componentInstance.formData.name = 'Test';
+    fixture.componentInstance.saveField();
+
+    expect(fixture.componentInstance.formError).not.toBe('');
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('toggles sort direction on repeated column click', async () => {
+    const { fixture } = await createFixture();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.sortColumn).toBe('orderNo');
+    expect(fixture.componentInstance.sortDirection).toBe('asc');
+
+    fixture.componentInstance.onSortChange('orderNo');
+    expect(fixture.componentInstance.sortDirection).toBe('desc');
+
+    fixture.componentInstance.onSortChange('name');
+    expect(fixture.componentInstance.sortColumn).toBe('name');
+    expect(fixture.componentInstance.sortDirection).toBe('asc');
   });
 });

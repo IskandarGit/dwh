@@ -15,6 +15,18 @@ spring:
   threads:
     virtual:
       enabled: true
+  cache:
+    type: caffeine
+    cache-names:
+      - taskStatuses
+      - taskTypes
+      - activeModules
+      - allModules
+      - moduleActive
+      - navigationItems
+      - customFields
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=10m
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/dwh_instance}
     username: ${DB_USER:postgres}
@@ -27,6 +39,8 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+      data-source-properties:
+        defaultRowFetchSize: 500
   flyway:
     # NFR-10 / ADR-0007 2.3: приложение НЕ мигрирует схему. Миграции — только
     # отдельным запуском: --spring.profiles.active=migrate (batch-job фазы P).
@@ -118,6 +132,7 @@ dwh:
     # a degraded external provider's longer transport timeout.
     health-timeout: ${DWH_SYSTEM_HEALTH_TIMEOUT:2s}
   files:
+    max-concurrent-uploads: ${DWH_FILES_MAX_CONCURRENT_UPLOADS:10}
     scanner:
       required: ${DWH_FILE_SCANNER_REQUIRED:false}
       clamav:
@@ -126,6 +141,9 @@ dwh:
         port: ${DWH_FILE_SCANNER_CLAMAV_PORT:3310}
         connect-timeout: ${DWH_FILE_SCANNER_CLAMAV_CONNECT_TIMEOUT:3s}
         read-timeout: ${DWH_FILE_SCANNER_CLAMAV_READ_TIMEOUT:60s}
+  reports:
+    export:
+      max-rows: ${DWH_REPORTS_EXPORT_MAX_ROWS:50000}
   webhooks:
     # Outbound webhooks are a deliberate egress boundary. The default install
     # is fail-closed; enabling requires an exact, comma-separated host allow-list.
@@ -151,8 +169,11 @@ dwh:
     timeout-ms: 1800000            # 30 мин; EventSource переподключается сам
     heartbeat-ms: 25000            # keep-alive < таймаута прокси (обычно 60 с)
     max-connections-per-user: 5    # защита от утечки вкладок на клиенте
+  security:
+    trusted-proxies: ${DWH_SECURITY_TRUSTED_PROXIES:127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,fe80::/10}
   rate-limit:
     enabled: true
+    max-entries: ${DWH_RATE_LIMIT_MAX_ENTRIES:10000}
     ip-per-minute: ${DWH_RATE_LIMIT_IP_PER_MINUTE:60}                  # вход и прочие anonymous requests
     public-read-per-minute: ${DWH_RATE_LIMIT_PUBLIC_READ_PER_MINUTE:600} # публичные словари i18n за общим NAT
     user-per-minute: ${DWH_RATE_LIMIT_USER_PER_MINUTE:600}             # cookie-сессии
@@ -168,6 +189,10 @@ dwh:
     api-key: ${DWH_TYPESENSE_API_KEY:dwh_typesense_local_dev_key}
     enabled: ${DWH_TYPESENSE_ENABLED:true}
     sync-on-startup: true
+  idempotency:
+    retention-days: ${DWH_IDEMPOTENCY_RETENTION_DAYS:14}
+    cleanup-cron: ${DWH_IDEMPOTENCY_CLEANUP_CRON:0 15 2 * * *}
+    lease-seconds: ${DWH_IDEMPOTENCY_LEASE_SECONDS:120}
 
 
 logging:

@@ -24,15 +24,22 @@ public class ReportService {
 
     private final ReportRepository reportRepository;
     private final MdScopeService scopeService;
+    private final int maxExportRows;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public ReportService(ReportRepository reportRepository, MdScopeService scopeService) {
+    public ReportService(ReportRepository reportRepository, MdScopeService scopeService,
+                         @org.springframework.beans.factory.annotation.Value("${dwh.reports.export.max-rows:50000}") int maxExportRows) {
         this.reportRepository = reportRepository;
         this.scopeService = scopeService;
+        this.maxExportRows = maxExportRows > 0 ? maxExportRows : ReportRepository.DEFAULT_MAX_EXPORT_ROWS;
+    }
+
+    public ReportService(ReportRepository reportRepository, MdScopeService scopeService) {
+        this(reportRepository, scopeService, ReportRepository.DEFAULT_MAX_EXPORT_ROWS);
     }
 
     public ReportService(JdbcClient jdbcClient, MdScopeService scopeService) {
-        this(new ReportRepository(jdbcClient), scopeService);
+        this(new ReportRepository(jdbcClient), scopeService, ReportRepository.DEFAULT_MAX_EXPORT_ROWS);
     }
 
     public void exportTasksCsv(OutputStream outputStream, Long currentUserId) throws IOException {
@@ -43,23 +50,30 @@ public class ReportService {
         // UTF-8 BOM so Microsoft Excel automatically recognizes Russian UTF-8
         outputStream.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
 
-        PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-        writer.println("ID;Заголовок;Проект;Приоритет;Статус;Срок;Дата создания;Автор");
+        java.io.BufferedWriter writer = new java.io.BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        writer.write("ID;Заголовок;Проект;Приоритет;Статус;Срок;Дата создания;Автор\n");
 
-        reportRepository.streamScopedTasks(scope, row -> {
-            String title = escapeCsv(row.title());
-            String project = escapeCsv(row.projectName());
-            String priority = mapPriority(row.priority());
-            String status = escapeCsv(row.statusName());
-            String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
-            String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
-            String reporter = escapeCsv(row.reporterName());
+        try {
+            reportRepository.streamScopedTasks(scope, maxExportRows, row -> {
+                try {
+                    String title = escapeCsv(row.title());
+                    String project = escapeCsv(row.projectName());
+                    String priority = mapPriority(row.priority());
+                    String status = escapeCsv(row.statusName());
+                    String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
+                    String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
+                    String reporter = escapeCsv(row.reporterName());
 
-            writer.printf("%d;%s;%s;%s;%s;%s;%s;%s%n",
-                    row.id(), title, project, priority, status, endTimeStr, createdStr, reporter);
-        });
-
-        writer.flush();
+                    writer.write(String.format("%d;%s;%s;%s;%s;%s;%s;%s%n",
+                            row.id(), title, project, priority, status, endTimeStr, createdStr, reporter));
+                } catch (IOException e) {
+                    throw new ClientAbortException(e);
+                }
+            });
+            writer.flush();
+        } catch (ClientAbortException | IOException e) {
+            // Client aborted or socket closed; terminate streaming and release DB connection cleanly
+        }
     }
 
     public void exportTasksExcelXml(OutputStream outputStream, Long currentUserId) throws IOException {
@@ -67,73 +81,87 @@ public class ReportService {
             throw ApiException.unauthorized("Требуется авторизация для экспорта задач");
         }
         var scope = scopeService.filterForTasks(currentUserId);
-        PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        java.io.BufferedWriter writer = new java.io.BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
 
-        writer.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        writer.println("<?mso-application progid=\"Excel.Sheet\"?>");
-        writer.println("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"");
-        writer.println(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"");
-        writer.println(" xmlns:x=\"urn:schemas-microsoft-com:office:excel\"");
-        writer.println(" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\"");
-        writer.println(" xmlns:html=\"http://www.w3.org/TR/REC-html40\">");
-        writer.println(" <Styles>");
-        writer.println("  <Style ss:ID=\"Header\">");
-        writer.println("   <Font ss:Bold=\"1\" ss:Color=\"#FFFFFF\"/>");
-        writer.println("   <Interior ss:Color=\"#0284C7\" ss:Pattern=\"Solid\"/>");
-        writer.println("   <Alignment ss:Horizontal=\"Center\" ss:Vertical=\"Center\"/>");
-        writer.println("  </Style>");
-        writer.println("  <Style ss:ID=\"Row\">");
-        writer.println("   <Alignment ss:Vertical=\"Center\"/>");
-        writer.println("  </Style>");
-        writer.println(" </Styles>");
-        writer.println(" <Worksheet ss:Name=\"Задачи\">");
-        writer.println("  <Table>");
-        writer.println("   <Column ss:Width=\"50\"/>");
-        writer.println("   <Column ss:Width=\"220\"/>");
-        writer.println("   <Column ss:Width=\"140\"/>");
-        writer.println("   <Column ss:Width=\"90\"/>");
-        writer.println("   <Column ss:Width=\"90\"/>");
-        writer.println("   <Column ss:Width=\"110\"/>");
-        writer.println("   <Column ss:Width=\"110\"/>");
-        writer.println("   <Column ss:Width=\"130\"/>");
+        try {
+            writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            writer.write("<?mso-application progid=\"Excel.Sheet\"?>\n");
+            writer.write("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"\n");
+            writer.write(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"\n");
+            writer.write(" xmlns:x=\"urn:schemas-microsoft-com:office:excel\"\n");
+            writer.write(" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\"\n");
+            writer.write(" xmlns:html=\"http://www.w3.org/TR/REC-html40\">\n");
+            writer.write(" <Styles>\n");
+            writer.write("  <Style ss:ID=\"Header\">\n");
+            writer.write("   <Font ss:Bold=\"1\" ss:Color=\"#FFFFFF\"/>\n");
+            writer.write("   <Interior ss:Color=\"#0284C7\" ss:Pattern=\"Solid\"/>\n");
+            writer.write("   <Alignment ss:Horizontal=\"Center\" ss:Vertical=\"Center\"/>\n");
+            writer.write("  </Style>\n");
+            writer.write("  <Style ss:ID=\"Row\">\n");
+            writer.write("   <Alignment ss:Vertical=\"Center\"/>\n");
+            writer.write("  </Style>\n");
+            writer.write(" </Styles>\n");
+            writer.write(" <Worksheet ss:Name=\"Задачи\">\n");
+            writer.write("  <Table>\n");
+            writer.write("   <Column ss:Width=\"50\"/>\n");
+            writer.write("   <Column ss:Width=\"220\"/>\n");
+            writer.write("   <Column ss:Width=\"140\"/>\n");
+            writer.write("   <Column ss:Width=\"90\"/>\n");
+            writer.write("   <Column ss:Width=\"90\"/>\n");
+            writer.write("   <Column ss:Width=\"110\"/>\n");
+            writer.write("   <Column ss:Width=\"110\"/>\n");
+            writer.write("   <Column ss:Width=\"130\"/>\n");
 
-        // Header
-        writer.println("   <Row ss:StyleID=\"Header\">");
-        writer.println("    <Cell><Data ss:Type=\"String\">ID</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Заголовок</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Проект</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Приоритет</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Статус</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Срок</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Дата создания</Data></Cell>");
-        writer.println("    <Cell><Data ss:Type=\"String\">Автор</Data></Cell>");
-        writer.println("   </Row>");
+            // Header
+            writer.write("   <Row ss:StyleID=\"Header\">\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">ID</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Заголовок</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Проект</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Приоритет</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Статус</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Срок</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Дата создания</Data></Cell>\n");
+            writer.write("    <Cell><Data ss:Type=\"String\">Автор</Data></Cell>\n");
+            writer.write("   </Row>\n");
 
-        reportRepository.streamScopedTasks(scope, row -> {
-            String title = escapeXml(row.title());
-            String project = escapeXml(row.projectName());
-            String priority = mapPriority(row.priority());
-            String status = escapeXml(row.statusName());
-            String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
-            String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
-            String reporter = escapeXml(row.reporterName());
+            reportRepository.streamScopedTasks(scope, maxExportRows, row -> {
+                try {
+                    String title = escapeXml(row.title());
+                    String project = escapeXml(row.projectName());
+                    String priority = mapPriority(row.priority());
+                    String status = escapeXml(row.statusName());
+                    String endTimeStr = row.endTime() != null ? DATE_FMT.format(row.endTime()) : "—";
+                    String createdStr = row.createdAt() != null ? DATE_FMT.format(row.createdAt()) : "—";
+                    String reporter = escapeXml(row.reporterName());
 
-            writer.println("   <Row ss:StyleID=\"Row\">");
-            writer.printf("    <Cell><Data ss:Type=\"Number\">%d</Data></Cell>%n", row.id());
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", title);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", project);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", priority);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", status);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", endTimeStr);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", createdStr);
-            writer.printf("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", reporter);
-            writer.println("   </Row>");
-        });
+                    writer.write("   <Row ss:StyleID=\"Row\">\n");
+                    writer.write(String.format("    <Cell><Data ss:Type=\"Number\">%d</Data></Cell>%n", row.id()));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", title));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", project));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", priority));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", status));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", endTimeStr));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", createdStr));
+                    writer.write(String.format("    <Cell><Data ss:Type=\"String\">%s</Data></Cell>%n", reporter));
+                    writer.write("   </Row>\n");
+                } catch (IOException e) {
+                    throw new ClientAbortException(e);
+                }
+            });
 
-        writer.println("  </Table>");
-        writer.println(" </Worksheet>");
-        writer.println("</Workbook>");
-        writer.flush();
+            writer.write("  </Table>\n");
+            writer.write(" </Worksheet>\n");
+            writer.write("</Workbook>\n");
+            writer.flush();
+        } catch (ClientAbortException | IOException e) {
+            // Client aborted or socket closed; terminate streaming and release DB connection cleanly
+        }
+    }
+
+    private static final class ClientAbortException extends RuntimeException {
+        ClientAbortException(IOException cause) {
+            super(cause);
+        }
     }
 
     private String escapeCsv(String value) {

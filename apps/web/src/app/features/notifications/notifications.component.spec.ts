@@ -13,9 +13,11 @@ describe('NotificationsComponent UI contracts', () => {
     fetchNotifications: vi.fn(() => of({ items: [] })),
     fetchUnreadCount: vi.fn(() => of(1)),
     markAllAsRead: vi.fn(() => of(undefined)),
-    markAsRead: vi.fn(() => of(undefined))
+    markAsRead: vi.fn(() => of(undefined)),
+    fetchPreferences: vi.fn(() => of([])),
+    updatePreferences: vi.fn(() => of(undefined))
   };
-  const toastService = { success: vi.fn() };
+  const toastService = { success: vi.fn(), error: vi.fn() };
   const router = { navigateByUrl: vi.fn() };
 
   beforeEach(async () => {
@@ -126,5 +128,22 @@ describe('NotificationsComponent UI contracts', () => {
     // markAsRead was called for id 9, but router should NOT have been navigated
     expect(notificationService.markAsRead).toHaveBeenCalledWith(9);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens preferences modal and saves updated preferences', () => {
+    const fixture = TestBed.createComponent(NotificationsComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.openPreferencesModal();
+    expect(notificationService.fetchPreferences).toHaveBeenCalled();
+    expect(fixture.componentInstance.isPreferencesOpen()).toBe(true);
+
+    fixture.componentInstance.savePreferences([
+      { eventType: 'task_assigned', channel: 'in_app', isEnabled: true }
+    ]);
+    expect(notificationService.updatePreferences).toHaveBeenCalledWith([
+      { eventType: 'task_assigned', channel: 'in_app', isEnabled: true }
+    ]);
+    expect(fixture.componentInstance.isPreferencesOpen()).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { Observable, Subject, map, of, startWith, switchMap, take, takeUntil, tap } from 'rxjs';
 import { ApiService } from './api.service';
 import { ToastService } from './toast.service';
-import { NotificationItem, Announcement } from '../models/notification.models';
+import { NotificationItem, Announcement, NotificationPrefItem } from '../models/notification.models';
 import { KeysetPage } from '../models/common.models';
 
 interface BackendNotification {
@@ -85,6 +85,18 @@ export class NotificationService {
     return this.api.post<void>('/notifications/inbox/read-all').pipe(
       takeUntil(this.sessionEnded),
       tap(() => this.unreadChanged.next())
+    );
+  }
+
+  fetchPreferences(): Observable<NotificationPrefItem[]> {
+    return this.api.get<NotificationPrefItem[]>('/notifications/preferences').pipe(
+      takeUntil(this.sessionEnded)
+    );
+  }
+
+  updatePreferences(prefs: NotificationPrefItem[]): Observable<void> {
+    return this.api.put<void>('/notifications/preferences', prefs).pipe(
+      takeUntil(this.sessionEnded)
     );
   }
 

@@ -1,0 +1,231 @@
+<div class="settings-page">
+      <!-- Page Header -->
+      <div class="view-header">
+        <div class="header-left">
+          <h1 class="view-title">{{ 'settings.title' | t }}</h1>
+          <p class="view-subtitle">{{ 'settings.sistemnye_nastroyki' | t }}</p>
+        </div>
+        <div class="header-right">
+          <ui-button
+            variant="secondary"
+            icon="refresh"
+            [loading]="isLoading()"
+            [ariaLabel]="'common.refresh' | t"
+            (onClick)="loadAllSettings()"
+          >
+            {{ 'common.refresh' | t }}
+          </ui-button>
+        </div>
+      </div>
+
+      <!-- Error Banner -->
+      <div *ngIf="loadError()" class="load-error-banner" role="alert">
+        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+        <span class="load-error-text">{{ loadError() }}</span>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="loadAllSettings()">
+          {{ 'common.retry' | t }}
+        </button>
+      </div>
+
+      <!-- Tabs Navigation -->
+      <div class="toolbar">
+        <div class="status-tabs" role="tablist" [attr.aria-label]="'settings.razdely_nastroek' | t" (focusin)="onSettingsTabFocusIn($event)">
+          <button
+            *ngIf="canManageSystemSettings()"
+            id="settings-general-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'general'"
+            [attr.aria-selected]="activeTab === 'general'"
+            aria-controls="settings-general-panel"
+            (click)="setTab('general')"
+            (keydown)="onTabKeydown($event, 'general')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">tune</span>
+            <span>{{ 'settings.tab.general' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canManageSystemSettings()"
+            id="settings-security-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'security'"
+            [attr.aria-selected]="activeTab === 'security'"
+            aria-controls="settings-security-panel"
+            (click)="setTab('security')"
+            (keydown)="onTabKeydown($event, 'security')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">security</span>
+            <span>{{ 'settings.tab.security' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canManageSystemSettings()"
+            id="settings-storage-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'storage'"
+            [attr.aria-selected]="activeTab === 'storage'"
+            aria-controls="settings-storage-panel"
+            (click)="setTab('storage')"
+            (keydown)="onTabKeydown($event, 'storage')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">cloud</span>
+            <span>{{ 'settings.tab.storage' | t }}</span>
+          </button>
+
+          <button
+            id="settings-preferences-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'preferences'"
+            [attr.aria-selected]="activeTab === 'preferences'"
+            aria-controls="settings-preferences-panel"
+            (click)="setTab('preferences')"
+            (keydown)="onTabKeydown($event, 'preferences')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">person</span>
+            <span>{{ 'settings.tab.preferences' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canManageSystemSettings()"
+            id="settings-languages-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'languages'"
+            [attr.aria-selected]="activeTab === 'languages'"
+            aria-controls="settings-languages-panel"
+            (click)="setTab('languages')"
+            (keydown)="onTabKeydown($event, 'languages')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">language</span>
+            <span>{{ 'settings.yazyki_i_lokalizaciya' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canViewSearchSettings()"
+            id="settings-search-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'search'"
+            [attr.aria-selected]="activeTab === 'search'"
+            aria-controls="settings-search-panel"
+            (click)="setTab('search')"
+            (keydown)="onTabKeydown($event, 'search')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">manage_search</span>
+            <span>{{ 'settings.search.tab' | t }}</span>
+          </button>
+
+          <button
+            *ngIf="canViewNavigationSettings()"
+            id="settings-navigation-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'navigation'"
+            [attr.aria-selected]="activeTab === 'navigation'"
+            aria-controls="settings-navigation-panel"
+            (click)="setTab('navigation')"
+            (keydown)="onTabKeydown($event, 'navigation')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">menu_open</span>
+            <span>{{ 'settings.navigation.tab' | t }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB: Search Settings -->
+      <div id="settings-search-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-search-tab" *ngIf="activeTab === 'search' && canViewSearchSettings()">
+        <app-search-settings />
+      </div>
+
+      <!-- TAB: Navigation Settings -->
+      <div id="settings-navigation-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-navigation-tab" *ngIf="activeTab === 'navigation' && canViewNavigationSettings()">
+        <app-navigation-settings />
+      </div>
+
+      <!-- TAB 1: General Settings -->
+      <div id="settings-general-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-general-tab" *ngIf="activeTab === 'general' && canManageSystemSettings()">
+        <app-settings-general-panel
+          [systemSettings]="systemSettings()"
+          [canUpdateSystemSettings]="canUpdateSystemSettings()"
+          [isSaving]="isSaving()"
+          [languages]="i18n.languages()"
+          (save)="saveSystemSettings()"
+        />
+      </div>
+
+      <!-- TAB 2: Security Settings -->
+      <div id="settings-security-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-security-tab" *ngIf="activeTab === 'security' && canManageSystemSettings()">
+        <app-settings-security-panel
+          [systemSettings]="systemSettings()"
+          [canUpdateSystemSettings]="canUpdateSystemSettings()"
+          [isSaving]="isSaving()"
+          (save)="saveSystemSettings()"
+          (toggleRequire2fa)="toggleRequire2fa($event)"
+        />
+      </div>
+
+      <!-- TAB 3: Storage Settings -->
+      <div id="settings-storage-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-storage-tab" *ngIf="activeTab === 'storage' && canManageSystemSettings()">
+        <app-settings-storage-panel
+          [systemSettings]="systemSettings()"
+          [canUpdateSystemSettings]="canUpdateSystemSettings()"
+          [isSaving]="isSaving()"
+          (save)="saveSystemSettings()"
+        />
+      </div>
+
+      <!-- TAB 4: User Preferences -->
+      <div id="settings-preferences-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-preferences-tab" *ngIf="activeTab === 'preferences'">
+        <app-settings-preferences-panel
+          [userSettings]="userSettings()"
+          [isSaving]="isSaving()"
+          [currentLang]="i18n.currentLang()"
+          [languages]="i18n.languages()"
+          [userThemePreference]="userThemePreference()"
+          (save)="saveUserSettings()"
+          (changeLanguage)="changePersonalLang($event)"
+          (themeChange)="onThemeChange($event)"
+          (toggleSound)="toggleSound($event)"
+        />
+      </div>
+
+      <!-- TAB 5: Languages & Translations -->
+      <div id="settings-languages-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-languages-tab" *ngIf="activeTab === 'languages' && canManageSystemSettings()">
+        <app-settings-languages-panel
+          [canUpdateSystemSettings]="canUpdateSystemSettings()"
+          [editingLanguageCode]="editingLanguageCode()"
+          [legacyLanguageCount]="legacyLanguageCount()"
+          [isMigratingLegacyLanguages]="isMigratingLegacyLanguages()"
+          [languages]="i18n.languages()"
+          [currentLang]="i18n.currentLang()"
+          [isAddLangModalOpen]="isAddLangModalOpen()"
+          [isAddingLang]="isAddingLang()"
+          [newLangCode]="newLangCode"
+          [newLangName]="newLangName"
+          [newLangJson]="newLangJson"
+          (openLanguageEditor)="openLanguageEditor($event)"
+          (closeLanguageEditor)="editingLanguageCode.set(null)"
+          (languageSaved)="onLanguageSaved()"
+          (migrateLegacyLanguages)="migrateLegacyLanguages()"
+          (openAddLangModal)="openAddLangModal()"
+          (closeAddLangModal)="isAddLangModalOpen.set(false)"
+          (saveNewLanguage)="saveNewLanguage()"
+          (exportLangJson)="exportLangJson($event)"
+          (switchLanguage)="switchLanguage($event)"
+          (newLangCodeChange)="newLangCode = $event"
+          (newLangNameChange)="newLangName = $event"
+          (newLangJsonChange)="newLangJson = $event"
+        />
+      </div>
+    </div>

@@ -69,6 +69,20 @@ class RateLimitServiceTest {
         assertThat(service.tryConsume("user:42:search", 120, 20).isConsumed()).isFalse();
     }
 
+    @Test
+    void capacityBoundPreventsUnboundedMemoryGrowthUnderKeyFlooding() {
+        int maxEntries = 200;
+        var service = new RateLimitService(TimeMeter.SYSTEM_NANOTIME, maxEntries);
+
+        for (int i = 0; i < 1000; i++) {
+            service.tryConsume("spoofed-ip:" + i, 60, 60);
+        }
+
+        service.cleanUp();
+
+        assertThat(service.estimatedSize()).isLessThanOrEqualTo(maxEntries);
+    }
+
     private static final class MutableTimeMeter implements TimeMeter {
         private final AtomicLong currentNanos = new AtomicLong();
 

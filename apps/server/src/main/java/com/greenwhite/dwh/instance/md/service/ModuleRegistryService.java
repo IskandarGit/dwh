@@ -3,6 +3,9 @@ package com.greenwhite.dwh.instance.md.service;
 import com.greenwhite.dwh.instance.audit.service.AuditLogService;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.md.repository.ModuleRegistryRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,11 +48,13 @@ public class ModuleRegistryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "allModules", key = "'all'")
     public List<InstalledModuleView> getAllModules() {
         return moduleRepository.findAll().stream().map(InstalledModuleView::from).toList();
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "activeModules", key = "'active'")
     public List<InstalledModuleView> getActiveModules() {
         return moduleRepository.findActive().stream().map(InstalledModuleView::from).toList();
     }
@@ -60,6 +65,7 @@ public class ModuleRegistryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "moduleActive", key = "#code != null ? #code.toLowerCase().trim() : ''")
     public boolean isModuleActive(String code) {
         if (code == null || code.isBlank()) {
             return false;
@@ -70,6 +76,11 @@ public class ModuleRegistryService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "activeModules", allEntries = true),
+            @CacheEvict(value = "allModules", allEntries = true),
+            @CacheEvict(value = "moduleActive", allEntries = true)
+    })
     public InstalledModuleView toggleModuleStatus(String code, boolean enable) {
         var existing = moduleRepository.findByCode(code)
                 .orElseThrow(() -> ApiException.notFound(com.greenwhite.dwh.core.error.ErrorCode.NOT_FOUND, "Модуль с кодом '" + code + "' не найден"));
@@ -96,6 +107,11 @@ public class ModuleRegistryService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "activeModules", allEntries = true),
+            @CacheEvict(value = "allModules", allEntries = true),
+            @CacheEvict(value = "moduleActive", allEntries = true)
+    })
     public InstalledModuleView registerModule(String code, String name, String description,
                                               String version, String icon, String route,
                                               boolean isSystem, int sortOrder, Map<String, Object> attributes) {

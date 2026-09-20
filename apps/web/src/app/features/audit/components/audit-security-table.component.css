@@ -1,0 +1,298 @@
+:host {
+      display: block;
+      min-width: 0;
+    }
+
+    .tab-content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .filter-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .filter-select option {
+      background: var(--bg-surface);
+      color: var(--text-main);
+    }
+
+    .search-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      color: var(--text-light);
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    .search-input {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 10px 6px 34px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      width: 160px;
+    }
+
+    .compact-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 142px;
+    }
+
+    .compact-filter-narrow {
+      min-width: 92px;
+      width: 110px;
+    }
+
+    .compact-filter label {
+      color: var(--text-light);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .filter-input {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .filter-input:focus, .filter-select:focus, .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .inline-feedback {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      margin-top: 4px;
+    }
+
+    .table-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    .table-container:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    .data-table th {
+      padding: 12px 16px;
+      background: var(--bg-hover);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .font-mono {
+      font-family: monospace;
+    }
+
+    .text-muted {
+      color: var(--text-light);
+    }
+
+    .text-xs {
+      font-size: 11px;
+    }
+
+    .ip-pill {
+      background: var(--bg-hover);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .sec-event-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .sec-event-badge .material-symbols-outlined {
+      font-size: 14px;
+    }
+
+    .sec-event-badge.success {
+      background: var(--success-bg);
+      color: var(--success);
+    }
+
+    .sec-event-badge.danger {
+      background: var(--danger-bg);
+      color: var(--danger);
+    }
+
+    .sec-event-badge.warning {
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+
+    .sec-event-badge.info {
+      background: var(--info-bg);
+      color: var(--info);
+    }
+
+    .user-cell {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 500;
+    }
+
+    .ua-cell {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    .date-cell {
+      white-space: nowrap;
+      color: var(--text-light);
+    }
+
+    .diff-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-light);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .diff-btn:hover {
+      background: var(--bg-hover);
+      color: var(--primary-text);
+      border-color: var(--primary);
+    }
+
+    .diff-btn .material-symbols-outlined {
+      font-size: 18px;
+    }
+
+    .loading-state-cell, .empty-state-cell {
+      padding: 48px !important;
+      text-align: center;
+      color: var(--text-light);
+    }
+
+    .empty-state-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .empty-state-box .empty-icon {
+      font-size: 48px;
+      color: var(--text-light);
+      opacity: 0.5;
+    }
+
+    .empty-state-box h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin: 0;
+    }
+
+    .empty-state-box p {
+      font-size: 13px;
+      margin: 0;
+    }

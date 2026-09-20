@@ -1,0 +1,180 @@
+<div class="projects-page">
+  <!-- Header -->
+  <div class="view-header">
+    <div class="header-left">
+      <h1 class="view-title">{{ 'nav.projects' | t }}</h1>
+      <span *ngIf="isListReady()" class="count-badge">{{ filteredProjects().length }}</span>
+
+      <!-- View Mode Switcher -->
+      <div class="status-tabs" role="group" [attr.aria-label]="'projects.rezhim_otobrazheniya_proektov' | t">
+        <button
+          type="button"
+          class="status-tab"
+          [class.active]="viewMode === 'list'"
+          [attr.aria-pressed]="viewMode === 'list'"
+          (click)="viewMode = 'list'"
+          [title]="'projects.spisok_tablica' | t"
+        >
+          <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">table_rows</span>
+          <span>{{ 'projects.spisok' | t }}</span>
+        </button>
+        <button
+          type="button"
+          class="status-tab"
+          [class.active]="viewMode === 'cards'"
+          [attr.aria-pressed]="viewMode === 'cards'"
+          (click)="viewMode = 'cards'"
+          [title]="'projects.kartochki' | t"
+        >
+          <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">grid_view</span>
+          <span>{{ 'projects.kartochki' | t }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <ui-button
+        *ngIf="canCreateProject()"
+        variant="primary"
+        size="md"
+        icon="add"
+        (onClick)="openCreateModal()"
+      >
+        {{ 'projects.novyy_proekt' | t }}
+      </ui-button>
+    </div>
+  </div>
+
+  <!-- Toolbar / Filter Bar -->
+  <app-project-filter-bar
+    [searchQuery]="searchQuery"
+    [selectedState]="selectedState"
+    (searchChange)="setSearchQuery($event)"
+    (clearSearch)="clearSearch()"
+    (stateChange)="setSelectedState($event)"
+  ></app-project-filter-bar>
+
+  <div
+    *ngIf="isLoading()"
+    class="request-state"
+    data-testid="projects-list-loading"
+    role="status"
+    aria-live="polite"
+  >
+    {{ 'projects.loading_projects' | t }}
+  </div>
+  <div *ngIf="listLoadError()" class="request-state request-error" data-testid="projects-list-error" role="alert">
+    <span>{{ 'projects.load_projects_error' | t }}</span>
+    <button type="button" class="request-retry projects-list-retry" (click)="loadProjects()">
+      {{ 'projects.retry_projects' | t }}
+    </button>
+  </div>
+
+  <div
+    *ngIf="!canViewTasks()"
+    class="stats-state"
+    data-testid="projects-stats-permission"
+    role="status"
+  >
+    {{ 'projects.stats_permission' | t }}
+  </div>
+  <div
+    *ngIf="canViewTasks() && statsLoading()"
+    class="stats-state"
+    data-testid="projects-stats-loading"
+    role="status"
+    aria-live="polite"
+  >
+    {{ 'projects.loading_stats' | t }}
+  </div>
+  <div
+    *ngIf="canViewTasks() && statsLoadError()"
+    class="stats-state request-error"
+    data-testid="projects-stats-error"
+    role="alert"
+  >
+    <span>{{ 'projects.load_stats_error' | t }}</span>
+    <button type="button" class="request-retry projects-stats-retry" (click)="loadStats()">
+      {{ 'projects.retry_stats' | t }}
+    </button>
+  </div>
+  <div *ngIf="canViewTasks() && statsLoaded()" class="stats-state" data-testid="projects-stats-scope" role="status">
+    {{ 'projects.closed_stats_scope' | t }}
+  </div>
+
+  <!-- VIEW 1: TABLE / LIST VIEW -->
+  <app-project-table-view
+    *ngIf="viewMode === 'list' && isListReady()"
+    [paginatedProjects]="paginatedProjects()"
+    [totalCount]="filteredProjects().length"
+    [currentPage]="currentPage"
+    [pageSize]="pageSize"
+    [canViewTasks]="canViewTasks()"
+    [canUpdateProject]="canUpdateProject()"
+    [projectStats]="projectStats()"
+    [statsLoading]="statsLoading()"
+    [statsLoadError]="statsLoadError()"
+    [statsLoaded]="statsLoaded()"
+    (viewTasks)="viewProjectTasks($event)"
+    (editProject)="openEditModal($event)"
+    (pageChange)="setPage($event)"
+    (pageSizeChange)="setPageSize($event)"
+  ></app-project-table-view>
+
+  <!-- VIEW 2: CARDS GRID VIEW -->
+  <app-project-cards-view
+    *ngIf="viewMode === 'cards' && isListReady()"
+    [paginatedProjects]="paginatedProjects()"
+    [totalCount]="filteredProjects().length"
+    [currentPage]="currentPage"
+    [pageSize]="pageSize"
+    [canViewTasks]="canViewTasks()"
+    [canUpdateProject]="canUpdateProject()"
+    [projectStats]="projectStats()"
+    [statsLoading]="statsLoading()"
+    [statsLoadError]="statsLoadError()"
+    [statsLoaded]="statsLoaded()"
+    (viewTasks)="viewProjectTasks($event)"
+    (editProject)="openEditModal($event)"
+    (pageChange)="setPage($event)"
+    (pageSizeChange)="setPageSize($event)"
+  ></app-project-cards-view>
+</div>
+
+<!-- Modals -->
+<app-project-modals
+  [routeRecordId]="routeRecordId()"
+  [viewingProject]="viewingProject()"
+  [recordLoading]="recordLoading()"
+  [recordError]="recordError()"
+  [recordNotFound]="recordNotFound()"
+  (closeRecordView)="closeRecordView()"
+  (loadRecordView)="loadRecordView($event)"
+
+  [isCreateModalOpen]="forms.isCreateModalOpen()"
+  [isCreateSubmitted]="forms.isCreateSubmitted"
+  [isCreateDiscardConfirmationOpen]="forms.isCreateDiscardConfirmationOpen()"
+  [createSaveError]="forms.createSaveError()"
+  [createForm]="forms.createForm"
+  (requestCloseCreate)="forms.requestCloseCreate()"
+  (confirmDiscardCreate)="forms.confirmDiscardCreate()"
+  (submitCreateProject)="forms.submitCreateProject()"
+
+  [isEditModalOpen]="forms.isEditModalOpen()"
+  [isEditSubmitted]="forms.isEditSubmitted"
+  [isEditDiscardConfirmationOpen]="forms.isEditDiscardConfirmationOpen()"
+  [editLoading]="forms.editLoading()"
+  [editLoadError]="forms.editLoadError()"
+  [editSaveError]="forms.editSaveError()"
+  [editingProject]="forms.editingProject"
+  [editForm]="forms.editForm"
+  (requestCloseEdit)="forms.requestCloseEdit()"
+  (confirmDiscardEdit)="forms.confirmDiscardEdit()"
+  (submitEditProject)="forms.submitEditProject()"
+  (retryEditLoad)="forms.retryEditLoad()"
+
+  (cancelNavigationDiscard)="forms.cancelNavigationDiscard($event)"
+
+  [isSubmitting]="forms.isSubmitting()"
+  [projectCustomFields]="projectCustomFields()"
+></app-project-modals>

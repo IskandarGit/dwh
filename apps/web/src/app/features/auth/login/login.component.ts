@@ -3,49 +3,34 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
-import { ToastService } from '../../../core/services/toast.service';
 import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
-import { UiModalComponent } from '../../../shared/ui/ui-modal.component';
 import { ApiService } from '../../../core/services/api.service';
 import { TranslatePipe, I18nService } from '../../../core/services/i18n.service';
 import { ThemeService } from '../../../core/services/theme.service';
+import { LoginStep, PasswordField } from './login.models';
+import { LoginTopBarComponent } from './components/login-top-bar.component';
+import { LoginHeaderComponent } from './components/login-header.component';
+import { LoginResetModalComponent } from './components/login-reset-modal.component';
 
-type LoginStep = 'credentials' | 'otp' | 'must_change_password';
-type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
-
+export * from './login.models';
 
 @Component({
   selector: 'app-login',
   standalone: true,
   imports: [
-    TranslatePipe,CommonModule, FormsModule, UiButtonComponent, UiModalComponent],
+    TranslatePipe,
+    CommonModule,
+    FormsModule,
+    UiButtonComponent,
+    LoginTopBarComponent,
+    LoginHeaderComponent,
+    LoginResetModalComponent
+  ],
   template: `
     <main class="login-wrapper">
-      <div class="login-top-bar">
-        <div class="lang-selector-login">
-          <span class="material-symbols-outlined lang-icon" aria-hidden="true">language</span>
-          <select
-            id="login-language-select"
-            class="lang-select-login"
-            [attr.aria-label]="'settings.yazyk_interfeysa' | t"
-            [value]="i18n.currentLang()"
-            (change)="onLanguageChange($event)"
-          >
-            <option *ngFor="let lang of i18n.languages()" [value]="lang.code">
-              {{ lang.code.toUpperCase() }} — {{ lang.name }}
-            </option>
-          </select>
-        </div>
-      </div>
+      <app-login-top-bar></app-login-top-bar>
       <div class="login-card">
-        <div class="login-header">
-          <div class="brand-lockup" role="img" aria-label="SmartupCMS">
-            <span class="brand-mark" aria-hidden="true">S</span>
-            <span class="brand-name" aria-hidden="true">SmartupCMS</span>
-          </div>
-          <h1 class="login-title">{{ 'auth.korporativnyy_vhod' | t }}</h1>
-          <p class="login-subtitle">{{ 'auth.platforma_upravleniya_dannymi_i_zadachami' | t }}</p>
-        </div>
+        <app-login-header></app-login-header>
 
         <!-- Step 1: Login & Password Form -->
         <form *ngIf="step() === 'credentials'" (ngSubmit)="onLoginSubmit()" class="login-form" [attr.aria-busy]="isLoading()">
@@ -274,288 +259,12 @@ type PasswordField = 'password' | 'new-password' | 'confirm-new-password';
     </main>
 
     <!-- Password Reset Modal -->
-    <ui-modal
+    <app-login-reset-modal
       [isOpen]="isResetModalOpen()"
-      [title]="'auth.vosstanovlenie_parolya' | t"
-      size="sm"
       (close)="isResetModalOpen.set(false)"
-    >
-      <div body class="reset-body">
-        <p id="reset-hint" class="reset-hint">{{ 'auth.vvedite_email_vashey_uchetnoy_zapisi_my_otpravim' | t }}</p>
-        <div class="form-group">
-          <label class="form-label" for="reset-email">Email</label>
-          <input
-            id="reset-email"
-            name="resetEmail"
-            type="email"
-            class="form-input"
-            [(ngModel)]="resetEmail"
-            placeholder="user@company.com"
-            autocomplete="email"
-            aria-describedby="reset-hint"
-            [attr.aria-invalid]="resetError() ? 'true' : null"
-          />
-        </div>
-        <p *ngIf="resetError()" class="form-error" role="alert">{{ resetError() }}</p>
-      </div>
-      <div footer>
-        <ui-button variant="secondary" size="md" (onClick)="isResetModalOpen.set(false)">{{ 'common.cancel' | t }}</ui-button>
-        <ui-button variant="primary" size="md" [loading]="isResetLoading()" (onClick)="sendResetRequest()">{{ 'auth.otpravit_kod' | t }}</ui-button>
-      </div>
-    </ui-modal>
+    ></app-login-reset-modal>
   `,
-  styles: [`
-    .login-wrapper {
-      min-height: 100vh;
-      min-height: 100dvh;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: var(--bg-app);
-      padding: 16px;
-      position: relative;
-    }
-
-    .login-top-bar {
-      position: absolute;
-      top: 20px;
-      right: 24px;
-      display: flex;
-      align-items: center;
-      z-index: 10;
-    }
-
-    .lang-selector-login {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background-color: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 4px 10px;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .lang-selector-login .lang-icon {
-      font-size: 18px;
-      color: var(--text-muted);
-    }
-
-    .lang-select-login {
-      border: none;
-      background: transparent;
-      color: var(--text-main);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      outline: none;
-      font-family: inherit;
-    }
-
-    .login-card {
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-overlay);
-      padding: 32px 28px;
-    }
-
-    :host-context([data-theme="dark"]) .login-card {
-      --text-inverse: var(--bg-app);
-    }
-
-    .login-header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .brand-lockup {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .brand-mark {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      flex: 0 0 44px;
-      border-radius: var(--radius-md);
-      background-color: var(--primary);
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 16px;
-    }
-
-    .brand-name {
-      color: var(--text-main);
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.2px;
-    }
-
-    .login-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text-main);
-      margin-bottom: 4px;
-    }
-
-    .login-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .login-form {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .form-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-main);
-    }
-
-    .password-label-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .forgot-link {
-      align-self: flex-end;
-      font-size: 11px;
-      color: var(--primary);
-      cursor: pointer;
-      text-decoration: none;
-      border: 0;
-      padding: 5px 2px;
-      background: transparent;
-      font-family: inherit;
-    }
-    .forgot-link:hover {
-      text-decoration: underline;
-    }
-
-    .form-input {
-      height: 36px;
-      padding: 6px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      background-color: var(--bg-surface);
-      color: var(--text-main);
-      font-size: 13px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s ease;
-    }
-    .form-input:focus {
-      border-color: var(--primary);
-      outline: 2px solid var(--focus-ring, var(--primary));
-      outline-offset: 2px;
-    }
-
-    .form-input[aria-invalid="true"] {
-      border-color: var(--danger);
-    }
-
-    .password-input {
-      position: relative;
-      display: flex;
-      min-width: 0;
-    }
-
-    .password-input .form-input {
-      width: 100%;
-      min-width: 0;
-      padding-right: 44px;
-    }
-
-    .password-toggle {
-      position: absolute;
-      inset: 0 0 0 auto;
-      width: 40px;
-      display: grid;
-      place-items: center;
-      padding: 0;
-      border: 0;
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .password-toggle .material-symbols-outlined { font-size: 20px; }
-    .password-toggle:hover:not(:disabled) { color: var(--text-main); }
-    .password-toggle:focus-visible, .forgot-link:focus-visible {
-      outline: 2px solid var(--focus-ring, var(--primary));
-      outline-offset: 2px;
-    }
-    .password-toggle:disabled, .forgot-link:disabled { opacity: 0.5; cursor: not-allowed; }
-    /* Keep pointer targets still when a password blur clears the hint. */
-    .caps-lock-hint { min-height: 1.4em; color: var(--warning); font-size: 12px; line-height: 1.4; }
-
-    @media (max-width: 480px) {
-      .login-card { padding: 24px 20px; }
-      .form-input { height: 44px; font-size: 16px; }
-      .password-toggle { width: 44px; }
-      .password-input .form-input { padding-right: 48px; }
-    }
-
-    .submit-btn {
-      width: 100%;
-      margin-top: 6px;
-    }
-
-    .otp-banner {
-      background-color: var(--info-bg);
-      color: var(--info);
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      display: flex;
-      gap: 10px;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    .otp-input {
-      font-size: 18px;
-      letter-spacing: 4px;
-      text-align: center;
-      font-weight: 600;
-    }
-
-    .otp-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .form-error {
-      color: var(--danger);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    .reset-hint {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      line-height: 1.4;
-    }
-
-  `]
+  styleUrl: './login.component.css'
 })
 export class LoginComponent {
   readonly i18n = inject(I18nService);
@@ -564,12 +273,6 @@ export class LoginComponent {
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
 
-  onLanguageChange(event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    if (select?.value && select.value !== this.i18n.currentLang()) {
-      this.i18n.setLanguage(select.value, false).subscribe();
-    }
-  }
   login = '';
   password = '';
   otpCode = '';
@@ -585,15 +288,11 @@ export class LoginComponent {
   readonly capsLockField = signal<PasswordField | null>(null);
   readonly isLoading = signal<boolean>(false);
   readonly isResetModalOpen = signal<boolean>(false);
-  readonly isResetLoading = signal<boolean>(false);
   readonly formError = signal<string>('');
-  readonly resetError = signal<string>('');
-  resetEmail = '';
 
   constructor(
     private authService: AuthService,
-    private api: ApiService,
-    private toast: ToastService
+    private api: ApiService
   ) {
     // Apply the saved theme on this public route before the app shell exists.
     inject(ThemeService);
@@ -712,26 +411,7 @@ export class LoginComponent {
   openResetModal() {
     if (this.isLoading()) return;
     this.maskPasswords();
-    this.resetEmail = '';
-    this.resetError.set('');
     this.isResetModalOpen.set(true);
-  }
-
-  sendResetRequest() {
-    if (!this.resetEmail) return;
-    this.resetError.set('');
-    this.isResetLoading.set(true);
-    this.api.post('/auth/password-reset/request', { email: this.resetEmail }).subscribe({
-      next: () => {
-        this.isResetLoading.set(false);
-        this.isResetModalOpen.set(false);
-        this.toast.success(this.uiI18n.translate('auth.instrukciya_po_sbrosu_parolya_otpravlena_na_ukaz'));
-      },
-      error: err => {
-        this.isResetLoading.set(false);
-        this.resetError.set(this.errorMessage(err, this.uiI18n.translate('auth.ne_udalos_otpravit_instrukciyu_povtorite_popytku')));
-      }
-    });
   }
 
   private errorMessage(error: unknown, fallback: string): string {

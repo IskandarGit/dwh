@@ -182,6 +182,15 @@ class ModularArchitectureTest {
                 .anyMatch(detail -> detail.contains("com.greenwhite.dwh.instance.md.repository.MdUserRepository"));
     }
 
+    @Test
+    @DisplayName("12. Внешние модули не должны напрямую обращаться к TypesenseClient (только через поисковый модуль)")
+    void externalModulesShouldNotDependOnTypesenseClientDirectly() {
+        noClasses()
+                .that().resideOutsideOfPackage("com.greenwhite.dwh.instance.search..")
+                .should().dependOnClassesThat().haveFullyQualifiedName("com.greenwhite.dwh.instance.search.typesense.TypesenseClient")
+                .check(importedClasses);
+    }
+
     private static class FakeRepositoryConsumer {
         private final com.greenwhite.dwh.instance.md.repository.MdUserRepository users;
         FakeRepositoryConsumer(com.greenwhite.dwh.instance.md.repository.MdUserRepository users) {

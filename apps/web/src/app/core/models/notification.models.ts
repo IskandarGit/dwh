@@ -18,3 +18,10 @@ export interface Announcement {
   bannerType: 'INFO' | 'WARNING' | 'CRITICAL';
   publishedAt: string;
 }
+
+export interface NotificationPrefItem {
+  eventType: string;
+  channel: string;
+  isEnabled: boolean;
+}
+
