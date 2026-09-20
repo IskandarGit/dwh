@@ -68,5 +68,5 @@ formats:
     sheets:
       - header_row: 1
         columns:
-          - {file_position: 1, name: "Код", field: object_key, type: object_key, required: true, key_mask: "^[0-9]{9}$"}
+          - {file_position: 1, name: "Код субъекта", field: object_key, type: object_key, required: true, key_mask: "^[0-9]{9}$"}
           - {file_position: 3, name: "Сумма", field: amount, type: integer, required: true, source_unit: unit_b3, base_unit: unit_b3}
