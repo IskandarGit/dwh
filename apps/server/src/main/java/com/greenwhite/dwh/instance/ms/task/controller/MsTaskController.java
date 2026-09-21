@@ -44,12 +44,13 @@ public class MsTaskController {
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "hide_terminal", required = false) Boolean hideTerminal,
             @RequestParam(name = "assigned_user_id", required = false) Long assignedUserId,
+            @RequestParam(name = "member_role", required = false) String memberRole,
             @RequestParam(name = "reporter_id", required = false) Long reporterId,
             @RequestParam(name = "overdue", required = false) Boolean overdue) {
 
         return ResponseEntity.ok(taskService.listTasks(
                 limit, cursor, projectId, statusId, priority, search, hideTerminal,
-                assignedUserId, reporterId, overdue, SecurityContext.getCurrentUserId()));
+                assignedUserId, reporterId, overdue, memberRole, SecurityContext.getCurrentUserId()));
     }
 
     // =========================================================================
@@ -221,7 +222,7 @@ public class MsTaskController {
     @RequiresPermission(form = MsTaskPref.FORM_TASKS, action = "update")
     public ResponseEntity<Void> changeStatus(@PathVariable("id") Long id, @Valid @RequestBody ChangeStatusDto body) {
         Long currentUserId = SecurityContext.getCurrentUserId();
-        taskService.changeStatus(id, body.statusId(), currentUserId);
+        taskService.changeStatus(id, body.statusId(), body.expectedRevision(), currentUserId);
         return ResponseEntity.noContent().build();
     }
 
@@ -262,6 +263,8 @@ public class MsTaskController {
         private Instant beginTime;
         private boolean endTimePresent;
         private Instant endTime;
+        private boolean expectedRevisionPresent;
+        private Long expectedRevision;
 
         public UpdateTaskDto() {}
 
@@ -320,6 +323,11 @@ public class MsTaskController {
             this.endTime = endTime;
         }
 
+        public void setExpectedRevision(Long expectedRevision) {
+            this.expectedRevisionPresent = true;
+            this.expectedRevision = expectedRevision;
+        }
+
         MsTaskPatch toPatch() {
             return new MsTaskPatch(
                     projectIdPresent, projectId,
@@ -332,13 +340,19 @@ public class MsTaskController {
                     observerUserIdsPresent, observerUserIds,
                     attributesPresent, attributes,
                     beginTimePresent, beginTime,
-                    endTimePresent, endTime);
+                    endTimePresent, endTime,
+                    expectedRevisionPresent, expectedRevision);
         }
     }
 
     public record ChangeStatusDto(
-            Long statusId
-    ) {}
+            Long statusId,
+            Long expectedRevision
+    ) {
+        public ChangeStatusDto(Long statusId) {
+            this(statusId, null);
+        }
+    }
 
     public record CreateStatusDto(
             String pcode,

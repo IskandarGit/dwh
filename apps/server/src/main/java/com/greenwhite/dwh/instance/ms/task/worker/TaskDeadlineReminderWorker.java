@@ -34,6 +34,11 @@ public class TaskDeadlineReminderWorker {
             }
 
             for (var row : rows) {
+                // Check if user enabled deadline notifications
+                if (!notificationService.isNotificationEnabled(row.userId(), "task_deadline_reminder", "in_app")) {
+                    continue;
+                }
+
                 // Avoid flooding: check if notification was already sent in last 24h
                 boolean alreadySent = notificationService.hasRecentNotification(
                         row.userId(),

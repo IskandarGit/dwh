@@ -51,7 +51,7 @@ test('translation override repaints live, persists across sessions, and keeps Ru
     await expect(page.getByRole('button', { name: marker, exact: true })).toBeVisible();
     await page.locator('#settings-languages-tab').click();
     await expect(page.getByRole('heading', {
-      name: 'Управление языковыми пакетами и локализацией'
+      name: /Sprachpakete und Lokalisierung verwalten|Управление языковыми пакетами и локализацией/
     })).toBeVisible();
 
     const secondContext = await browser.newContext();

@@ -1,5 +1,6 @@
 package com.greenwhite.dwh.instance.ms.task.event;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -14,13 +15,18 @@ public final class MsTaskEvents {
 
     private MsTaskEvents() {}
 
-    /** Пользователь назначен на задачу (ответственным или исполнителем). */
+    /** Пользователь назначен на задачу с указанием роли (R, E, O, etc.). */
     public record TaskAssigned(
             Long taskId,
             String taskTitle,
             List<Long> recipientUserIds,
+            String involveKind,
             Long actorUserId
-    ) {}
+    ) {
+        public TaskAssigned(Long taskId, String taskTitle, List<Long> recipientUserIds, Long actorUserId) {
+            this(taskId, taskTitle, recipientUserIds, null, actorUserId);
+        }
+    }
 
     /** Изменён статус задачи. */
     public record TaskStatusChanged(
@@ -39,4 +45,24 @@ public final class MsTaskEvents {
             List<Long> recipientUserIds,
             Long actorUserId
     ) {}
+
+    /** Изменён дедлайн задачи. */
+    public record TaskDeadlineChanged(
+            Long taskId,
+            String taskTitle,
+            Instant oldDeadline,
+            Instant newDeadline,
+            List<Long> recipientUserIds,
+            Long actorUserId
+    ) {}
+
+    /** Пользователь снят с задачи. */
+    public record TaskMemberRemoved(
+            Long taskId,
+            String taskTitle,
+            List<Long> recipientUserIds,
+            String involveKind,
+            Long actorUserId
+    ) {}
 }
+

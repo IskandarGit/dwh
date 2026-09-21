@@ -17,7 +17,8 @@ public record RateLimitProperties(
         int userPerMinute,
         int tokenPerMinute,
         int expensivePerMinute,
-        List<String> expensivePaths
+        List<String> expensivePaths,
+        int maxEntries
 ) implements SearchOwnerRateLimits {
     public RateLimitProperties {
         if (ipPerMinute <= 0) ipPerMinute = 60;
@@ -25,6 +26,7 @@ public record RateLimitProperties(
         if (userPerMinute <= 0) userPerMinute = 600;
         if (tokenPerMinute <= 0) tokenPerMinute = 300;
         if (expensivePerMinute <= 0) expensivePerMinute = 10;
+        if (maxEntries <= 0) maxEntries = 10_000;
         if (expensivePaths == null) {
             expensivePaths = List.of(
                     "/api/v1/audit/stats",

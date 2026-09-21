@@ -30,7 +30,11 @@ foreach ($invalidRef in @('main', 'refs/tags/v1.2.3', 'v1.2', 'v01.2.3', 'v1.02.
     }
 }
 
-$absoluteWorkflowPath = Join-Path $repoRoot $WorkflowPath
+$absoluteWorkflowPath = if ([System.IO.Path]::IsPathRooted($WorkflowPath)) {
+    $WorkflowPath
+} else {
+    Join-Path $repoRoot $WorkflowPath
+}
 if (-not (Test-Path -LiteralPath $absoluteWorkflowPath -PathType Leaf)) {
     Add-ContractError "Missing release workflow: $WorkflowPath"
     $workflow = ''
@@ -82,6 +86,12 @@ foreach ($image in @('server', 'web', 'backup', 'postgres', 'typesense')) {
 
 Assert-Matches $workflow 'linux/amd64,linux/arm64' 'Release images must target linux/amd64 and linux/arm64.'
 Assert-Matches $workflow '(?m)^\s*push:\s*true\s*$' 'Release build must push immutable image manifests.'
+Assert-Matches $workflow '(?i)scan-type:\s*image' 'Release workflow must scan published image digests with Trivy.'
+Assert-Matches $workflow 'aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8' 'Release workflow must use pinned Trivy action.'
+Assert-Matches $workflow 'test-secret-scan\.ps1' 'Release workflow verify job must include secret scanning.'
+Assert-Matches $workflow 'rollback\.ps1' 'Release bundle must contain rollback automation.'
+Assert-Matches $workflow 'test-recovery\.ps1' 'Release bundle must contain recovery drill test.'
+Assert-Matches (Get-Content -LiteralPath (Join-Path $repoRoot 'scripts/security/scan-runtime-images.ps1') -Raw) 'clamav' 'Runtime image scanner must include ClamAV.'
 Assert-Matches $workflow 'attest-build-provenance' 'Release workflow must emit GitHub build provenance attestations.'
 Assert-Matches $workflow 'cosign sign --yes' 'Release workflow must create keyless Cosign signatures.'
 Assert-Matches $workflow '@\$\{[^\r\n]+digest' 'Cosign and attestations must address images by digest.'
@@ -94,6 +104,7 @@ Assert-Matches $workflow 'invoke-managed-preflight\.ps1' 'Release bundle must co
 Assert-Matches $workflow 'invoke-managed-host-check\.ps1' 'Release bundle must contain the managed target host check.'
 Assert-Matches $workflow 'restore-combined\.ps1' 'Release bundle must contain combined database/object recovery.'
 Assert-Matches $workflow 'verify-published-release\.ps1' 'Release bundle must contain independent target-side release verification.'
+Assert-Matches $workflow 'test-release-gates\.ps1' 'Release bundle must contain release gates drill.'
 Assert-Matches $workflow '\.env\.managed\.example' 'Release bundle must contain the non-secret managed acceptance template.'
 Assert-Matches $workflow 'dist/\$\{bundle\}/scripts/prod' 'Release bundle must preserve the scripts/prod layout used by runbooks and cross-script calls.'
 Assert-Matches $workflow 'cp -R docs ' 'Release bundle must include the documentation tree referenced by its README.'

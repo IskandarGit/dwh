@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { PACKAGED_RUSSIAN } from '../../core/i18n/packaged-russian';
 
 const UPL_DIR = 'src/app/features/upl';
-const SHELL_FILE = 'src/app/layout/app-shell/app-shell.component.ts';
+const SHELL_FILES = [
+  'src/app/layout/app-shell/app-shell.component.ts',
+  'src/app/layout/app-shell/app-shell.models.ts'
+];
 /** Литерал ключа словаря; префикс `'upl.err.'` (кончается точкой) сюда не попадает. */
 const KEY_LITERAL = /'(upl\.[A-Za-z0-9_.]*[A-Za-z0-9_]|nav\.upl_[a-z0-9_]+)'/g;
 /** Подкод ошибки контракта: текст берётся по ключу `upl.err.<подкод>`. */
@@ -17,7 +20,7 @@ function sourceFiles(): string[] {
   const own = readdirSync(UPL_DIR, { recursive: true })
     .map(name => `${UPL_DIR}/${name.replace(/\\/g, '/')}`)
     .filter(name => name.endsWith('.ts') && !name.endsWith('.spec.ts') && !name.endsWith('.d.ts'));
-  return [...own, SHELL_FILE];
+  return [...own, ...SHELL_FILES];
 }
 
 function literals(texts: string[], pattern: RegExp): string[] {

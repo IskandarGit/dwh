@@ -69,6 +69,9 @@ public class ApiException extends RuntimeException {
         return new ApiException(code, message);
     }
 
+    public static ApiException rateLimited(String message) {
+        return new ApiException(ErrorCode.RATE_LIMITED, message);
+    }
 
     public static ApiException validation(String message, List<FieldErrorItem> errors) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message, errors);

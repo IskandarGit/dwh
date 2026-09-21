@@ -20,15 +20,16 @@ import { PermissionService } from '../../../core/services/permission.service';
 import { SearchManagementService } from '../../../core/services/search-management.service';
 import { UiModalComponent } from '../../../shared/ui/ui-modal.component';
 
-type PendingMutation =
-  | { kind: 'start'; request: SearchStartJobRequest }
-  | { kind: 'retry'; jobId: string; request: SearchRetryJobRequest }
-  | { kind: 'cancel'; jobId: string };
-
-interface MaintenanceConfirmation {
-  action: Extract<SearchJobAction, 'REBUILD' | 'ROLLBACK'>;
-  generationId?: string;
-}
+import {
+  PendingMutation,
+  MaintenanceConfirmation,
+  validateSearchPolicy,
+  cloneSearchSnapshot,
+  cloneSearchPolicy,
+  toProblemDetail,
+  formatBytes,
+  formatJobError
+} from './search-settings.models';
 
 @Component({
   selector: 'app-search-settings',
@@ -81,7 +82,7 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   previewQuery = '';
   previewEntity: SearchEntityType | '' = '';
 
-  readonly policyErrors = computed(() => this.validatePolicy(this.draft()));
+  readonly policyErrors = computed(() => validateSearchPolicy(this.draft(), this.entities));
   readonly dirty = computed(() => {
     const saved = this.savedSettings();
     const draft = this.draft();
@@ -366,15 +367,7 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   }
 
   jobErrorMessage(code?: string | null): string {
-    if (!code) return '';
-    const known: Record<string, string> = {
-      DEPENDENCY_UNAVAILABLE: 'settings.search.error.dependency_unavailable',
-      COLLECTION_MISSING: 'settings.search.error.collection_missing',
-      STORAGE_CAPACITY_EXCEEDED: 'settings.search.error.storage_capacity',
-      GENERATION_CAPACITY_EXCEEDED: 'settings.search.error.generation_capacity',
-      VERIFICATION_FAILED: 'settings.search.error.verification_failed'
-    };
-    return this.i18n.translate(known[code] ?? 'settings.search.error.generic_job');
+    return formatJobError(code, key => this.i18n.translate(key));
   }
 
   displayNumber(value: number | null | undefined): string {
@@ -382,11 +375,7 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   }
 
   displayBytes(value: number | null | undefined): string {
-    if (value === null || value === undefined) return this.i18n.translate('settings.search.unknown');
-    if (value < 1024) return `${value} B`;
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
-    if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MiB`;
-    return `${(value / 1024 / 1024 / 1024).toFixed(1)} GiB`;
+    return formatBytes(value, this.i18n.translate('settings.search.unknown'));
   }
 
   trackField(_index: number, field: SearchFieldPolicy): string {
@@ -403,32 +392,6 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
       const rows = current.fields[entity].map((field, row) => row === index ? update(field) : field);
       return { ...current, fields: { ...current.fields, [entity]: rows } };
     });
-  }
-
-  private validatePolicy(policy: SearchQueryPolicy | null): string[] {
-    if (!policy) return ['settings.search.validation.unavailable'];
-    const errors: string[] = [];
-    if (!Number.isInteger(policy.globalLimit) || policy.globalLimit < 1 || policy.globalLimit > 50)
-      errors.push('settings.search.validation.global_limit');
-    if (!Number.isInteger(policy.requestsPerMinute) || policy.requestsPerMinute < 30 || policy.requestsPerMinute > 600)
-      errors.push('settings.search.validation.rate');
-    if (!Number.isInteger(policy.burst) || policy.burst < 10 || policy.burst > 60 || policy.burst > policy.requestsPerMinute)
-      errors.push('settings.search.validation.burst');
-    for (const entity of this.entities) {
-      const fields = policy.fields[entity] ?? [];
-      if (fields.length === 0) {
-        if (entity === 'NOTE') continue;
-        errors.push('settings.search.validation.searchable_field');
-        continue;
-      }
-      if (!fields.some(field => Number.isInteger(field.weight) && field.weight > 0))
-        errors.push('settings.search.validation.searchable_field');
-      if (fields.some(field => !Number.isInteger(field.weight) || field.weight < 0 || field.weight > 127))
-        errors.push('settings.search.validation.weight');
-      if (fields.some(field => !Number.isInteger(field.numTypos) || field.numTypos < 0 || field.numTypos > 2))
-        errors.push('settings.search.validation.typos');
-    }
-    return [...new Set(errors)];
   }
 
   private executeMutation(action: PendingMutation): void {
@@ -511,11 +474,11 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   }
 
   private cloneSnapshot(snapshot: SearchSettingsSnapshot): SearchSettingsSnapshot {
-    return { version: snapshot.version, policy: this.clonePolicy(snapshot.policy) };
+    return cloneSearchSnapshot(snapshot);
   }
 
   private clonePolicy(policy: SearchQueryPolicy): SearchQueryPolicy {
-    return structuredClone(policy);
+    return cloneSearchPolicy(policy);
   }
 
   private newRequestId(): string {
@@ -523,12 +486,6 @@ export class SearchSettingsComponent implements OnInit, OnDestroy {
   }
 
   private problem(error: unknown): ProblemDetail {
-    if (error && typeof error === 'object' && 'status' in error && 'detail' in error) return error as ProblemDetail;
-    return {
-      title: this.i18n.translate('common.error'),
-      status: 0,
-      code: 'NETWORK_ERROR',
-      detail: this.i18n.translate('settings.search.error.request_failed')
-    };
+    return toProblemDetail(error, this.i18n.translate('common.error'), this.i18n.translate('settings.search.error.request_failed'));
   }
 }

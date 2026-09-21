@@ -1,18 +1,18 @@
 package com.greenwhite.dwh.instance.kauth.controller;
 
 import com.greenwhite.dwh.instance.common.error.ApiException;
-import com.greenwhite.dwh.instance.kauth.pref.KauthPref;
+import com.greenwhite.dwh.instance.common.security.ClientIpResolver;
 import com.greenwhite.dwh.instance.common.security.SecurityContext;
+import com.greenwhite.dwh.instance.kauth.pref.KauthPref;
 import com.greenwhite.dwh.instance.kauth.service.KauthAuthService;
 import com.greenwhite.dwh.instance.kauth.service.KauthSessionService;
-import com.greenwhite.dwh.instance.common.annotation.RequiresPermission;
-import com.greenwhite.dwh.instance.md.pref.MdPref;
-import com.greenwhite.dwh.instance.md.service.MdUserView;
 import com.greenwhite.dwh.instance.md.service.MdUserService;
+import com.greenwhite.dwh.instance.md.service.MdUserView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -30,16 +30,30 @@ public class KauthAuthController {
     private final KauthSessionService sessionService;
     private final MdUserService userService;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final ClientIpResolver clientIpResolver;
+
+    @Autowired
+    public KauthAuthController(
+            KauthAuthService authService,
+            KauthSessionService sessionService,
+            MdUserService userService,
+            CsrfTokenRepository csrfTokenRepository,
+            ClientIpResolver clientIpResolver) {
+        this.authService = authService;
+        this.sessionService = sessionService;
+        this.userService = userService;
+        this.csrfTokenRepository = csrfTokenRepository;
+        this.clientIpResolver = clientIpResolver != null
+                ? clientIpResolver
+                : new ClientIpResolver(null);
+    }
 
     public KauthAuthController(
             KauthAuthService authService,
             KauthSessionService sessionService,
             MdUserService userService,
             CsrfTokenRepository csrfTokenRepository) {
-        this.authService = authService;
-        this.sessionService = sessionService;
-        this.userService = userService;
-        this.csrfTokenRepository = csrfTokenRepository;
+        this(authService, sessionService, userService, csrfTokenRepository, null);
     }
 
     @PostMapping("/login")
@@ -48,7 +62,7 @@ public class KauthAuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        String ip = getClientIp(request);
+        String ip = clientIpResolver.resolveClientIp(request);
         String userAgent = request.getHeader("User-Agent") != null ? request.getHeader("User-Agent") : "Unknown";
 
         var result = authService.login(body.login(), body.password(), ip, userAgent, body.deviceInfo());
@@ -74,7 +88,7 @@ public class KauthAuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        String ip = getClientIp(request);
+        String ip = clientIpResolver.resolveClientIp(request);
         String userAgent = request.getHeader("User-Agent") != null ? request.getHeader("User-Agent") : "Unknown";
 
         var result = authService.verifyOtp(body.otpToken(), body.code(), ip, userAgent, body.deviceInfo());
@@ -93,7 +107,7 @@ public class KauthAuthController {
             sessionService.closeSession(principal.sessionId());
         }
 
-        boolean isSecure = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+        boolean isSecure = clientIpResolver.isSecure(request);
         ResponseCookie cookie = ResponseCookie.from(KauthPref.SESSION_COOKIE_NAME, "")
                 .httpOnly(true)
                 .secure(isSecure)
@@ -136,7 +150,7 @@ public class KauthAuthController {
     }
 
     private void setSessionCookie(HttpServletRequest request, HttpServletResponse response, String rawToken) {
-        boolean isSecure = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+        boolean isSecure = clientIpResolver.isSecure(request);
         ResponseCookie cookie = ResponseCookie.from(KauthPref.SESSION_COOKIE_NAME, rawToken)
                 .httpOnly(true)
                 .secure(isSecure)
@@ -147,15 +161,6 @@ public class KauthAuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         // Renew only after completed credential/OTP authentication, including stale-cookie relogin.
         csrfTokenRepository.saveToken(csrfTokenRepository.generateToken(request), request, response);
-    }
-
-
-    private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
     }
 
     public record LoginDto(

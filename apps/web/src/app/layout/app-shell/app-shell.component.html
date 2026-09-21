@@ -1,0 +1,68 @@
+<a class="skip-link" href="#main-content" (click)="skipToContent($event)">{{ 'layout.app_shell.pereyti_k_osnovnomu_soderzhimomu' | t }}</a>
+    <div class="app-layout">
+      <!-- Sidebar (Delegated Component) -->
+      <app-sidebar
+        [sidebarId]="sidebarId"
+        [isMobile]="isMobile()"
+        [isMobileMenuOpen]="isMobileMenuOpen()"
+        [isCollapsed]="isCollapsed()"
+        [navSections]="navSections()"
+        [isFlyoutVisible]="isFlyoutVisible()"
+        [hoveredFlyoutSection]="hoveredFlyoutSection()"
+        [flyoutAnchorTop]="flyoutAnchorTop()"
+        [isProfileFlyoutVisible]="isProfileFlyoutVisible()"
+        [currentUser]="authService.currentUser()"
+        [isSectionActive]="isSectionActiveFn"
+        [isRouteActive]="isRouteActiveFn"
+        [getSectionIcon]="getSectionIconFn"
+        [getSectionBadge]="getSectionBadgeFn"
+        [hasVisibleItems]="hasVisibleItemsFn"
+        [isSectionExpanded]="isSectionExpandedFn"
+        [isSubmenuExpanded]="isSubmenuExpandedFn"
+        (toggleSidebar)="toggleSidebar()"
+        (closeMobileMenu)="closeMobileMenu($event)"
+        (onNavClick)="onNavClick()"
+        (toggleSection)="toggleSection($event.id, $event.event)"
+        (toggleSubmenu)="toggleSubmenu($event.id, $event.event)"
+        (categoryClick)="onCategoryClick($event.section, $event.event)"
+        (categoryMouseEnter)="onCategoryMouseEnter($event.section, $event.event)"
+        (categoryMouseLeave)="onCategoryMouseLeave()"
+        (profileMouseEnter)="onProfileMouseEnter($event)"
+        (profileMouseLeave)="onProfileMouseLeave()"
+        (flyoutMouseEnter)="onFlyoutMouseEnter()"
+        (flyoutMouseLeave)="onFlyoutMouseLeave()"
+        (flyoutItemClick)="onFlyoutItemClick()"
+        (profileFlyoutMouseEnter)="onProfileFlyoutMouseEnter()"
+        (profileFlyoutMouseLeave)="onProfileFlyoutMouseLeave()"
+        (profileFlyoutClick)="onProfileFlyoutClick()"
+        (logout)="onLogout()"
+      ></app-sidebar>
+
+      <!-- Main Container -->
+      <div class="main-wrapper" [attr.inert]="isMobile() && isMobileMenuOpen() ? true : null">
+        <!-- Top Navigation (Delegated Component) -->
+        <app-header
+          [isMobile]="isMobile()"
+          [isMobileMenuOpen]="isMobileMenuOpen()"
+          [sidebarId]="sidebarId"
+          [isChangingLanguage]="isChangingLanguage()"
+          [isDismissingAnnouncement]="isDismissingAnnouncement()"
+          [canReadNotifications]="canReadNotifications()"
+          [canReadAnnouncements]="canReadAnnouncements()"
+          (toggleMobileMenu)="toggleMobileMenu()"
+          (changeLanguage)="changeLanguage($event)"
+          (dismissAnnouncement)="dismissAnnouncement()"
+          (logout)="onLogout()"
+        ></app-header>
+
+        <!-- Page View Outlet -->
+        <main id="main-content" #mainContent class="page-content" tabindex="-1">
+          <router-outlet></router-outlet>
+        </main>
+      </div>
+    </div>
+
+    <!-- Command Palette Modal -->
+    <app-command-palette></app-command-palette>
+
+    <!-- Global Toast Container -->

@@ -34,17 +34,26 @@ public class MsTaskNotificationListener {
 
     @EventListener
     public void onTaskAssigned(MsTaskEvents.TaskAssigned event) {
+        String roleKind = event.involveKind() != null ? event.involveKind() : "";
+        String title = switch (roleKind) {
+            case "R" -> "Вы назначены ответственным за задачу";
+            case "E" -> "Вы добавлены соисполнителем задачи";
+            case "O" -> "Вы добавлены наблюдателем задачи";
+            default -> "Вам назначена задача";
+        };
         notifyAll(event.recipientUserIds(), event.actorUserId(),
+                "task_assigned",
                 MsNotifyPref.TYPE_INFO,
-                "Вам назначена задача",
+                title,
                 event.taskTitle(),
                 event.taskId(),
-                "task-assigned-" + event.taskId());
+                "task-assigned-" + event.taskId() + (roleKind.isEmpty() ? "" : "-" + roleKind));
     }
 
     @EventListener
     public void onTaskStatusChanged(MsTaskEvents.TaskStatusChanged event) {
         notifyAll(event.recipientUserIds(), event.actorUserId(),
+                "task_status",
                 event.terminal() ? MsNotifyPref.TYPE_SUCCESS : MsNotifyPref.TYPE_INFO,
                 "Статус задачи: " + event.newStatusName(),
                 event.taskTitle(),
@@ -57,6 +66,7 @@ public class MsTaskNotificationListener {
     @EventListener
     public void onTaskCommented(MsTaskEvents.TaskCommented event) {
         notifyAll(event.recipientUserIds(), event.actorUserId(),
+                "task_comment",
                 MsNotifyPref.TYPE_INFO,
                 "Новый комментарий к задаче",
                 event.taskTitle(),
@@ -64,13 +74,44 @@ public class MsTaskNotificationListener {
                 null); // комментарии не схлопываем: важен каждый
     }
 
-    private void notifyAll(List<Long> recipients, Long actorUserId, String type,
+    @EventListener
+    public void onTaskDeadlineChanged(MsTaskEvents.TaskDeadlineChanged event) {
+        notifyAll(event.recipientUserIds(), event.actorUserId(),
+                "task_deadline",
+                MsNotifyPref.TYPE_WARNING,
+                "Изменён дедлайн задачи",
+                event.taskTitle(),
+                event.taskId(),
+                "task-deadline-" + event.taskId());
+    }
+
+    @EventListener
+    public void onTaskMemberRemoved(MsTaskEvents.TaskMemberRemoved event) {
+        String roleName = switch (event.involveKind() != null ? event.involveKind() : "") {
+            case "R" -> "ответственного";
+            case "E" -> "соисполнителя";
+            case "O" -> "наблюдателя";
+            default -> "участника";
+        };
+        notifyAll(event.recipientUserIds(), event.actorUserId(),
+                "task_member_removed",
+                MsNotifyPref.TYPE_INFO,
+                "Вы сняты с роли " + roleName + " задачи",
+                event.taskTitle(),
+                event.taskId(),
+                "task-removed-" + event.taskId());
+    }
+
+    private void notifyAll(List<Long> recipients, Long actorUserId, String eventType, String type,
                            String title, String body, Long taskId, String sourceCode) {
         if (recipients == null) {
             return;
         }
         for (Long userId : recipients) {
             if (userId == null || userId.equals(actorUserId)) {
+                continue;
+            }
+            if (!notificationService.isNotificationEnabled(userId, eventType, "in_app")) {
                 continue;
             }
             notificationService.sendInAppNotification(

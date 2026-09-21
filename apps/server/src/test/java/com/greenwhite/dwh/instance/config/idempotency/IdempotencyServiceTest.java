@@ -42,7 +42,7 @@ class IdempotencyServiceTest {
                 IdempotencyRepository.State.COMPLETED, Instant.now()
         );
 
-        when(repository.tryReserve(eq(key), eq(1L), eq("abc123hash"), any(UUID.class))).thenReturn(false);
+        when(repository.tryReserve(eq(key), eq(1L), eq("abc123hash"), any(UUID.class), any(Instant.class))).thenReturn(false);
         when(repository.findByKey(key)).thenReturn(Optional.of(record));
 
         var result = service.claim(key, 1L, "abc123hash");
@@ -64,5 +64,29 @@ class IdempotencyServiceTest {
         service.complete(key, reservationToken, 201, "{\"id\":100}");
 
         verify(repository).complete(key, reservationToken, 201, "{\"id\":100}");
+    }
+
+    @Test
+    @DisplayName("Успешный захват резервации должен возвращать ACQUIRED с reservation token")
+    void shouldAcquireNewReservation() {
+        UUID key = UUID.randomUUID();
+        when(repository.tryReserve(eq(key), eq(2L), eq("reqhash"), any(UUID.class), any(Instant.class)))
+                .thenReturn(true);
+
+        var result = service.claim(key, 2L, "reqhash");
+
+        assertThat(result.state()).isEqualTo(IdempotencyService.ClaimState.ACQUIRED);
+        assertThat(result.reservationToken()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Очистка устаревших ключей должна вызывать удаление записей старше N дней")
+    void shouldCleanupOldKeys() {
+        when(repository.deleteOlderThan(any(Instant.class))).thenReturn(5);
+
+        int deleted = service.cleanupOldKeys(14);
+
+        assertThat(deleted).isEqualTo(5);
+        verify(repository).deleteOlderThan(any(Instant.class));
     }
 }

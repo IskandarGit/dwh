@@ -1,0 +1,91 @@
+.settings-page {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 0;
+      width: 100%;
+      min-width: 0;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .toolbar {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+    }
+
+    .status-tabs {
+      min-width: max-content;
+      flex: 0 0 max-content;
+      margin-inline: 8px;
+    }
+
+    .view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .view-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0;
+    }
+
+    .view-subtitle {
+      font-size: 13px;
+      color: var(--text-light);
+    }
+
+    .load-error-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .load-error-text {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+    .btn-secondary {
+      background: var(--bg-surface);
+      border-color: var(--border-color);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+    }

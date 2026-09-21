@@ -1,6 +1,6 @@
 # Контекст SmartupCMS для AI-ассистентов
 
-**Актуализировано:** 2026-09-10
+**Актуализировано:** 2026-09-19
 
 **Назначение:** краткий воспроизводимый handoff для следующей AI-сессии
 
@@ -109,28 +109,26 @@ repositories/adapters — I/O. Детали приведены в
 
 ## 6. Последняя подтверждённая проверка
 
-### Точка продолжения — 2026-09-10 (HEAD synchronized with origin/main)
+### Точка продолжения — 2026-09-18 (Release Hardening Roadmap I-01..I-10 Fully Completed)
 
-2026-09-10 зафиксирован и запушен коммит `8a5a4315716e2b2aedd1b8ca889685b99e658d30`
-(`feat(navigation): add category rail with flyout popover and modular system enhancements`).
-Ветка `main` полностью синхронизирована с `origin/main` (`ahead 0, behind 0`).
-Локальные черновики `audit/` сохранены в untracked-состоянии согласно `AGENTS.md`.
+Завершена последовательная реализация дорожной карты обеспечения релизной надежности (`docs/superpowers/plans/2026-09-05-release-hardening.md`), закрывшая все аудиторские замечания P0/P1 и инфраструктурные риски (пакеты I-01 — I-10):
 
-Ключевые подтверждённые факты и выполненные решения:
-1. **Целевой SLO:** утверждён на уровне 99.9% доступности сервиса.
-2. **Объектное хранилище и каналы:** поддерживаются MinIO (S3-совместимое) и `local_disk`; канал SMTP настраивается независимо per-deployment.
-3. **Модульность ядра и БД:** в скоуп включены модуль `ms/note`, реестр модулей (`md_module_registry`), настраиваемая навигация (`md_navigation_items`) и миграции Flyway `V028`..`V032`.
-4. **Навигация и UI:**
-   - Левый рейл (60px) отображает категории/разделы (`space_dashboard`, `manage_accounts`, `tune`).
-   - Автоматическое расширение меню по ширине на ховере полностью отключено («меню не раскрывается»).
-   - Наведение или клик на категорию открывает компактную всплывающую карточку (`.rail-flyout-popover`) с заголовком раздела в uppercase, списком пунктов и активной синей плашкой `#0284c7`, точно по дизайну пользователя (`media_1788983193674.png`).
-   - Закрытие карточки реализовано по Escape и клику вне области. В подвале рейла профиль пользователя также открывает flyout-карточку.
-5. **Тестирование и верификация:**
-   - TypeScript: 0 ошибок (`npm run typecheck`).
-   - Frontend Vitest: 61 тестовый файл, 598 тестов пройдено из 598 (100% pass).
-   - Все 7 верификационных контрактов репозитория подтверждены (`test-public-docs.ps1`, `test-repository-hygiene.ps1`, `test-unified-boundaries.ps1`, `verify-release.ps1`, `test-release-config.ps1`, `test-backup-status.ps1`, `test-deploy-fail-closed.sh`).
-   - Граф знаний Graphify синхронизирован (`graphify update .`).
-   - Docker-контейнер `smartupcms-web-1` пересобран и активен на `http://localhost:4200`.
+1. **I-01 (Task Export Security)**: Принудительное разграничение скоупов (`MdScopeService`) для CSV/XML экспортов, нейтрализация формульных инъекций (CSV formula injection), 69 интеграционных тестов в real PostgreSQL 18.
+2. **I-04 (Secret-Safe Idempotency)**: Строгий allow-list эндпоинтов, фильтрация учетных данных и секретов, арендный механизм предотвращения гонок, лимит размера тела 64 КБ, автоочистка по TTL (24 ч) с `IdempotencyCleanupWorker`.
+3. **I-03 (Trusted Client IP & Bounded Limiter)**: `ClientIpResolver` с валидацией доверенных подсетей обратных прокси, защита от спуфинга `X-Forwarded-For` и `X-Forwarded-Proto`, ограниченный W-TinyLFU кэш Caffeine (до 10 000 записей).
+4. **I-02 (Database Least Privilege)**: Разделение ролей (`smartupcms_migrator` с DDL, `smartupcms` с DML без DDL/TRUNCATE, `smartupcms_backup` с read-only). Миграция `V033` с безопасными `SECURITY DEFINER` функциями управления партициями аудита (`audit_log_create_partition`, `audit_log_detach_partition`).
+5. **I-05 (Recoverable Deployment)**: Безопасный деплой с сохранением томов (`deploy.sh` / `deploy.ps1`), откат на известные дайджесты (`rollback.sh` / `rollback.ps1`), атомарный комбинированный бэкап и восстановление БД + объектов S3 (`backup-objects.ps1`, `restore-combined.ps1`, `test-recovery.ps1`).
+6. **I-06 (Release Artifact Gates)**: Проверка истории репозитория на секреты (Gitleaks fixture, 0 leaks), сканирование образов Trivy на уязвимости перед публикацией, валидация дайджестов, подписей и SBOM.
+7. **I-07 (Reliable Search Synchronization)**: Транзакционный outbox (`search_outbox`), надежная фоновая доставка с экспоненциальным backoff (до 8 попыток), неблокирующий старт при отказе Typesense, фоновая сверка и изоляция в ArchUnit (Rule 12).
+8. **I-08 (Measured DB / Concurrency Improvements)**: Удаление дублирующих B-tree индексов (`V034`), объединение частых записей сессий/токенов (coalescing 60с), защита фильтра аутентификации от ложных 401 логаутов при сбоях соединений с БД, оптимистическая блокировка задач (OCC) с монотонным счетчиком `revision` и HTTP 409 `TASK_REVISION_CONFLICT`.
+9. **I-09 (Capacity & Operations Evidence)**: Потоковый экспорт задач с `defaultRowFetchSize: 500`, лимитом `dwh.reports.export.max-rows: 50000` и перехватом обрыва соединения клиентом (`ClientAbortException`), семафор одновременных загрузок файлов (HTTP 429 при превышении), объединение запросов статистики аудита с 15-секундным снапшот-кэшем, аппаратные лимиты CPU/RAM и ограниченный tmpfs (`1024m`) в production Compose.
+10. **I-10 (Final Release Readiness)**: Приведение спецификации OpenAPI 3.1.0 в `OpenApiController` в соответствие с фактическими эндпоинтами и брендингом SmartupCMS Core API (`OpenApiControllerTest`), разработка [приложения по приватности и срокам хранения](ops/privacy-and-retention-annex.md), расширение инструкций эксплуатации в [operations-runbook.md](ops/operations-runbook.md) и [production-launch-checklist.md](ops/production-launch-checklist.md), создание мастер-скрипта проверки релизной готовности `scripts/release/test-final-readiness.ps1`.
+
+Текущее подтвержденное состояние качества:
+- Backend: **832 теста пройдено из 832 (0 failures, 0 errors, 0 skipped)** в `apps/server`.
+- Frontend: **598 тестов пройдено из 598 (100% pass)** в `apps/web`.
+- TypeScript: 0 ошибок (`npm run typecheck`).
+- Граф знаний Graphify синхронизирован (`graphify update .`).
 
 ### Текущая локальная работа — оргструктура и data scope, 2026-09-08
 
@@ -681,6 +679,19 @@ actions по-прежнему зафиксированы immutable SHA; `verify-
 запрещает возврат этих пяти action families на неутверждённый pin. Локальные
 `actionlint` и supply-chain contract зелёные; remote CI `33919377814` подтвердил
 все пять jobs без прежних Node 20 annotations.
+
+Срез 2026-09-19:
+- Выполнен полный сквозной аудит качества проекта (Backend, Frontend, DB, Security, E2E).
+- Полный прогон Playwright E2E: 14 сьютов, 50/50 passed (включая a11y axe-core, mobile viewports 320/390px, смену паролей, вебхуки).
+- Angular Vitest: 63 тестовых файла, 626/626 passed.
+- Устранена рассинхронизация каталогов локализации: добавлен ключ `tasks.bystrye_filtry` в `ru.json` и `en.json`, синхронизирован `packaged-russian.ts`, аудит `i18n:audit` даёт 100% совпадение (1304 используемых ключа).
+- Исправлен тест многопоточности `AuthenticationGenerationConcurrencyTest` (переведён на `incrementAuthenticationVersion`, 45/45 passed).
+- Тест `S3StorageProviderIntegrationTest` переведён на канонический образ `quay.io/minio/minio:latest` (passed).
+- Исправлен формат секрета в `webhooks-settings.component.spec.ts`.
+- Оптимизирован начальный бандл веб-приложения: `AppShellComponent` переведён на динамический импорт (`loadComponent`) в роутере, размер `Initial total` снизился с 561.35 kB до 394.45 kB (бюджет 500 kB выполнен, 0 warnings).
+- Контракт сетевой изоляции `scripts/security/test-no-default-egress.ps1` успешно подтвердил 0 внешних исходящих сетевых пакетов в runtime под нагрузкой.
+- Формализованы решения по всем 4 направлениям Раздела 7 ТЗ (нагрузка/задержки, Privacy & Retention, боевая топология, On-call/Rollback).
+- Следующий этап: развитие и унификация переиспользуемой библиотеки компонентов (`shared/ui`) по методологии `smartup5x_biruni`, чтобы исключить написание типовых компонентов (таблицы, гриды, фильтры, селекты, формы) с нуля.
 
 ## 7. Открытые release gates
 

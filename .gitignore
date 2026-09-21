@@ -52,6 +52,8 @@ coverage/
 # --- Local verification tools, reports, and agent scratch state ---
 /output/
 /.superpowers/
+/deployments/
+
 
 # --- Local Git worktrees ---
 .worktrees/

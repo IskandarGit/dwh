@@ -1,0 +1,112 @@
+<div class="roles-page">
+      <!-- Top Page Header -->
+      <div class="view-header">
+        <div class="header-left">
+          <h1 class="view-title">{{ 'iam.roli_i_matrica_prav' | t }}</h1>
+          <span class="count-badge">{{ roles().length }}</span>
+        </div>
+        <div class="header-right">
+          <ui-button
+            *ngIf="canCreateRole()"
+            variant="primary"
+            size="md"
+            icon="add"
+            (onClick)="openCreateModal()"
+          >
+            {{ 'iam.novaya_rol' | t }}
+          </ui-button>
+        </div>
+      </div>
+
+      <!-- Roles Horizontal Bar -->
+      <app-role-cards-bar
+        [roles]="filteredRoles()"
+        [selectedRole]="selectedRole()"
+        [roleUserCounts]="roleUserCounts()"
+        [searchQuery]="roleSearchQuery"
+        (searchQueryChange)="roleSearchQuery = $event"
+        [isSaving]="isSaving()"
+        [scopePanelBusy]="scopePanelBusy()"
+        [isSubmittingRole]="isSubmittingRole()"
+        [canCreateRole]="canCreateRole()"
+        [canUpdateRole]="canUpdateRole()"
+        [canDeleteRole]="canDeleteRole()"
+        (selectRole)="selectRole($event)"
+        (navigateToUsers)="navigateToUsersWithRole($event.role, $event.event)"
+        (openEdit)="openEditRoleModal($event)"
+        (openDelete)="openDeleteRoleModal($event)"
+        (openCreate)="openCreateModal()"
+      ></app-role-cards-bar>
+
+      <!-- Main Permission Matrix Section -->
+      <div class="matrix-card" *ngIf="selectedRole() as role" [attr.aria-busy]="isLoading() || isSaving()">
+        <app-role-permissions-matrix
+          [role]="role"
+          [isLoading]="isLoading()"
+          [isSaving]="isSaving()"
+          [permissionsError]="permissionsError()"
+          [activePermissionsCount]="activePermissionsCount()"
+          [totalActionsCount]="totalActionsCount()"
+          [permissionPercentage]="permissionPercentage()"
+          [isPermissionsDirty]="isPermissionsDirty()"
+          [dirtyPermissionsCount]="dirtyPermissionsCount()"
+          [canGrant]="canGrant()"
+          [canEditPermissions]="canEditPermissions()"
+          [matrixSearchQuery]="matrixSearchQuery"
+          [matchingFormsCount]="matchingFormsCount()"
+          [formsCount]="forms().length"
+          [selectedModuleTab]="selectedModuleTab"
+          [moduleGroups]="moduleGroups"
+          [visibleModuleGroups]="visibleModuleGroups()"
+          [hasPermission]="hasPermissionFn"
+          [isPermissionDirty]="isPermissionDirtyFn"
+          [getModuleIcon]="getModuleIconFn"
+          [getModuleActionsCount]="getModuleActionsCountFn"
+          (resetChanges)="resetMatrixChanges()"
+          (savePermissions)="savePermissions()"
+          (refreshRole)="selectRole($event)"
+          (matrixSearchQueryChange)="matrixSearchQuery = $event"
+          (selectedModuleTabChange)="selectedModuleTab = $event"
+          (setAllModulesExpanded)="setAllModulesExpanded($event)"
+          (toggleAllPermissions)="toggleAllPermissions($event)"
+          (toggleReadOnlyAllPermissions)="toggleReadOnlyAllPermissions()"
+          (toggleModuleExpand)="toggleModuleExpand($event)"
+          (toggleReadOnlyModule)="toggleReadOnlyModule($event)"
+          (toggleAllModule)="toggleAllModule($event.mod, $event.select)"
+          (toggleAllForm)="toggleAllForm($event.form, $event.select)"
+          (togglePermission)="togglePermission($event.formCode, $event.action, $event.event)"
+        ></app-role-permissions-matrix>
+        <app-role-scope-panel
+          *ngIf="canViewOrgUnits() && safeRoleId(role.id)"
+          [roleId]="role.id"
+          (busyChange)="scopePanelBusy.set($event)"
+        ></app-role-scope-panel>
+      </div>
+    </div>
+
+    <!-- Modals (Create, Edit, Delete, Discard) -->
+    <app-role-modals
+      [isCreateModalOpen]="isCreateModalOpen()"
+      [isCreateSubmitted]="isCreateSubmitted"
+      [newRoleForm]="newRoleForm"
+      [isEditModalOpen]="isEditModalOpen()"
+      [isEditSubmitted]="isEditSubmitted"
+      [editingRole]="editingRole"
+      [editRoleForm]="editRoleForm"
+      [isDeleteModalOpen]="isDeleteModalOpen()"
+      [deletingRole]="deletingRole"
+      [isDiscardPermissionsModalOpen]="isDiscardPermissionsModalOpen()"
+      [selectedRole]="selectedRole()"
+      [dirtyPermissionsCount]="dirtyPermissionsCount()"
+      [isSubmittingRole]="isSubmittingRole()"
+      [isSaving]="isSaving()"
+      (closeCreate)="isCreateModalOpen.set(false)"
+      (submitCreate)="submitCreateRole()"
+      (closeEdit)="isEditModalOpen.set(false)"
+      (submitEdit)="submitEditRole()"
+      (closeDelete)="closeDeleteRoleModal()"
+      (confirmDelete)="confirmDeleteRole()"
+      (closeDiscard)="closeDiscardModal()"
+      (confirmDiscardAndSwitch)="confirmDiscardAndSwitch()"
+      (saveAndSwitch)="saveAndSwitch()"
+    ></app-role-modals>

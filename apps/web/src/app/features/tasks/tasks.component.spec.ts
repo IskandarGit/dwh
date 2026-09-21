@@ -232,6 +232,82 @@ describe('TasksComponent UI contracts', () => {
     expect(action.type).toBe('button');
     expect(action.getAttribute('aria-label')).toBe('Открыть подзадачу #11: Проверить подзадачу');
   });
+
+  it('submits executorUserIds when creating a task with co-executors', async () => {
+    let postedPayload: any = null;
+    const api = {
+      get: vi.fn(() => of([])),
+      post: vi.fn((path: string, body: any) => {
+        if (path === '/tasks') postedPayload = body;
+        return of({ id: 100 });
+      }),
+      patch: vi.fn(() => of({})),
+      delete: vi.fn(() => of({}))
+    };
+    await TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [TasksComponent],
+      providers: [
+        { provide: ApiService, useValue: api },
+        { provide: PermissionService, useValue: { canCreate: () => true, canUpdate: () => true, canDelete: () => true, hasPermission: () => true } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { queryParams: of({}) } }
+      ]
+    }).compileComponents();
+    const fixture = TestBed.createComponent(TasksComponent);
+    fixture.detectChanges();
+
+    fixture.componentInstance.openCreateTaskModal();
+    fixture.componentInstance.createForm.title = 'Новая задача с соисполнителями';
+    fixture.componentInstance.createForm.responsibleUserId = 10;
+    fixture.componentInstance.createForm.executorUserIds = [20, 30];
+    fixture.componentInstance.createForm.observerUserIds = [40];
+    fixture.componentInstance.submitCreateTask();
+
+    expect(postedPayload).not.toBeNull();
+    expect(postedPayload.title).toBe('Новая задача с соисполнителями');
+    expect(postedPayload.responsibleUserId).toBe(10);
+    expect(postedPayload.executorUserIds).toEqual([20, 30]);
+    expect(postedPayload.observerUserIds).toEqual([40]);
+  });
+
+  it('groups task members by RACI roles in detail view', async () => {
+    const fixture = await createFixture();
+    const component = fixture.componentInstance;
+    const task: Task = {
+      id: 42,
+      title: 'Проверить отчёт',
+      statusId: 1,
+      priority: 'high',
+      attributes: {},
+      createdAt: '2026-08-30T00:00:00Z'
+    };
+    component.selectedTask.set(task);
+    component.taskMembers.set([
+      { taskId: 42, userId: 1, userName: 'Алиса', userLogin: 'alisa', involveKind: 'R' },
+      { taskId: 42, userId: 2, userName: 'Борис', userLogin: 'boris', involveKind: 'E' },
+      { taskId: 42, userId: 3, userName: 'Вера', userLogin: 'vera', involveKind: 'E' },
+      { taskId: 42, userId: 4, userName: 'Глеб', userLogin: 'gleb', involveKind: 'O' },
+      { taskId: 42, userId: 5, userName: 'Дамир', userLogin: 'damir', involveKind: 'A' }
+    ]);
+    fixture.detectChanges();
+
+    const roleTitles = Array.from(fixture.nativeElement.querySelectorAll('.member-role-title'))
+      .map((node: any) => node.textContent.trim());
+
+    expect(roleTitles.some(t => t.includes('Ответственный'))).toBe(true);
+    expect(roleTitles.some(t => t.includes('Соисполнители'))).toBe(true);
+    expect(roleTitles.some(t => t.includes('Наблюдатели'))).toBe(true);
+    expect(roleTitles.some(t => t.includes('Автор'))).toBe(true);
+
+    const memberNames = Array.from(fixture.nativeElement.querySelectorAll('.member-name'))
+      .map((node: any) => node.textContent.trim());
+    expect(memberNames).toContain('Алиса');
+    expect(memberNames).toContain('Борис');
+    expect(memberNames).toContain('Вера');
+    expect(memberNames).toContain('Глеб');
+    expect(memberNames).toContain('Дамир');
+  });
 });
 
 describe('TasksComponent asynchronous detail and editing state', () => {
@@ -1196,6 +1272,15 @@ describe('TasksComponent asynchronous detail and editing state', () => {
     const { component, api } = await createControlledFixture();
     component.setPreset('overdue');
     expect(api.get).toHaveBeenCalledWith('/tasks', expect.objectContaining({ overdue: true }));
+  });
+
+  it('passes member_role E or O when executor or observer presets are selected', async () => {
+    const { component, api } = await createControlledFixture();
+    component.setPreset('executor');
+    expect(api.get).toHaveBeenCalledWith('/tasks', expect.objectContaining({ member_role: 'E' }));
+
+    component.setPreset('observer');
+    expect(api.get).toHaveBeenCalledWith('/tasks', expect.objectContaining({ member_role: 'O' }));
   });
 
   it('calculates deadline badges correctly for overdue, today, tomorrow, and future', async () => {

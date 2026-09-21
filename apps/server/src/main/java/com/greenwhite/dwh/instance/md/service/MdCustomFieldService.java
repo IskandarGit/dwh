@@ -6,7 +6,11 @@ import com.greenwhite.dwh.instance.audit.service.AuditLogService;
 import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.md.repository.MdCustomFieldRepository;
 import com.greenwhite.dwh.instance.md.repository.MdUserRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -33,24 +37,39 @@ public class MdCustomFieldService {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
     private final MdUserRepository userRepository;
+    private final ObjectProvider<MdCustomFieldService> selfProvider;
 
     @Autowired
     public MdCustomFieldService(MdCustomFieldRepository customFieldRepository,
                                 AuditLogService auditLogService,
                                 ObjectMapper objectMapper,
-                                MdUserRepository userRepository) {
+                                MdUserRepository userRepository,
+                                @Lazy ObjectProvider<MdCustomFieldService> selfProvider) {
         this.customFieldRepository = customFieldRepository;
         this.auditLogService = auditLogService;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
         this.userRepository = userRepository;
+        this.selfProvider = selfProvider;
+    }
+
+    public MdCustomFieldService(MdCustomFieldRepository customFieldRepository,
+                                AuditLogService auditLogService,
+                                ObjectMapper objectMapper,
+                                MdUserRepository userRepository) {
+        this(customFieldRepository, auditLogService, objectMapper, userRepository, null);
     }
 
     public MdCustomFieldService(MdCustomFieldRepository customFieldRepository,
                                 AuditLogService auditLogService) {
-        this(customFieldRepository, auditLogService, new ObjectMapper(), null);
+        this(customFieldRepository, auditLogService, new ObjectMapper(), null, null);
+    }
+
+    private MdCustomFieldService getSelf() {
+        return selfProvider != null && selfProvider.getIfAvailable() != null ? selfProvider.getIfAvailable() : this;
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "customFields", key = "#entityType != null ? #entityType.toLowerCase() : 'all'")
     public List<MdCustomFieldRepository.CustomFieldRecord> getFields(String entityType) {
         if (entityType == null || entityType.isBlank() || entityType.equalsIgnoreCase("ALL")) {
             return customFieldRepository.findAll();
@@ -59,6 +78,7 @@ public class MdCustomFieldService {
     }
 
     @Transactional
+    @CacheEvict(value = "customFields", allEntries = true)
     public MdCustomFieldRepository.CustomFieldRecord createField(
             String entityType, String code, String name, String fieldType,
             boolean isRequired, String defaultValue, Object options, int orderNo) {
@@ -99,6 +119,7 @@ public class MdCustomFieldService {
     }
 
     @Transactional
+    @CacheEvict(value = "customFields", allEntries = true)
     public void updateField(Long id, String name, Boolean isRequired, String defaultValue, Object options, Integer orderNo) {
         var before = requireField(id);
         customFieldRepository.update(id, name, isRequired, defaultValue, options, orderNo);
@@ -111,6 +132,7 @@ public class MdCustomFieldService {
     }
 
     @Transactional
+    @CacheEvict(value = "customFields", allEntries = true)
     public void deleteField(Long id) {
         var before = requireField(id);
         customFieldRepository.delete(id);
@@ -130,7 +152,7 @@ public class MdCustomFieldService {
      * Dynamic Attribute Validation against schema definitions in md_custom_fields.
      */
     public void validateAttributes(String entityType, Map<String, Object> attributes) {
-        List<MdCustomFieldRepository.CustomFieldRecord> fieldDefs = customFieldRepository.findByEntityType(entityType);
+        List<MdCustomFieldRepository.CustomFieldRecord> fieldDefs = getSelf().getFields(entityType);
         if (fieldDefs.isEmpty()) {
             return;
         }

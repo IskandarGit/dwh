@@ -1,6 +1,8 @@
 package com.greenwhite.dwh.instance.config.security;
 
+import com.greenwhite.dwh.instance.common.security.ClientIpResolver;
 import com.greenwhite.dwh.instance.common.security.SecurityContext;
+import com.greenwhite.dwh.instance.common.security.TrustedProxyProperties;
 import com.greenwhite.dwh.instance.kauth.pref.KauthPref;
 import com.greenwhite.dwh.instance.kauth.security.KauthAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
@@ -26,7 +28,7 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(RateLimitProperties.class)
+@EnableConfigurationProperties({RateLimitProperties.class, TrustedProxyProperties.class})
 public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
@@ -45,6 +47,11 @@ public class SecurityConfig {
         repository.setCookieName("XSRF-TOKEN");
         repository.setCookiePath("/");
         return repository;
+    }
+
+    @Bean
+    public ClientIpResolver clientIpResolver(TrustedProxyProperties properties) {
+        return new ClientIpResolver(properties);
     }
 
     @Bean

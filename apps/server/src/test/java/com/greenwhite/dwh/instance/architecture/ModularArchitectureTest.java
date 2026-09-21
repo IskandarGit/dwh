@@ -148,11 +148,10 @@ class ModularArchitectureTest {
     }
 
     @Test
-    @DisplayName("9. Модуль аутентификации (kauth) не должен напрямую зависеть от репозиториев мастер-данных (md), кроме адаптера KauthUserSessionInvalidator")
+    @DisplayName("9. Модуль аутентификации (kauth) не должен напрямую зависеть от репозиториев мастер-данных (md)")
     void kauthShouldNotDependOnMdRepositoriesDirectly() {
         noClasses()
                 .that().resideInAPackage("com.greenwhite.dwh.instance.kauth..")
-                .and().doNotHaveSimpleName("KauthUserSessionInvalidator")
                 .should().dependOnClassesThat(
                         JavaClass.Predicates.resideInAPackage("com.greenwhite.dwh.instance.md.repository..")
                                 .and(JavaClass.Predicates.simpleNameEndingWith("Repository")))
@@ -180,6 +179,15 @@ class ModularArchitectureTest {
         assertThat(result.hasViolation()).isTrue();
         assertThat(result.getFailureReport().getDetails())
                 .anyMatch(detail -> detail.contains("com.greenwhite.dwh.instance.md.repository.MdUserRepository"));
+    }
+
+    @Test
+    @DisplayName("12. Внешние модули не должны напрямую обращаться к TypesenseClient (только через поисковый модуль)")
+    void externalModulesShouldNotDependOnTypesenseClientDirectly() {
+        noClasses()
+                .that().resideOutsideOfPackage("com.greenwhite.dwh.instance.search..")
+                .should().dependOnClassesThat().haveFullyQualifiedName("com.greenwhite.dwh.instance.search.typesense.TypesenseClient")
+                .check(importedClasses);
     }
 
     private static class FakeRepositoryConsumer {

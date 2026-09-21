@@ -64,5 +64,10 @@ export async function loginToInstance(page: Page): Promise<void> {
   }
 
   await expect(page).toHaveURL(/\/tasks(?:\?.*)?$/u);
-  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  const isMobile = (page.viewportSize()?.width ?? 1280) < 768;
+  if (isMobile) {
+    await expect(page.locator('.mobile-menu-btn')).toBeVisible();
+  } else {
+    await expect(page.locator('nav.sidebar-nav')).toBeVisible();
+  }
 }

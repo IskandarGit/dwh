@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { AppShellComponent } from './layout/app-shell/app-shell.component';
 import { permissionGuard } from './core/services/permission.service';
 import { projectRecordMatcher, taskRecordMatcher, userRecordMatcher } from './core/services/search-target';
 import { recordNavigationGuard } from './core/guards/record-navigation.guard';
@@ -15,7 +14,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    component: AppShellComponent,
+    loadComponent: () => import('./layout/app-shell/app-shell.component').then(m => m.AppShellComponent),
     canActivate: [authGuard],
     children: [
       {
@@ -91,18 +90,18 @@ export const routes: Routes = [
       {
         path: 'upl/sources',
         pathMatch: 'full',
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         loadComponent: () => import('./features/upl/sources/sources-list.component').then(m => m.SourcesListComponent)
       },
       {
         matcher: uplFormatMatcher,
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         canDeactivate: [recordNavigationGuard],
         loadComponent: () => import('./features/upl/formats/format-editor.component').then(m => m.FormatEditorComponent)
       },
       {
         matcher: uplSourceMatcher,
-        canActivate: [permissionGuard('upl.sources', 'view')],
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         loadComponent: () => import('./features/upl/sources/source-card.component').then(m => m.SourceCardComponent)
       },
       {

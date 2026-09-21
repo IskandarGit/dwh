@@ -119,6 +119,48 @@ describe('ModuleService', () => {
     expect(customMods[0].code).toBe('crm');
   });
 
+  it('excludes built-in nav modules (notes, upl) from active custom modules', async () => {
+    const { service, api } = setup();
+
+    const mockModules: InstalledModule[] = [
+      {
+        code: 'notes',
+        name: 'Заметки',
+        version: '1.0.0',
+        route: '/notes',
+        icon: 'description',
+        isSystem: false,
+        status: 'ACTIVE',
+        isActive: true
+      },
+      {
+        code: 'upl',
+        name: 'Загрузка',
+        version: '1.0.0',
+        route: '/upl/sources',
+        icon: 'upload_file',
+        isSystem: false,
+        status: 'ACTIVE',
+        isActive: true
+      },
+      {
+        code: 'crm',
+        name: 'CRM',
+        version: '1.0.0',
+        route: '/crm',
+        icon: 'handshake',
+        isSystem: false,
+        status: 'ACTIVE',
+        isActive: true
+      }
+    ];
+
+    api.get.mockReturnValue(of(mockModules));
+    await firstValueFrom(service.loadActiveModules());
+
+    expect(service.getActiveCustomModules().map(m => m.code)).toEqual(['crm']);
+  });
+
   it('toggles module status and reactively updates activeModuleCodes', async () => {
     const { service, api } = setup();
 

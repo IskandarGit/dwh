@@ -103,9 +103,20 @@ public class AuditLogService {
         return KeysetPage.of(safeRows, nextCursor, hasMore, total);
     }
 
+    private final java.util.concurrent.atomic.AtomicReference<CachedStats> cachedStats = new java.util.concurrent.atomic.AtomicReference<>();
+
+    private record CachedStats(AuditLogRepository.AuditStats stats, java.time.Instant expiresAt) {}
+
     @Transactional(readOnly = true)
     public AuditLogRepository.AuditStats getAuditStats() {
-        return auditLogRepository.getAuditStats();
+        var now = java.time.Instant.now();
+        var current = cachedStats.get();
+        if (current != null && now.isBefore(current.expiresAt())) {
+            return current.stats();
+        }
+        var fresh = auditLogRepository.getAuditStats();
+        cachedStats.set(new CachedStats(fresh, now.plusSeconds(15)));
+        return fresh;
     }
 
     private AuditLogRepository.AuditRecord redact(AuditLogRepository.AuditRecord record) {

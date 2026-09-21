@@ -24,6 +24,9 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     public static final String HEADER_IDEMPOTENCY_KEY = "Idempotency-Key";
     public static final String HEADER_IDEMPOTENT_REPLAY = "Idempotent-Replay";
 
+    public static final int MAX_REQUEST_BODY_BYTES = 65_536; // 64 KB
+    public static final int MAX_RESPONSE_BODY_BYTES = 65_536; // 64 KB
+
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final IdempotencyService idempotencyService;
@@ -32,6 +35,13 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     public IdempotencyFilter(IdempotencyService idempotencyService, ObjectMapper objectMapper) {
         this.idempotencyService = idempotencyService;
         this.objectMapper = objectMapper;
+    }
+
+    private boolean isUnsupportedPath(String uri) {
+        return uri.startsWith("/api/v1/auth/")
+                || uri.equals("/api/v1/auth")
+                || uri.startsWith("/api/v1/iam/profile/api-tokens")
+                || uri.startsWith("/api/v1/iam/profile/channels");
     }
 
     @Override
@@ -47,7 +57,32 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Validate UUID format
+        // 1. Validate sensitive / unsupported endpoint
+        if (isUnsupportedPath(request.getRequestURI())) {
+            writeProblemDetail(response, HttpServletResponse.SC_BAD_REQUEST, ErrorCode.IDEMPOTENCY_NOT_SUPPORTED,
+                    "Идемпотентность не поддерживается для эндпоинтов авторизации и генерации секретов.",
+                    request.getRequestURI());
+            return;
+        }
+
+        // 2. Validate multipart and content-length header
+        String contentType = request.getContentType();
+        if (contentType != null && contentType.toLowerCase().startsWith("multipart/")) {
+            writeProblemDetail(response, HttpServletResponse.SC_BAD_REQUEST, ErrorCode.IDEMPOTENCY_NOT_SUPPORTED,
+                    "Идемпотентность не поддерживается для multipart-загрузок файлов.",
+                    request.getRequestURI());
+            return;
+        }
+
+        int contentLength = request.getContentLength();
+        if (contentLength > MAX_REQUEST_BODY_BYTES) {
+            writeProblemDetail(response, 413, ErrorCode.PAYLOAD_TOO_LARGE,
+                    "Размер тела запроса с Idempotency-Key превышает допустимый лимит (64 КБ).",
+                    request.getRequestURI());
+            return;
+        }
+
+        // 3. Validate UUID format
         UUID idempotencyKey;
         try {
             idempotencyKey = UUID.fromString(keyHeader.trim());
@@ -57,8 +92,14 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Read and cache request body
-        byte[] requestBody = request.getInputStream().readAllBytes();
+        // 4. Read and cache request body up to limit + 1 byte (handles chunked/unknown content-length safely)
+        byte[] requestBody = request.getInputStream().readNBytes(MAX_REQUEST_BODY_BYTES + 1);
+        if (requestBody.length > MAX_REQUEST_BODY_BYTES) {
+            writeProblemDetail(response, 413, ErrorCode.PAYLOAD_TOO_LARGE,
+                    "Размер тела запроса с Idempotency-Key превышает допустимый лимит (64 КБ).",
+                    request.getRequestURI());
+            return;
+        }
         CachedBodyHttpServletRequest wrappedRequest = new CachedBodyHttpServletRequest(request, requestBody);
 
         String requestHash = idempotencyService.computeRequestHash(
@@ -104,12 +145,17 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             byte[] responseBytes = responseWrapper.getContentAsByteArray();
 
             try {
-                // Cache successful and client-side responses. Exceptions and 5xx
+                // Cache successful and client-side responses if within safe body size. Exceptions and 5xx
                 // release the reservation so a corrected retry can execute.
                 if (chainCompleted && status >= 200 && status < 500) {
-                    String responseBodyStr = new String(responseBytes, StandardCharsets.UTF_8);
-                    idempotencyService.complete(
-                            idempotencyKey, claim.reservationToken(), status, responseBodyStr);
+                    if (responseBytes.length <= MAX_RESPONSE_BODY_BYTES) {
+                        String responseBodyStr = new String(responseBytes, StandardCharsets.UTF_8);
+                        idempotencyService.complete(
+                                idempotencyKey, claim.reservationToken(), status, responseBodyStr);
+                    } else {
+                        // Oversized response: release reservation so huge payload is not stored in DB
+                        idempotencyService.release(idempotencyKey, claim.reservationToken());
+                    }
                 } else {
                     idempotencyService.release(idempotencyKey, claim.reservationToken());
                 }

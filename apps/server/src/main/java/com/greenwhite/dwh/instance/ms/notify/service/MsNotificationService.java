@@ -18,18 +18,52 @@ public class MsNotificationService {
     private final MsNotificationRepository notificationRepository;
     private final MsOutboxRepository outboxRepository;
     private final MsAnnouncementRepository announcementRepository;
+    private final com.greenwhite.dwh.instance.ms.notify.repository.MsNotificationPrefRepository prefRepository;
     private final ApplicationEventPublisher eventPublisher;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MsNotificationService(
+            MsNotificationRepository notificationRepository,
+            MsOutboxRepository outboxRepository,
+            MsAnnouncementRepository announcementRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.greenwhite.dwh.instance.ms.notify.repository.MsNotificationPrefRepository prefRepository,
+            ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+        this.notificationRepository = notificationRepository;
+        this.outboxRepository = outboxRepository;
+        this.announcementRepository = announcementRepository;
+        this.prefRepository = prefRepository;
+    }
 
     public MsNotificationService(
             MsNotificationRepository notificationRepository,
             MsOutboxRepository outboxRepository,
             MsAnnouncementRepository announcementRepository,
             ApplicationEventPublisher eventPublisher) {
-        this.eventPublisher = eventPublisher;
-        this.notificationRepository = notificationRepository;
-        this.outboxRepository = outboxRepository;
-        this.announcementRepository = announcementRepository;
+        this(notificationRepository, outboxRepository, announcementRepository, null, eventPublisher);
     }
+
+    @Transactional(readOnly = true)
+    public List<com.greenwhite.dwh.instance.ms.notify.repository.MsNotificationPrefRepository.NotificationPrefRecord> getUserPreferences(Long userId) {
+        if (prefRepository == null) return List.of();
+        return prefRepository.findByUserId(userId);
+    }
+
+    @Transactional
+    public void updateUserPreferences(Long userId, List<PrefUpdateDto> updates) {
+        if (prefRepository == null || updates == null) return;
+        for (var pref : updates) {
+            prefRepository.upsert(userId, pref.eventType(), pref.channel(), pref.isEnabled());
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isNotificationEnabled(Long userId, String eventType, String channel) {
+        if (prefRepository == null) return true;
+        return prefRepository.isEnabled(userId, eventType, channel, true);
+    }
+
+    public record PrefUpdateDto(String eventType, String channel, boolean isEnabled) {}
 
     @Transactional
     public void sendInAppNotification(Long userId, String type, String title, String body, String formLink, String sourceCode) {

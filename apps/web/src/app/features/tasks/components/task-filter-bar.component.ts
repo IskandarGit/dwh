@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '../../../core/services/i18n.service';
 import { Project, TaskStatus } from '../../../core/models/task.models';
 
-export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
+export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | 'overdue';
 
 @Component({
   selector: 'app-task-filter-bar',
@@ -18,7 +18,7 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
     <div class="toolbar">
       <div class="toolbar-left-row">
         <!-- Smart View Presets -->
-        <div class="preset-filter-group" role="group" [attr.aria-label]="'tasks.filtr_po_statusu' | t">
+        <div class="preset-filter-group" role="group" [attr.aria-label]="'tasks.bystrye_filtry' | t">
           <button
             type="button"
             class="preset-btn"
@@ -38,6 +38,26 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
           >
             <span class="material-symbols-outlined preset-icon" aria-hidden="true">person</span>
             <span>{{ 'tasks.filter_preset_my' | t }}</span>
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="activePreset === 'executor'"
+            [attr.aria-pressed]="activePreset === 'executor'"
+            (click)="onPresetClick('executor')"
+          >
+            <span class="material-symbols-outlined preset-icon" aria-hidden="true">group</span>
+            <span>{{ 'tasks.filter_preset_executor' | t }}</span>
+          </button>
+          <button
+            type="button"
+            class="preset-btn"
+            [class.active]="activePreset === 'observer'"
+            [attr.aria-pressed]="activePreset === 'observer'"
+            (click)="onPresetClick('observer')"
+          >
+            <span class="material-symbols-outlined preset-icon" aria-hidden="true">visibility</span>
+            <span>{{ 'tasks.filter_preset_observer' | t }}</span>
           </button>
           <button
             type="button"
@@ -166,6 +186,11 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+    }
     .toolbar {
       display: flex;
       align-items: center;
@@ -176,12 +201,16 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       padding: 8px 12px;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .toolbar-left-row {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+      max-width: 100%;
+      min-width: 0;
     }
     .preset-filter-group {
       display: flex;
@@ -190,6 +219,9 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
       border-radius: var(--radius-sm);
       padding: 2px;
       gap: 2px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .preset-btn {
       border: none;
@@ -253,6 +285,8 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .status-tabs {
@@ -262,6 +296,9 @@ export type TaskPreset = 'all' | 'my' | 'reported' | 'overdue';
       border-radius: var(--radius-sm);
       padding: 2px;
       gap: 2px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .status-tab {
       border: none;

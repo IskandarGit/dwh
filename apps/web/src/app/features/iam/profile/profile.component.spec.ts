@@ -4,14 +4,16 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiService } from '../../../core/services/api.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { User, UserSession, ApiToken } from '../../../core/models/auth.models';
+import { User, UserSession, ApiToken, UserChannel } from './profile.models';
 import { ProfileComponent } from './profile.component';
 
 describe('ProfileComponent UI contracts', () => {
   async function createFixture(options?: {
     sessions?: UserSession[];
     tokens?: ApiToken[];
+    channels?: UserChannel[];
     mockApi?: any;
   }) {
     const user: User = {
@@ -33,9 +35,14 @@ describe('ProfileComponent UI contracts', () => {
       get: vi.fn((url: string) => {
         if (url.includes('/sessions')) return of(options?.sessions || []);
         if (url.includes('/tokens')) return of(options?.tokens || []);
+        if (url.includes('/channels')) return of(options?.channels || []);
         return of([]);
       }),
-      post: vi.fn(() => of({ record: { id: 1, name: 'test' }, rawSecretToken: 'dwh_secret_xyz' })),
+      post: vi.fn((url: string) => {
+        if (url.includes('/channels/confirm')) return of(undefined);
+        if (url.includes('/channels')) return of({ verifyToken: 'mock_verify_token_123' });
+        return of({ record: { id: 1, name: 'test' }, rawSecretToken: 'dwh_secret_xyz' });
+      }),
       delete: vi.fn(() => of({}))
     };
 
@@ -44,7 +51,8 @@ describe('ProfileComponent UI contracts', () => {
       providers: [
         { provide: ApiService, useValue: apiMock },
         { provide: AuthService, useValue: { currentUser: signal(user), onPasswordChanged: vi.fn() } },
-        { provide: ToastService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }
+        { provide: PermissionService, useValue: { hasPermission: vi.fn(() => true), permissions: signal(new Set(['*.*'])) } },
+        { provide: ToastService, useValue: { success: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() } }
       ]
     }).compileComponents();
     const fixture = TestBed.createComponent(ProfileComponent);
@@ -65,14 +73,17 @@ describe('ProfileComponent UI contracts', () => {
     expect(fixture.nativeElement.querySelector('button[aria-label="Показать новый пароль"]')).not.toBeNull();
   });
 
-  it('names session and token table regions', async () => {
+  it('names channel, session and token table regions', async () => {
     const { fixture } = await createFixture();
     const regions = fixture.nativeElement.querySelectorAll('.table-wrapper[role="region"]');
 
-    expect(regions.length).toBe(2);
+    expect(regions.length).toBe(3);
     expect(regions[0].tabIndex).toBe(0);
-    expect(regions[0].querySelector('table')?.getAttribute('aria-label')).toBe('Активные сессии');
-    expect(regions[1].querySelector('table')?.getAttribute('aria-label')).toBe('API-токены');
+    expect(regions[0].querySelector('table')?.getAttribute('aria-label')).toBe('Каналы связи');
+    expect(regions[1].tabIndex).toBe(0);
+    expect(regions[1].querySelector('table')?.getAttribute('aria-label')).toBe('Активные сессии');
+    expect(regions[2].tabIndex).toBe(0);
+    expect(regions[2].querySelector('table')?.getAttribute('aria-label')).toBe('API-токены');
   });
 
   it('validates token name inline before creation', async () => {
@@ -208,4 +219,90 @@ describe('ProfileComponent UI contracts', () => {
     expect(apiMock.delete).toHaveBeenCalledWith('/iam/profile/sessions/101');
     expect(comp.sessionToTerminate).toBeNull();
   });
+
+  it('renders communication channels and status badges', async () => {
+    const channels: UserChannel[] = [
+      {
+        id: 1,
+        userId: 1,
+        channel: 'email',
+        address: 'user@example.com',
+        isVerified: true,
+        createdAt: '2026-09-01T10:00:00Z'
+      },
+      {
+        id: 2,
+        userId: 1,
+        channel: 'telegram',
+        address: '@user_tg',
+        isVerified: false,
+        createdAt: '2026-09-01T11:00:00Z'
+      }
+    ];
+
+    const { fixture } = await createFixture({ channels });
+    const cardEl = fixture.nativeElement.querySelector('app-profile-channels-card');
+    expect(cardEl).not.toBeNull();
+
+    const rows = cardEl.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(2);
+
+    const verifiedBadge = rows[0].querySelector('ui-badge');
+    expect(verifiedBadge?.textContent).toContain('Подтверждён');
+
+    const pendingBadge = rows[1].querySelector('ui-badge');
+    expect(pendingBadge?.textContent).toContain('Ожидает подтверждения');
+  });
+
+  it('initiates channel binding and opens verification modal', async () => {
+    const { fixture, apiMock } = await createFixture();
+    const comp = fixture.componentInstance;
+
+    comp.onBindChannel({ channel: 'email', address: 'alex@example.test' });
+
+    expect(apiMock.post).toHaveBeenCalledWith('/iam/profile/channels', {
+      channel: 'email',
+      address: 'alex@example.test'
+    });
+
+    expect(comp.channelsCard?.isConfirmModalOpen).toBe(true);
+    expect(comp.channelsCard?.activeVerifyToken).toBe('mock_verify_token_123');
+    expect(comp.channelsCard?.activeVerifyAddress).toBe('alex@example.test');
+  });
+
+  it('confirms channel with OTP code and closes modal', async () => {
+    const { fixture, apiMock } = await createFixture();
+    const comp = fixture.componentInstance;
+
+    comp.channelsCard?.openConfirmModal('mock_verify_token_123', 'alex@example.test');
+    expect(comp.channelsCard?.isConfirmModalOpen).toBe(true);
+
+    comp.onConfirmChannel({ verifyToken: 'mock_verify_token_123', code: '123456' });
+
+    expect(apiMock.post).toHaveBeenCalledWith('/iam/profile/channels/confirm', {
+      verifyToken: 'mock_verify_token_123',
+      code: '123456'
+    });
+    expect(comp.channelsCard?.isConfirmModalOpen).toBe(false);
+  });
+
+  it('requests and executes channel unbinding', async () => {
+    const channels: UserChannel[] = [
+      {
+        id: 2,
+        userId: 1,
+        channel: 'telegram',
+        address: '@user_tg',
+        isVerified: true,
+        createdAt: '2026-09-01T11:00:00Z'
+      }
+    ];
+    const { fixture, apiMock } = await createFixture({ channels });
+    const comp = fixture.componentInstance;
+
+    comp.onUnbindChannel('telegram');
+
+    expect(apiMock.delete).toHaveBeenCalledWith('/iam/profile/channels/telegram');
+  });
 });
+

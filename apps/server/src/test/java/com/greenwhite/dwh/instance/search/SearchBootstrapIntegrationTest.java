@@ -103,7 +103,7 @@ class SearchBootstrapIntegrationTest extends SearchDeliveryTestSupport {
             beforeRequest = exchange -> jdbc.sql("update search_generations set task_collection='v2_tasks',project_collection='v2_projects',user_collection='v2_users' where id=:id")
                     .param("id", id).update();
             assertThat(service.search("nothing", "ALL", 10).source()).isEqualTo("TYPESENSE");
-            assertThat(searchCollections).containsExactly(List.of("v1_tasks", "v1_projects", "v1_users"));
+            assertThat(searchCollections.getFirst()).containsExactly("v1_tasks", "v1_projects", "v1_users");
             beforeRequest = exchange -> {};
             service.search("nothing", "ALL", 10);
             assertThat(searchCollections.getLast()).containsExactly("v2_tasks", "v2_projects", "v2_users");

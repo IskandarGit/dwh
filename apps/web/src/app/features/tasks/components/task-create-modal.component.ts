@@ -193,6 +193,28 @@ import { User } from '../../../core/models/auth.models';
           </div>
         </div>
 
+        <!-- Executors Searchable Multi-Select Tags Input -->
+        <div class="form-group">
+          <div class="label-row">
+            <span class="clean-label">{{ 'tasks.soispolniteli' | t }}</span>
+          </div>
+          <ui-user-multi-select
+            [users]="executorUsers"
+            [selectedUserIds]="createForm.executorUserIds"
+            [ariaLabel]="'tasks.soispolniteli' | t"
+            (selectedUserIdsChange)="createForm.executorUserIds = $event"
+            [placeholder]="'tasks.nazhmite_dlya_dobavleniya_soispolniteley' | t"
+            [searchPlaceholder]="'tasks.poisk_sotrudnika' | t"
+            [remoteSearch]="true"
+            [loading]="executorLookupLoading"
+            [loadError]="executorLookupError"
+            [hasMore]="executorLookupHasMore"
+            (searchChange)="executorSearch.emit($event)"
+            (loadMore)="executorLoadMore.emit()"
+            (retry)="executorRetry.emit()"
+          ></ui-user-multi-select>
+        </div>
+
         <!-- Observers Searchable Multi-Select Tags Input -->
         <div class="form-group">
           <div class="label-row">
@@ -252,14 +274,18 @@ import { User } from '../../../core/models/auth.models';
     </ui-modal>
   `,
   styles: [`
-    .modal-form { display: flex; flex-direction: column; gap: 14px; }
-    .modal-form-fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
+    .modal-form { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+    .modal-form-fieldset { border: none; padding: 0; margin: 0; min-width: 0; max-width: 100%; box-sizing: border-box; }
     .modal-form-fieldset:disabled { opacity: 0.75; }
-    .form-group { display: flex; flex-direction: column; gap: 4px; }
-    .label-row { display: flex; align-items: center; justify-content: space-between; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; box-sizing: border-box; }
+    .label-row { display: flex; align-items: center; justify-content: space-between; min-width: 0; max-width: 100%; }
     .clean-label { font-size: 12px; font-weight: 600; color: var(--text-main); }
     .req-tag { font-size: 10px; color: var(--text-muted); }
     .clean-input {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
       height: 34px;
       padding: 6px 10px;
       border-radius: var(--radius-sm);
@@ -274,13 +300,15 @@ import { User } from '../../../core/models/auth.models';
     .title-input { font-size: 14px; font-weight: 500; }
     .input-error { border-color: var(--danger); }
     .error-msg { font-size: 11px; color: var(--danger); margin-top: 2px; }
-    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 640px) { .form-grid-2 { grid-template-columns: 1fr; } }
+    .form-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 0; max-width: 100%; }
+    .form-grid-2 > * { min-width: 0; max-width: 100%; }
+    @media (max-width: 640px) { .form-grid-2 { grid-template-columns: minmax(0, 1fr); } }
 
     .type-chips-selector {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+      max-width: 100%;
     }
     .type-chip-btn {
       display: inline-flex;
@@ -295,6 +323,7 @@ import { User } from '../../../core/models/auth.models';
       font-weight: 500;
       cursor: pointer;
       transition: all 0.12s ease;
+      max-width: 100%;
     }
     .type-chip-btn .material-symbols-outlined { font-size: 16px; color: var(--chip-color); }
     .type-chip-btn:hover { border-color: var(--chip-color); color: var(--text-main); }
@@ -308,14 +337,18 @@ import { User } from '../../../core/models/auth.models';
 
     .priority-chips-selector {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       background-color: var(--bg-hover);
       padding: 3px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border-color);
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .prio-chip-btn {
-      flex: 1;
+      flex: 1 1 calc(25% - 6px);
+      min-width: 0;
       border: none;
       background: transparent;
       padding: 4px 8px;
@@ -326,6 +359,9 @@ import { User } from '../../../core/models/auth.models';
       cursor: pointer;
       transition: all 0.1s ease;
       text-align: center;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
     }
     .prio-chip-btn.active {
       background-color: var(--bg-surface);
@@ -377,6 +413,10 @@ export class TaskCreateModalComponent {
   @Input() responsibleLookupLoading = false;
   @Input() responsibleLookupError = false;
   @Input() responsibleLookupHasMore = false;
+  @Input() executorUsers: User[] = [];
+  @Input() executorLookupLoading = false;
+  @Input() executorLookupError = false;
+  @Input() executorLookupHasMore = false;
   @Input() observerUsers: User[] = [];
   @Input() observerLookupLoading = false;
   @Input() observerLookupError = false;
@@ -391,6 +431,9 @@ export class TaskCreateModalComponent {
   @Output() responsibleSearch = new EventEmitter<string>();
   @Output() responsibleLoadMore = new EventEmitter<void>();
   @Output() responsibleRetry = new EventEmitter<void>();
+  @Output() executorSearch = new EventEmitter<string>();
+  @Output() executorLoadMore = new EventEmitter<void>();
+  @Output() executorRetry = new EventEmitter<void>();
   @Output() observerSearch = new EventEmitter<string>();
   @Output() observerLoadMore = new EventEmitter<void>();
   @Output() observerRetry = new EventEmitter<void>();

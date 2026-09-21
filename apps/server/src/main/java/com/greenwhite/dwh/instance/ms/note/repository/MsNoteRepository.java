@@ -92,7 +92,7 @@ public class MsNoteRepository {
 
     public NoteRecord update(Long id, String title, String contentMd, String color, Boolean isPinned,
                              Map<String, Object> attributes, Long userId) {
-        String attrsJson = toJson(attributes);
+        String attrsJson = attributes == null ? null : toJson(attributes);
         return jdbcClient.sql("""
                 update ms_notes
                 set title = coalesce(:title, title),

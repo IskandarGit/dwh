@@ -24,6 +24,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class MsTaskService {
@@ -83,7 +86,7 @@ public class MsTaskService {
             com.greenwhite.dwh.instance.audit.service.AuditLogService auditLogService) {
         this(taskRepository, statusRepository, typeRepository, memberRepository, projectRepository,
              customFieldService, scopeService, fileService, eventPublisher, searchChangePublisher,
-             auditLogService, new MsTaskStatusService(statusRepository, typeRepository, searchChangePublisher));
+             auditLogService, new MsTaskStatusService(statusRepository, typeRepository, searchChangePublisher, auditLogService));
     }
 
 
@@ -153,17 +156,24 @@ public class MsTaskService {
             }
         }
 
-        // FR-TASK-8: назначенные узнают о задаче; автор себя не уведомляет
-        List<Long> assigned = new ArrayList<>();
+        // FR-TASK-8: назначенные узнают о задаче с учётом роли; автор себя не уведомляет
         if (responsibleUserId != null) {
-            assigned.add(responsibleUserId);
-        }
-        if (executorUserIds != null) {
-            assigned.addAll(executorUserIds);
-        }
-        if (!assigned.isEmpty()) {
             eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
-                    task.id(), task.title(), assigned, reporterId));
+                    task.id(), task.title(), List.of(responsibleUserId), MsTaskPref.INVOLVE_RESPONSIBLE, reporterId));
+        }
+        if (executorUserIds != null && !executorUserIds.isEmpty()) {
+            List<Long> execs = executorUserIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+            if (!execs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        task.id(), task.title(), execs, MsTaskPref.INVOLVE_EXECUTOR, reporterId));
+            }
+        }
+        if (observerUserIds != null && !observerUserIds.isEmpty()) {
+            List<Long> obs = observerUserIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+            if (!obs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        task.id(), task.title(), obs, MsTaskPref.INVOLVE_OBSERVER, reporterId));
+            }
         }
 
         searchChangePublisher.changed("TASK", task.id());
@@ -248,6 +258,15 @@ public class MsTaskService {
     public KeysetPage<MsTaskRepository.TaskRecord> listTasks(
             int limit, String cursor, Long projectId, Long statusId, String priority, String search,
             Boolean hideTerminal, Long assignedUserId, Long reporterId, Boolean overdue, Long currentUserId) {
+        return listTasks(limit, cursor, projectId, statusId, priority, search, hideTerminal,
+                assignedUserId, reporterId, overdue, null, currentUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public KeysetPage<MsTaskRepository.TaskRecord> listTasks(
+            int limit, String cursor, Long projectId, Long statusId, String priority, String search,
+            Boolean hideTerminal, Long assignedUserId, Long reporterId, Boolean overdue,
+            String memberRole, Long currentUserId) {
 
         Long afterId = null;
         if (cursor != null && !cursor.isBlank()) {
@@ -262,7 +281,7 @@ public class MsTaskService {
         int fetchLimit = limit + 1;
         List<MsTaskRepository.TaskRecord> tasks = taskRepository.listTasks(
                 fetchLimit, afterId, projectId, statusId, priority, search, hideTerminal,
-                assignedUserId, reporterId, overdue, scopeService.filterForTasks(currentUserId));
+                assignedUserId, reporterId, overdue, memberRole, scopeService.filterForTasks(currentUserId));
 
         boolean hasMore = tasks.size() > limit;
         List<MsTaskRepository.TaskRecord> resultItems = hasMore ? tasks.subList(0, limit) : tasks;
@@ -324,10 +343,61 @@ public class MsTaskService {
             replaceMembers(taskId, MsTaskPref.INVOLVE_OBSERVER, requested.observerUserIds());
         }
 
-        if (requested.responsibleUserIdPresent() && requested.responsibleUserId() != null) {
-            String taskTitle = rowPatch.titlePresent() ? rowPatch.title() : existing.title();
-            eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
-                    taskId, taskTitle, List.of(requested.responsibleUserId()), currentUserId));
+        String taskTitle = rowPatch.titlePresent() ? rowPatch.title() : existing.title();
+
+        if (requested.responsibleUserIdPresent()) {
+            Long oldResp = oldMembers.stream()
+                    .filter(m -> MsTaskPref.INVOLVE_RESPONSIBLE.equals(m.involveKind()))
+                    .map(MsTaskMemberRepository.TaskMemberRecord::userId)
+                    .findFirst().orElse(null);
+            Long newResp = requested.responsibleUserId();
+            if (newResp != null && !newResp.equals(oldResp)) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        taskId, taskTitle, List.of(newResp), MsTaskPref.INVOLVE_RESPONSIBLE, currentUserId));
+            }
+            if (oldResp != null && !oldResp.equals(newResp)) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskMemberRemoved(
+                        taskId, taskTitle, List.of(oldResp), MsTaskPref.INVOLVE_RESPONSIBLE, currentUserId));
+            }
+        }
+        if (requested.executorUserIdsPresent() && requested.executorUserIds() != null) {
+            Set<Long> oldExecs = oldMembers.stream()
+                    .filter(m -> MsTaskPref.INVOLVE_EXECUTOR.equals(m.involveKind()))
+                    .map(MsTaskMemberRepository.TaskMemberRecord::userId)
+                    .collect(Collectors.toSet());
+            Set<Long> newExecs = requested.executorUserIds().stream().filter(Objects::nonNull).collect(Collectors.toSet());
+            List<Long> addedExecs = newExecs.stream().filter(uid -> !oldExecs.contains(uid)).toList();
+            List<Long> removedExecs = oldExecs.stream().filter(uid -> !newExecs.contains(uid)).toList();
+            if (!addedExecs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        taskId, taskTitle, addedExecs, MsTaskPref.INVOLVE_EXECUTOR, currentUserId));
+            }
+            if (!removedExecs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskMemberRemoved(
+                        taskId, taskTitle, removedExecs, MsTaskPref.INVOLVE_EXECUTOR, currentUserId));
+            }
+        }
+        if (requested.observerUserIdsPresent() && requested.observerUserIds() != null) {
+            Set<Long> oldObs = oldMembers.stream()
+                    .filter(m -> MsTaskPref.INVOLVE_OBSERVER.equals(m.involveKind()))
+                    .map(MsTaskMemberRepository.TaskMemberRecord::userId)
+                    .collect(Collectors.toSet());
+            Set<Long> newObs = requested.observerUserIds().stream().filter(Objects::nonNull).collect(Collectors.toSet());
+            List<Long> addedObs = newObs.stream().filter(uid -> !oldObs.contains(uid)).toList();
+            List<Long> removedObs = oldObs.stream().filter(uid -> !newObs.contains(uid)).toList();
+            if (!addedObs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        taskId, taskTitle, addedObs, MsTaskPref.INVOLVE_OBSERVER, currentUserId));
+            }
+            if (!removedObs.isEmpty()) {
+                eventPublisher.publishEvent(new MsTaskEvents.TaskMemberRemoved(
+                        taskId, taskTitle, removedObs, MsTaskPref.INVOLVE_OBSERVER, currentUserId));
+            }
+        }
+
+        if (rowPatch.endTimePresent() && !Objects.equals(existing.endTime(), rowPatch.endTime())) {
+            eventPublisher.publishEvent(new MsTaskEvents.TaskDeadlineChanged(
+                    taskId, taskTitle, existing.endTime(), rowPatch.endTime(), memberUserIds(taskId), currentUserId));
         }
 
         searchChangePublisher.changed("TASK", taskId);
@@ -383,13 +453,18 @@ public class MsTaskService {
 
     @Transactional
     public void changeStatus(Long taskId, Long newStatusId, Long currentUserId) {
+        changeStatus(taskId, newStatusId, null, currentUserId);
+    }
+
+    @Transactional
+    public void changeStatus(Long taskId, Long newStatusId, Long expectedRevision, Long currentUserId) {
         var existing = getTaskById(taskId, currentUserId);
         searchChangePublisher.lockStatusMembership(newStatusId);
         var newStatus = statusRepository.findById(newStatusId)
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, "Статус не найден"));
 
         Instant resolvedTime = newStatus.isTerminal() ? Instant.now() : null;
-        taskRepository.updateStatus(taskId, newStatusId, resolvedTime, currentUserId);
+        taskRepository.updateStatus(taskId, newStatusId, resolvedTime, expectedRevision, currentUserId);
 
         var task = getTaskById(taskId, currentUserId);
         eventPublisher.publishEvent(new MsTaskEvents.TaskStatusChanged(
@@ -414,7 +489,7 @@ public class MsTaskService {
             memberRepository.addOrUpdateMember(taskId, responsibleUserId, MsTaskPref.INVOLVE_RESPONSIBLE, false);
             var task = getTaskById(taskId);
             eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
-                    taskId, task.title(), List.of(responsibleUserId), null));
+                    taskId, task.title(), List.of(responsibleUserId), MsTaskPref.INVOLVE_RESPONSIBLE, null));
         }
     }
 
@@ -427,13 +502,23 @@ public class MsTaskService {
             memberRepository.addOrUpdateMember(taskId, responsibleUserId, MsTaskPref.INVOLVE_RESPONSIBLE, false);
             var task = getTaskById(taskId, currentUserId);
             eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
-                    taskId, task.title(), List.of(responsibleUserId), currentUserId));
+                    taskId, task.title(), List.of(responsibleUserId), MsTaskPref.INVOLVE_RESPONSIBLE, currentUserId));
         }
     }
 
     @Transactional
     public void setExecutors(Long taskId, List<Long> executorUserIds) {
-        getTaskById(taskId);
+        setExecutors(taskId, executorUserIds, null);
+    }
+
+    @Transactional
+    public void setExecutors(Long taskId, List<Long> executorUserIds, Long currentUserId) {
+        if (currentUserId != null) {
+            getTaskById(taskId, currentUserId);
+            validateParticipants(currentUserId, executorUserIds);
+        } else {
+            getTaskById(taskId);
+        }
         memberRepository.removeMembersByKind(taskId, MsTaskPref.INVOLVE_EXECUTOR);
         if (executorUserIds != null) {
             for (Long uid : executorUserIds) {
@@ -441,26 +526,28 @@ public class MsTaskService {
                     memberRepository.addOrUpdateMember(taskId, uid, MsTaskPref.INVOLVE_EXECUTOR, false);
                 }
             }
-        }
-    }
-
-    @Transactional
-    public void setExecutors(Long taskId, List<Long> executorUserIds, Long currentUserId) {
-        getTaskById(taskId, currentUserId);
-        validateParticipants(currentUserId, executorUserIds);
-        memberRepository.removeMembersByKind(taskId, MsTaskPref.INVOLVE_EXECUTOR);
-        if (executorUserIds != null) {
-            for (Long uid : executorUserIds) {
-                if (uid != null) {
-                    memberRepository.addOrUpdateMember(taskId, uid, MsTaskPref.INVOLVE_EXECUTOR, false);
-                }
+            List<Long> execs = executorUserIds.stream().filter(Objects::nonNull).distinct().toList();
+            if (!execs.isEmpty()) {
+                var task = currentUserId != null ? getTaskById(taskId, currentUserId) : getTaskById(taskId);
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        taskId, task.title(), execs, MsTaskPref.INVOLVE_EXECUTOR, currentUserId));
             }
         }
     }
 
     @Transactional
     public void setObservers(Long taskId, List<Long> observerUserIds) {
-        getTaskById(taskId);
+        setObservers(taskId, observerUserIds, null);
+    }
+
+    @Transactional
+    public void setObservers(Long taskId, List<Long> observerUserIds, Long currentUserId) {
+        if (currentUserId != null) {
+            getTaskById(taskId, currentUserId);
+            validateParticipants(currentUserId, observerUserIds);
+        } else {
+            getTaskById(taskId);
+        }
         memberRepository.removeMembersByKind(taskId, MsTaskPref.INVOLVE_OBSERVER);
         if (observerUserIds != null) {
             for (Long uid : observerUserIds) {
@@ -468,19 +555,11 @@ public class MsTaskService {
                     memberRepository.addOrUpdateMember(taskId, uid, MsTaskPref.INVOLVE_OBSERVER, false);
                 }
             }
-        }
-    }
-
-    @Transactional
-    public void setObservers(Long taskId, List<Long> observerUserIds, Long currentUserId) {
-        getTaskById(taskId, currentUserId);
-        validateParticipants(currentUserId, observerUserIds);
-        memberRepository.removeMembersByKind(taskId, MsTaskPref.INVOLVE_OBSERVER);
-        if (observerUserIds != null) {
-            for (Long uid : observerUserIds) {
-                if (uid != null) {
-                    memberRepository.addOrUpdateMember(taskId, uid, MsTaskPref.INVOLVE_OBSERVER, false);
-                }
+            List<Long> obs = observerUserIds.stream().filter(Objects::nonNull).distinct().toList();
+            if (!obs.isEmpty()) {
+                var task = currentUserId != null ? getTaskById(taskId, currentUserId) : getTaskById(taskId);
+                eventPublisher.publishEvent(new MsTaskEvents.TaskAssigned(
+                        taskId, task.title(), obs, MsTaskPref.INVOLVE_OBSERVER, currentUserId));
             }
         }
     }
@@ -633,7 +712,8 @@ public class MsTaskService {
                 requested.observerUserIdsPresent(), requested.observerUserIds(),
                 attributesPresent, requested.attributes(),
                 requested.beginTimePresent(), requested.beginTime(),
-                requested.endTimePresent(), requested.endTime());
+                requested.endTimePresent(), requested.endTime(),
+                requested.expectedRevisionPresent(), requested.expectedRevision());
     }
 
     private void validateDeadline(MsTaskRepository.TaskRecord existing, MsTaskPatch patch) {

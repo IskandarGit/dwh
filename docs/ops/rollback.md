@@ -49,7 +49,17 @@ tested compatible forward fix or a separately authorized restore. Do not turn
 this limitation into an automatic global logout or destructive credential
 reset.
 
-Set `APP_VERSION` in `.env.production` to the exact previous verified tag, then:
+Set `APP_VERSION` in `.env.production` to the exact previous verified tag, or run the supported rollback script:
+
+```bash
+bash scripts/prod/rollback.sh
+```
+
+```powershell
+./scripts/prod/rollback.ps1
+```
+
+Or execute manually:
 
 ```bash
 docker compose -f deploy/compose/docker-compose.prod.yml \

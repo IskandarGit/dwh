@@ -1,7 +1,9 @@
 package com.greenwhite.dwh.instance.support;
 
+import com.greenwhite.dwh.instance.fnd.FndActors;
 import com.greenwhite.dwh.instance.fnd.migration.FndMigrator;
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -61,6 +63,9 @@ public final class TestDatabases {
         instance();
         if (!migrated) {
             FndMigrator.migrateOltp(oltp());
+            // Контексты тестов поднимаются без параметров первого администратора: непустая md_users
+            // оставляет InstanceBootstrap каркаса no-op (раньше это давал сид миграции, теперь — код основы).
+            FndActors.ensureSystemUser(JdbcClient.create(oltp()));
             FndMigrator.migrateDwh(dwh());
             migrated = true;
         }

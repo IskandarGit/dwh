@@ -79,10 +79,61 @@ $objectBackupPath = (Resolve-Path -LiteralPath $ObjectBackupFile).Path
 $identityPath = (Resolve-Path -LiteralPath $AgeIdentityFile).Path
 $composePath = (Resolve-Path -LiteralPath $ComposeFile).Path
 $environmentPath = (Resolve-Path -LiteralPath $EnvFile).Path
-$agePath = Require-Command 'age'
+
+$ageCommand = Get-Command 'age' -ErrorAction SilentlyContinue
+$script:hasHostAge = $null -ne $ageCommand
+$agePath = if ($script:hasHostAge) { $ageCommand.Source } else { $null }
+
 $tarPath = Require-Command 'tar'
-$pgRestorePath = Require-Command 'pg_restore'
+
+$pgRestoreCommand = Get-Command 'pg_restore' -ErrorAction SilentlyContinue
+$script:hasHostPgRestore = $null -ne $pgRestoreCommand
+$pgRestorePath = if ($script:hasHostPgRestore) { $pgRestoreCommand.Source } else { $null }
+
 $awsPath = if ($TargetObjectProvider -eq 's3') { Require-Command 'aws' } else { $null }
+
+function Invoke-AgeDecrypt([string]$Identity, [string]$InputFile, [string]$OutputFile) {
+    if ($script:hasHostAge) {
+        & $script:agePath --decrypt --identity $Identity --output $OutputFile $InputFile
+        if ($LASTEXITCODE -ne 0) { throw 'Database age decryption failed.' }
+    }
+    else {
+        $resolvedIn = (Resolve-Path -LiteralPath $InputFile).Path
+        $inDir = Split-Path -Parent $resolvedIn
+        $inLeaf = Split-Path -Leaf $resolvedIn
+        $resolvedId = (Resolve-Path -LiteralPath $Identity).Path
+        $idDir = Split-Path -Parent $resolvedId
+        $idLeaf = Split-Path -Leaf $resolvedId
+        $resolvedOut = [System.IO.Path]::GetFullPath($OutputFile)
+        $outDir = Split-Path -Parent $resolvedOut
+        $outLeaf = Split-Path -Leaf $resolvedOut
+        & docker run --rm --entrypoint age `
+            -v "${inDir}:/in:ro" `
+            -v "${idDir}:/id:ro" `
+            -v "${outDir}:/out" `
+            smartupcms/backup:release-config-test `
+            --decrypt --identity "/id/$idLeaf" --output "/out/$outLeaf" "/in/$inLeaf"
+        if ($LASTEXITCODE -ne 0) { throw 'Containerized age decryption failed.' }
+    }
+}
+
+function Invoke-PgRestoreList([string]$DumpFile) {
+    if ($script:hasHostPgRestore) {
+        & $script:pgRestorePath --list $DumpFile | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'pg_restore catalog validation failed.' }
+    }
+    else {
+        $resolvedDump = (Resolve-Path -LiteralPath $DumpFile).Path
+        $dumpDir = Split-Path -Parent $resolvedDump
+        $dumpLeaf = Split-Path -Leaf $resolvedDump
+        & docker run --rm --entrypoint pg_restore `
+            -v "${dumpDir}:/dump:ro" `
+            smartupcms/backup:release-config-test `
+            --list "/dump/$dumpLeaf" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Containerized pg_restore catalog validation failed.' }
+    }
+}
+
 Test-Checksum $databaseBackupPath
 Test-Checksum $objectBackupPath
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
@@ -98,10 +149,8 @@ $previousRegion = $env:AWS_DEFAULT_REGION
 try {
     # Both decryptions happen before the isolated database starts. Missing/wrong
     # age keys and a partial object backup therefore fail closed.
-    & $agePath --decrypt --identity $identityPath --output $databasePlain $databaseBackupPath
-    if ($LASTEXITCODE -ne 0) { throw 'Database age decryption failed.' }
-    & $agePath --decrypt --identity $identityPath --output $objectsTar $objectBackupPath
-    if ($LASTEXITCODE -ne 0) { throw 'Object age decryption failed.' }
+    Invoke-AgeDecrypt -Identity $identityPath -InputFile $databaseBackupPath -OutputFile $databasePlain
+    Invoke-AgeDecrypt -Identity $identityPath -InputFile $objectBackupPath -OutputFile $objectsTar
 
     $entries = @(& $tarPath -tf $objectsTar)
     if ($LASTEXITCODE -ne 0) { throw 'Object archive catalog validation failed.' }
@@ -131,15 +180,16 @@ try {
     }
     $evidence.objectCount = @($manifest.objects).Count
 
-    & $pgRestorePath --list $databasePlain | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'pg_restore catalog validation failed.' }
+    Invoke-PgRestoreList -DumpFile $databasePlain
 
     Invoke-Compose @('config', '--quiet')
     $startedByScript = $true
     Invoke-Compose @('up', '-d', '--wait', 'postgres')
-    & $agePath --decrypt --identity $identityPath $databaseBackupPath |
-        & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath exec -T postgres `
-            sh -ec 'exec pg_restore --exit-on-error --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+    & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath cp $databasePlain "postgres:/tmp/restore.dump"
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to copy decrypted dump into postgres container.' }
+    & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath exec -T postgres `
+        sh -ec 'exec pg_restore --exit-on-error --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/restore.dump && rm -f /tmp/restore.dump'
     if ($LASTEXITCODE -ne 0) { throw 'Isolated PostgreSQL restore failed.' }
 
     $rowCountSql = @'
@@ -165,15 +215,30 @@ from (
 '@
     $databaseInventoryJson = ($fileInventorySql | & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath exec -T postgres `
         sh -ec 'exec psql -X -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"') -join "`n"
-    if ($LASTEXITCODE -ne 0) { throw 'Restored file-inventory query failed.' }
-    $databaseInventory = @($databaseInventoryJson.Trim() | ConvertFrom-Json)
-    $databaseKeys = @($databaseInventory | ForEach-Object { "$($_.key)" })
-    $backupKeys = @($manifest.objects | ForEach-Object { "$($_.key)" })
+    $databaseKeys = [System.Collections.Generic.List[string]]::new()
+    $parsedDbInventory = $databaseInventoryJson.Trim() | ConvertFrom-Json
+    foreach ($item in $parsedDbInventory) {
+        if ($item -is [System.Collections.IEnumerable] -and $item -isnot [string]) {
+            foreach ($sub in $item) { $databaseKeys.Add([string]$sub.key) }
+        } else {
+            $databaseKeys.Add([string]$item.key)
+        }
+    }
+    $backupKeys = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $manifest.objects) {
+        if ($item -is [System.Collections.IEnumerable] -and $item -isnot [string]) {
+            foreach ($sub in $item) { $backupKeys.Add([string]$sub.key) }
+        } else {
+            $backupKeys.Add([string]$item.key)
+        }
+    }
     $missing = @($databaseKeys | Where-Object { $backupKeys -notcontains $_ })
     $orphans = @($backupKeys | Where-Object { $databaseKeys -notcontains $_ })
     $evidence.missingObjects = $missing.Count
     $evidence.orphanObjects = $orphans.Count
-    if ($missing.Count -gt 0 -or $orphans.Count -gt 0) { throw 'Database and object inventories do not match.' }
+    if ($missing.Count -gt 0 -or $orphans.Count -gt 0) {
+        throw "Database and object inventories do not match. Missing in backup: [$($missing -join ', ')]; Orphans in backup: [$($orphans -join ', ')]."
+    }
 
     $sample = @($manifest.objects | Select-Object -First ([Math]::Min($SampleDownloads, @($manifest.objects).Count)))
     if ($TargetObjectProvider -eq 'local_disk') {
@@ -222,12 +287,55 @@ from (
         }
     }
 
-    $databaseCapturedAt = (Get-Item -LiteralPath $databaseBackupPath).LastWriteTimeUtc
+    $dbManifestPath = "${databaseBackupPath}.manifest.json"
+    $databaseCapturedAt = $null
+
+    if (Test-Path -LiteralPath $dbManifestPath -PathType Leaf) {
+        $dbManifestChecksum = "${dbManifestPath}.sha256"
+        if (Test-Path -LiteralPath $dbManifestChecksum -PathType Leaf) {
+            Test-Checksum $dbManifestPath
+        }
+        $dbManifest = Get-Content -LiteralPath $dbManifestPath -Raw | ConvertFrom-Json
+        if ($dbManifest.schemaVersion -ne 1) { throw 'Unsupported database manifest schema version.' }
+        if (-not [string]::IsNullOrWhiteSpace($dbManifest.archiveSha256)) {
+            $expectedArchiveHash = (Get-FileHash -LiteralPath $databaseBackupPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($dbManifest.archiveSha256.ToLowerInvariant() -ne $expectedArchiveHash) {
+                throw 'Database manifest archiveSha256 does not match database backup file.'
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($dbManifest.capturedAt)) {
+            throw 'Database manifest is missing capturedAt timestamp.'
+        }
+        $databaseCapturedAt = [datetime]::Parse("$($dbManifest.capturedAt)").ToUniversalTime()
+    }
+    elseif ((Split-Path -Leaf $databaseBackupPath) -match 'smartupcms-(\d{8}T\d{6}Z)\.dump\.age') {
+        $databaseCapturedAt = [datetime]::ParseExact($matches[1], 'yyyyMMddTHHmmssZ', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal).ToUniversalTime()
+    }
+    else {
+        throw 'Database backup capture timestamp cannot be authentically determined (no valid manifest or standard timestamped filename).'
+    }
+
+    $nowUtc = (Get-Date).ToUniversalTime()
+    if ($databaseCapturedAt -gt $nowUtc.AddSeconds(300)) {
+        throw 'Database backup capture timestamp is in the future.'
+    }
     $objectCapturedAt = [datetime]::Parse("$($manifest.capturedAt)").ToUniversalTime()
+    if ($objectCapturedAt -gt $nowUtc.AddSeconds(300)) {
+        throw 'Object backup capture timestamp is in the future.'
+    }
+
+    $pointInTimeSkewSeconds = [int][Math]::Abs(($databaseCapturedAt - $objectCapturedAt).TotalSeconds)
+    $evidence.pointInTimeSkewSeconds = $pointInTimeSkewSeconds
+    $evidence.databaseCapturedAt = $databaseCapturedAt.ToString('o')
+    $evidence.objectCapturedAt = $objectCapturedAt.ToString('o')
+    if ($pointInTimeSkewSeconds -gt $MaxRpoSeconds) {
+        throw "Point-in-time skew between database and object backup ($pointInTimeSkewSeconds s) exceeds MaxRpoSeconds ($MaxRpoSeconds s)."
+    }
+
     $oldestCapture = if ($databaseCapturedAt -lt $objectCapturedAt) { $databaseCapturedAt } else { $objectCapturedAt }
-    $evidence.rpoSeconds = [int][Math]::Ceiling(((Get-Date).ToUniversalTime() - $oldestCapture).TotalSeconds)
+    $evidence.rpoSeconds = [int][Math]::Ceiling(($nowUtc - $oldestCapture).TotalSeconds)
     if ($evidence.rpoSeconds -gt $MaxRpoSeconds) { throw 'Measured RPO exceeds the approved threshold.' }
-    $evidence.rtoSeconds = [int][Math]::Ceiling(((Get-Date).ToUniversalTime() - $startedAt).TotalSeconds)
+    $evidence.rtoSeconds = [int][Math]::Ceiling(($nowUtc - $startedAt).TotalSeconds)
     if ($evidence.rtoSeconds -gt $MaxRtoSeconds) { throw 'Measured RTO exceeds the approved threshold.' }
     $evidence.status = 'PASS'
 }
@@ -247,7 +355,7 @@ finally {
     New-Item -ItemType Directory -Path $evidenceRoot -Force | Out-Null
     $evidenceFile = Join-Path $evidenceRoot ("combined-restore-{0}.json" -f $startedAt.ToString('yyyyMMddTHHmmssZ'))
     $evidencePartial = "$evidenceFile.partial"
-    $evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePartial -Encoding utf8NoBOM
+    [System.IO.File]::WriteAllText($evidencePartial, ($evidence | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
     Move-Item -LiteralPath $evidencePartial -Destination $evidenceFile -Force
 
     if (-not $KeepIsolatedTarget) {
@@ -258,7 +366,10 @@ finally {
             }
         }
         if ($startedByScript) {
-            & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath down --volumes --remove-orphans 2>$null | Out-Null
+            $prev = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            & docker compose -p $IsolatedProjectName -f $composePath --env-file $environmentPath down --volumes --remove-orphans 2>&1 | Out-Null
+            $ErrorActionPreference = $prev
         }
     }
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

@@ -1,0 +1,343 @@
+<div class="tasks-page">
+      <!-- Header -->
+      <div class="view-header">
+        <div class="header-left">
+          <h1 class="view-title">{{ 'nav.tasks' | t }}</h1>
+          <span class="count-badge">{{ 'tasks.loaded_count' | t:{count: tasks().length} }}</span>
+
+          <!-- View Mode Switcher: Table / Kanban -->
+          <div class="status-tabs" role="group" [attr.aria-label]="'tasks.rezhim_otobrazheniya_zadach' | t">
+            <button
+              type="button"
+              class="status-tab"
+              [class.active]="viewMode === 'table'"
+              [attr.aria-pressed]="viewMode === 'table'"
+              (click)="viewMode = 'table'"
+              [title]="'tasks.tablichnyy_vid' | t"
+            >
+              <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">table_rows</span>
+              <span>{{ 'projects.spisok' | t }}</span>
+            </button>
+            <button
+              type="button"
+              class="status-tab"
+              [class.active]="viewMode === 'kanban'"
+              [attr.aria-pressed]="viewMode === 'kanban'"
+              (click)="viewMode = 'kanban'"
+              [title]="'tasks.kanban_doska' | t"
+            >
+              <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">view_kanban</span>
+              <span>{{ 'tasks.kanban' | t }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Dictionary Settings Button -->
+          <button
+            type="button"
+            class="btn btn-secondary compact-secondary-action"
+            [title]="'tasks.upravlenie_statusami_i_tipami_zadach' | t"
+            (click)="openSettingsModal()"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+            <span>{{ 'tasks.spravochniki' | t }}</span>
+          </button>
+
+          <!-- Export Dropdown -->
+          <div class="export-dropdown-container" style="position: relative; display: inline-block;">
+            <button
+              type="button"
+              class="btn btn-secondary compact-secondary-action"
+              [title]="'tasks.export_all_accessible' | t"
+              (click)="showExportMenu = !showExportMenu"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">download</span>
+              <span>{{ 'analytics.eksport' | t }}</span>
+              <span class="material-symbols-outlined" style="font-size: 16px;">arrow_drop_down</span>
+            </button>
+            <div class="export-popover" *ngIf="showExportMenu">
+              <strong class="export-scope-title">{{ 'tasks.export_all_accessible' | t }}</strong>
+              <span class="export-scope-note">{{ 'tasks.export_filters_not_applied' | t }}</span>
+              <button type="button" class="export-item-btn" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; background: none; border: none; width: 100%; text-align: left; cursor: pointer; color: var(--text-main);" (click)="exportTasks('xlsx')">
+                <span class="material-symbols-outlined" style="color: var(--success); font-size: 18px;">table_view</span>
+                <span>Excel (.xlsx)</span>
+              </button>
+              <button type="button" class="export-item-btn" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; background: none; border: none; width: 100%; text-align: left; cursor: pointer; color: var(--text-main); border-top: 1px solid var(--border-subtle);" (click)="exportTasks('csv')">
+                <span class="material-symbols-outlined" style="color: var(--primary); font-size: 18px;">description</span>
+                <span>CSV (UTF-8)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Create Task Button -->
+          <ui-button
+            *ngIf="canCreateTask()"
+            variant="primary"
+            size="md"
+            icon="add"
+            (onClick)="openCreateTaskModal()"
+          >
+            {{ 'task.new' | t }}
+          </ui-button>
+        </div>
+      </div>
+
+      <!-- Linear-Style Toolbar -->
+      <app-task-filter-bar
+        [activePreset]="activePreset"
+        [searchQuery]="searchQuery"
+        [statusFilterMode]="statusFilterMode"
+        [statuses]="statuses()"
+        [selectedProjectId]="selectedProjectId"
+        [projects]="projects()"
+        [selectedPriority]="selectedPriority"
+        [hasActiveFilters]="hasActiveFilters()"
+        (activePresetChange)="setPreset($event)"
+        (searchQueryChange)="onTaskSearchChange($event)"
+        (searchApply)="applyTaskSearchImmediately()"
+        (searchClear)="clearSearch()"
+        (statusFilterModeChange)="setStatusFilterMode($event)"
+        (selectedProjectIdChange)="onProjectFilterChange($event)"
+        (selectedPriorityChange)="onPriorityFilterChange($event)"
+        (resetFilters)="resetFilters()"
+      ></app-task-filter-bar>
+
+      <div class="request-state request-loading" *ngIf="isLoading()" role="status">
+        {{ 'common.loading' | t }}
+      </div>
+      <div class="request-state request-error" *ngIf="listLoadError()" role="alert">
+        <span>{{ (tasks().length ? 'tasks.list_load_error_stale' : 'tasks.list_load_error') | t }}</span>
+        <ui-button variant="secondary" size="sm" (onClick)="retryTaskList()">{{ 'audit.retry' | t }}</ui-button>
+      </div>
+
+      <!-- ======================================================================= -->
+      <!-- VIEW 1: TABLE / LIST VIEW (Default View)                                -->
+      <!-- ======================================================================= -->
+      <app-task-table-view
+        *ngIf="viewMode === 'table'"
+        [tasks]="tasks()"
+        [paginatedTasks]="paginatedTasks()"
+        [statuses]="statuses()"
+        [projects]="projects()"
+        [taskTypes]="taskTypes()"
+        [canCreateTask]="canCreateTask()"
+        [canUpdateTask]="canUpdateTask()"
+        [hasActiveFilters]="hasActiveFilters()"
+        [isLoading]="isLoading()"
+        [listLoadError]="listLoadError()"
+        [isOverdue]="isOverdueFn"
+        [getTypeColor]="getTypeColorFn"
+        [getTypeBg]="getTypeBgFn"
+        [getTypeIcon]="getTypeIconFn"
+        [getTypeLabel]="getTypeLabelFn"
+        [getProjectName]="getProjectNameFn"
+        [getStatusColor]="getStatusColorFn"
+        [getDeadlineInfo]="getDeadlineInfoFn"
+        (openTaskDetails)="openTaskDetails($event)"
+        (openEditModal)="openEditModal($event)"
+        (updatePriority)="updatePriority($event.taskId, $event.priority)"
+        (updateStatus)="updateStatus($event.taskId, $event.statusId)"
+        (resetFilters)="resetFilters()"
+        (createTask)="openCreateTaskModal()"
+      ></app-task-table-view>
+
+
+      <!-- ======================================================================= -->
+      <!-- VIEW 2: KANBAN BOARD WITH DRAG & DROP                                  -->
+      <!-- ======================================================================= -->
+      <app-task-kanban-view
+        *ngIf="viewMode === 'kanban'"
+        [tasks]="tasks()"
+        [statuses]="statuses()"
+        [projects]="projects()"
+        [taskTypes]="taskTypes()"
+        [canCreateTask]="canCreateTask()"
+        [canUpdateTask]="canUpdateTask()"
+        [hasActiveFilters]="hasActiveFilters()"
+        [isLoading]="isLoading()"
+        [listLoadError]="listLoadError()"
+        [getDeadlineInfo]="getDeadlineInfoFn"
+        [getPriorityLabel]="getPriorityLabelFn"
+        [getTypeColor]="getTypeColorFn"
+        [getTypeIcon]="getTypeIconFn"
+        [getProjectName]="getProjectNameFn"
+        [isOverdue]="isOverdueFn"
+        (openTaskDetails)="openTaskDetails($event)"
+        (taskStatusChange)="executeStatusChange($event.task, $event.targetStatusId)"
+        (taskDragStart)="draggedTask = $event"
+        (taskDragEnd)="draggedTask = null"
+        (resetFilters)="resetFilters()"
+        (createTask)="openCreateTaskModal()"
+      ></app-task-kanban-view>
+
+      <ui-pagination
+        [totalItems]="tasks().length"
+        [currentPage]="currentPage"
+        [pageSize]="pageSize"
+        [showPageSize]="false"
+        [cursorMode]="true"
+        [cursorItemsArePageLength]="true"
+        [hasNextPage]="hasMore()"
+        [disabled]="isLoading() || listLoadError()"
+        (pageChange)="goToTaskPage($event)"
+      ></ui-pagination>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- Task Details Modal (Sleek Linear/Jira 2-Pane View)                     -->
+    <!-- ======================================================================= -->
+    <app-task-detail-modal
+      [isOpen]="(selectedTask() !== null || routeRecordId() !== null) && !isEditModalOpen()"
+      [selectedTask]="selectedTask()"
+      [routeRecordId]="routeRecordId()"
+      [detailRecordId]="detailRecordId()"
+      [detailLoading]="detailLoading()"
+      [detailLoadError]="detailLoadError()"
+      [detailNotFound]="detailNotFound()"
+      [taskAncestors]="taskAncestors()"
+      [taskSubtasks]="taskSubtasks()"
+      [taskFiles]="taskFiles()"
+      [comments]="comments()"
+      [commentsLoading]="commentsLoading()"
+      [commentsLoadError]="commentsLoadError()"
+      [taskMembers]="taskMembers()"
+      [taskCustomFields]="taskCustomFields()"
+      [statuses]="statuses()"
+      [projects]="projects()"
+      [taskTypes]="taskTypes()"
+      [commentDraft]="commentDraft"
+      [isCommentSubmitting]="isCommentSubmitting()"
+      [canCreateTask]="canCreateTask()"
+      [canUpdateTask]="canUpdateTask()"
+      [canCommentTask]="canCommentTask()"
+      [isOverdue]="isOverdueFn"
+      [getTypeColor]="getTypeColorFn"
+      [getTypeBg]="getTypeBgFn"
+      [getTypeIcon]="getTypeIconFn"
+      [getTypeLabel]="getTypeLabelFn"
+      [getStatusName]="getStatusNameFn"
+      [getStatusColor]="getStatusColorFn"
+      [getPriorityLabel]="getPriorityLabelFn"
+      [getProjectName]="getProjectNameFn"
+      (close)="closeTaskDetails()"
+      (retryTaskDetails)="retryTaskDetails()"
+      (openTaskDetails)="openTaskDetails($event)"
+      (openAddSubtask)="openAddSubtaskModal($event)"
+      (openEditModal)="openEditModal($event)"
+      (statusChange)="updateStatus($event.taskId, $event.statusId)"
+      (fileAttached)="onTaskFileAttached($event)"
+      (fileRemoved)="onTaskFileRemoved($event)"
+      (retryComments)="retryComments()"
+      (commentDraftChange)="commentDraft = $event"
+      (submitComment)="submitComment()"
+    ></app-task-detail-modal>
+
+    <!-- ======================================================================= -->
+    <!-- Create Task Modal (With RichText MD Editor & User Multi-Select)         -->
+    <!-- ======================================================================= -->
+    <app-task-create-modal
+      [isOpen]="isCreateModalOpen()"
+      [createForm]="createForm"
+      [isSubmitting]="isSubmitting()"
+      [isCreateSubmitted]="isCreateSubmitted"
+      [taskTypes]="taskTypes()"
+      [projects]="projects()"
+      [parentTaskOptions]="parentTaskOptions()"
+      [parentLookupLoading]="parentLookupLoading()"
+      [parentLookupError]="parentLookupError()"
+      [parentLookupHasMore]="parentLookupHasMore()"
+      [responsibleUserOptions]="responsibleUserOptions()"
+      [responsibleLookupLoading]="responsibleLookupLoading()"
+      [responsibleLookupError]="responsibleLookupError()"
+      [responsibleLookupHasMore]="responsibleLookupHasMore()"
+      [executorUsers]="executorUsers()"
+      [executorLookupLoading]="executorLookupLoading()"
+      [executorLookupError]="executorLookupError()"
+      [executorLookupHasMore]="executorLookupHasMore()"
+      [observerUsers]="observerUsers()"
+      [observerLookupLoading]="observerLookupLoading()"
+      [observerLookupError]="observerLookupError()"
+      [observerLookupHasMore]="observerLookupHasMore()"
+      [taskCustomFields]="taskCustomFields()"
+      (close)="requestCloseCreate()"
+      (submit)="submitCreateTask()"
+      (parentSearch)="onParentSearch($event)"
+      (parentLoadMore)="loadMoreParents()"
+      (parentRetry)="retryParentLookup()"
+      (responsibleSearch)="onResponsibleSearch($event)"
+      (responsibleLoadMore)="loadMoreResponsibleUsers()"
+      (responsibleRetry)="retryResponsibleLookup()"
+      (executorSearch)="onExecutorSearch($event)"
+      (executorLoadMore)="loadMoreExecutors()"
+      (executorRetry)="retryExecutorLookup()"
+      (observerSearch)="onObserverSearch($event)"
+      (observerLoadMore)="loadMoreObservers()"
+      (observerRetry)="retryObserverLookup()"
+    ></app-task-create-modal>
+
+    <!-- ======================================================================= -->
+    <!-- Edit Task Modal (Delegated Component)                                   -->
+    <!-- ======================================================================= -->
+    <app-task-edit-modal
+      [isOpen]="isEditModalOpen()"
+      [editingTask]="editingTask"
+      [editForm]="editForm"
+      [editLoading]="editLoading()"
+      [editLoadError]="editLoadError()"
+      [isSubmitting]="isSubmitting()"
+      [isEditSubmitted]="isEditSubmitted"
+      [isEditDiscardConfirmationOpen]="isEditDiscardConfirmationOpen()"
+      [taskTypes]="taskTypes()"
+      [projects]="projects()"
+      [parentTaskOptions]="parentTaskOptions()"
+      [parentLookupLoading]="parentLookupLoading()"
+      [parentLookupError]="parentLookupError()"
+      [parentLookupHasMore]="parentLookupHasMore()"
+      [responsibleUserOptions]="responsibleUserOptions()"
+      [responsibleLookupLoading]="responsibleLookupLoading()"
+      [responsibleLookupError]="responsibleLookupError()"
+      [responsibleLookupHasMore]="responsibleLookupHasMore()"
+      [executorUsers]="executorUsers()"
+      [executorLookupLoading]="executorLookupLoading()"
+      [executorLookupError]="executorLookupError()"
+      [executorLookupHasMore]="executorLookupHasMore()"
+      [observerUsers]="observerUsers()"
+      [observerLookupLoading]="observerLookupLoading()"
+      [observerLookupError]="observerLookupError()"
+      [observerLookupHasMore]="observerLookupHasMore()"
+      [taskCustomFields]="taskCustomFields()"
+      [getAvailableParentTaskOptions]="getAvailableParentTaskOptionsFn"
+      (close)="requestCloseEdit()"
+      (submit)="submitEditTask()"
+      (retryEditLoad)="retryEditLoad()"
+      (cancelDiscard)="cancelDiscardEdit()"
+      (confirmDiscard)="confirmDiscardEdit()"
+      (parentSearch)="onParentSearch($event)"
+      (parentLoadMore)="loadMoreParents()"
+      (parentRetry)="retryParentLookup()"
+      (responsibleSearch)="onResponsibleSearch($event)"
+      (responsibleLoadMore)="loadMoreResponsibleUsers()"
+      (responsibleRetry)="retryResponsibleLookup()"
+      (executorSearch)="onExecutorSearch($event)"
+      (executorLoadMore)="loadMoreExecutors()"
+      (executorRetry)="retryExecutorLookup()"
+      (observerSearch)="onObserverSearch($event)"
+      (observerLoadMore)="loadMoreObservers()"
+      (observerRetry)="retryObserverLookup()"
+    ></app-task-edit-modal>
+
+    <!-- ======================================================================= -->
+    <!-- Dictionaries Settings Modal (Delegated Component)                       -->
+    <!-- ======================================================================= -->
+    <app-task-dictionaries-modal
+      [isOpen]="isSettingsModalOpen()"
+      [taskTypes]="taskTypes()"
+      [statuses]="statuses()"
+      (close)="isSettingsModalOpen.set(false)"
+      (createType)="handleCreateType($event)"
+      (createStatus)="handleCreateStatus($event)"
+      (deleteItem)="handleDeleteDictionaryItem($event)"
+      (reorderTypes)="handleReorderTypes($event)"
+      (reorderStatuses)="handleReorderStatuses($event)"
+    ></app-task-dictionaries-modal>

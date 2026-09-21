@@ -384,6 +384,7 @@ test.describe.serial('authentication generation password-change acceptance', () 
         await screenshotClearedLogin(subjectPage, testInfo, 'profile-password-changed-desktop.png');
         await subjectPage.setViewportSize(mobileViewport);
         await screenshotClearedLogin(subjectPage, testInfo, 'profile-password-changed-mobile.png');
+        await subjectPage.setViewportSize(desktopViewport);
       } finally {
         await clearPasswordFields(fields);
       }

@@ -1,5 +1,7 @@
 package com.greenwhite.dwh.instance.ms.task.repository;
 
+import com.greenwhite.dwh.core.error.ErrorCode;
+import com.greenwhite.dwh.instance.common.error.ApiException;
 import com.greenwhite.dwh.instance.common.security.ScopeFilter;
 import com.greenwhite.dwh.instance.ms.task.MsTaskPatch;
 import tools.jackson.core.JacksonException;
@@ -35,7 +37,8 @@ public class MsTaskRepository {
                         :endTime, now(), now(), :createdBy, :createdBy)
                 returning id, project_id, parent_task_id, title, description_markdown, status_id,
                           priority, reporter_id, attributes::text as attributes_str, begin_time,
-                          end_time, resolved_time, created_at, modified_at, created_by, modified_by
+                          end_time, resolved_time, created_at, modified_at, created_by, modified_by,
+                          revision
                 """)
                 .param("projectId", data.projectId())
                 .param("parentTaskId", data.parentTaskId())
@@ -60,7 +63,8 @@ public class MsTaskRepository {
         String sql = """
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
-                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by
+                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by,
+                       t.revision
                 from ms_tasks t
                 where t.id = :id
                 """ + scope.sql();
@@ -84,10 +88,19 @@ public class MsTaskRepository {
     public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
                                       String priority, String search, Boolean hideTerminal,
                                       Long assignedUserId, Long reporterId, Boolean overdue, ScopeFilter scope) {
+        return listTasks(limit, afterId, projectId, statusId, priority, search, hideTerminal,
+                assignedUserId, reporterId, overdue, null, scope);
+    }
+
+    public List<TaskRecord> listTasks(int limit, Long afterId, Long projectId, Long statusId,
+                                      String priority, String search, Boolean hideTerminal,
+                                      Long assignedUserId, Long reporterId, Boolean overdue,
+                                      String memberRole, ScopeFilter scope) {
         StringBuilder sql = new StringBuilder("""
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
-                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by
+                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by,
+                       t.revision
                 from ms_tasks t
                 where 1=1
                 """);
@@ -112,7 +125,15 @@ public class MsTaskRepository {
             sql.append(" and (t.title ilike :search or t.description_markdown ilike :search)");
         }
         if (assignedUserId != null) {
-            sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind in ('R', 'E'))");
+            if ("R".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'R')");
+            } else if ("E".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'E')");
+            } else if ("O".equalsIgnoreCase(memberRole)) {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind = 'O')");
+            } else {
+                sql.append(" and exists (select 1 from ms_task_members m where m.task_id = t.id and m.user_id = :assignedUserId and m.involve_kind in ('R', 'E'))");
+            }
         }
         if (reporterId != null) {
             sql.append(" and (t.reporter_id = :reporterId or t.created_by = :reporterId)");
@@ -141,7 +162,7 @@ public class MsTaskRepository {
     public void update(Long id, TaskUpdateData data, Long modifiedBy) {
         String attrsJson = data.attributes() != null ? toJson(data.attributes()) : null;
 
-        jdbcClient.sql("""
+        var updated = jdbcClient.sql("""
                 update ms_tasks
                 set title = coalesce(:title, title),
                     description_markdown = coalesce(:descriptionMarkdown, description_markdown),
@@ -153,9 +174,12 @@ public class MsTaskRepository {
                     end_time = coalesce(:endTime, end_time),
                     resolved_time = coalesce(:resolvedTime, resolved_time),
                     attributes = case when cast(:attributes as text) is not null then cast(:attributes as jsonb) else attributes end,
+                    revision = revision + 1,
                     modified_at = now(),
                     modified_by = :modifiedBy
                 where id = :id
+                  and (cast(:expectedRevision as bigint) is null or revision = :expectedRevision)
+                returning revision
                 """)
                 .param("id", id)
                 .param("title", data.title())
@@ -168,14 +192,25 @@ public class MsTaskRepository {
                 .param("endTime", data.endTime() != null ? java.sql.Timestamp.from(data.endTime()) : null)
                 .param("resolvedTime", data.resolvedTime() != null ? java.sql.Timestamp.from(data.resolvedTime()) : null)
                 .param("attributes", attrsJson)
+                .param("expectedRevision", data.expectedRevision())
                 .param("modifiedBy", modifiedBy)
-                .update();
+                .query(Long.class)
+                .optional();
+
+        if (updated.isEmpty()) {
+            if (data.expectedRevision() != null) {
+                throw ApiException.conflict(ErrorCode.TASK_REVISION_CONFLICT,
+                        "Задача была изменена другим пользователем. Обновите данные и повторите попытку.");
+            } else {
+                throw ApiException.notFound(ErrorCode.TASK_NOT_FOUND, "Задача не найдена");
+            }
+        }
     }
 
     public void patch(Long id, MsTaskPatch patch, Long modifiedBy) {
         String attrsJson = patch.attributes() != null ? toJson(patch.attributes()) : null;
 
-        jdbcClient.sql("""
+        var updated = jdbcClient.sql("""
                 update ms_tasks
                 set title = case when :titlePresent then :title else title end,
                     description_markdown = case when :descriptionPresent then :descriptionMarkdown else description_markdown end,
@@ -185,9 +220,12 @@ public class MsTaskRepository {
                     begin_time = case when :beginPresent then :beginTime else begin_time end,
                     end_time = case when :endPresent then :endTime else end_time end,
                     attributes = case when :attributesPresent then cast(:attributes as jsonb) else attributes end,
+                    revision = revision + 1,
                     modified_at = now(),
                     modified_by = :modifiedBy
                 where id = :id
+                  and (cast(:expectedRevision as bigint) is null or revision = :expectedRevision)
+                returning revision
                 """)
                 .param("id", id)
                 .param("titlePresent", patch.titlePresent())
@@ -206,25 +244,53 @@ public class MsTaskRepository {
                 .param("endTime", patch.endTime() != null ? java.sql.Timestamp.from(patch.endTime()) : null)
                 .param("attributesPresent", patch.attributesPresent())
                 .param("attributes", attrsJson)
+                .param("expectedRevision", patch.expectedRevision())
                 .param("modifiedBy", modifiedBy)
-                .update();
+                .query(Long.class)
+                .optional();
+
+        if (updated.isEmpty()) {
+            if (patch.expectedRevision() != null) {
+                throw ApiException.conflict(ErrorCode.TASK_REVISION_CONFLICT,
+                        "Задача была изменена другим пользователем. Обновите данные и повторите попытку.");
+            } else {
+                throw ApiException.notFound(ErrorCode.TASK_NOT_FOUND, "Задача не найдена");
+            }
+        }
     }
 
-
     public void updateStatus(Long taskId, Long statusId, Instant resolvedTime, Long modifiedBy) {
-        jdbcClient.sql("""
+        updateStatus(taskId, statusId, resolvedTime, null, modifiedBy);
+    }
+
+    public void updateStatus(Long taskId, Long statusId, Instant resolvedTime, Long expectedRevision, Long modifiedBy) {
+        var updated = jdbcClient.sql("""
                 update ms_tasks
                 set status_id = :statusId,
                     resolved_time = :resolvedTime,
+                    revision = revision + 1,
                     modified_at = now(),
                     modified_by = :modifiedBy
                 where id = :taskId
+                  and (cast(:expectedRevision as bigint) is null or revision = :expectedRevision)
+                returning revision
                 """)
                 .param("taskId", taskId)
                 .param("statusId", statusId)
                 .param("resolvedTime", resolvedTime != null ? java.sql.Timestamp.from(resolvedTime) : null)
+                .param("expectedRevision", expectedRevision)
                 .param("modifiedBy", modifiedBy)
-                .update();
+                .query(Long.class)
+                .optional();
+
+        if (updated.isEmpty()) {
+            if (expectedRevision != null) {
+                throw ApiException.conflict(ErrorCode.TASK_REVISION_CONFLICT,
+                        "Задача была изменена другим пользователем. Обновите данные и повторите попытку.");
+            } else {
+                throw ApiException.notFound(ErrorCode.TASK_NOT_FOUND, "Задача не найдена");
+            }
+        }
     }
 
     public List<TaskRecord> findSubtasks(Long parentTaskId) {
@@ -235,7 +301,8 @@ public class MsTaskRepository {
         String sql = """
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
-                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by
+                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by,
+                       t.revision
                 from ms_tasks t
                 where t.parent_task_id = :parentTaskId
                 """ + scope.sql() + " order by t.id asc";
@@ -262,7 +329,8 @@ public class MsTaskRepository {
                 )
                 select t.id, t.project_id, t.parent_task_id, t.title, t.description_markdown, t.status_id,
                        t.priority, t.reporter_id, t.attributes::text as attributes_str, t.begin_time,
-                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by
+                       t.end_time, t.resolved_time, t.created_at, t.modified_at, t.created_by, t.modified_by,
+                       t.revision
                 from ancestors a
                 join ms_tasks t on t.id = a.id
                 where 1=1
@@ -340,7 +408,8 @@ public class MsTaskRepository {
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("modified_at").toInstant(),
                 rs.getLong("created_by"),
-                rs.getLong("modified_by")
+                rs.getLong("modified_by"),
+                rs.getObject("revision") != null ? rs.getLong("revision") : 1L
         );
     }
 
@@ -428,8 +497,31 @@ public class MsTaskRepository {
             Instant createdAt,
             Instant modifiedAt,
             Long createdBy,
-            Long modifiedBy
-    ) {}
+            Long modifiedBy,
+            Long revision
+    ) {
+        public TaskRecord(
+                Long id,
+                Long projectId,
+                Long parentTaskId,
+                String title,
+                String descriptionMarkdown,
+                Long statusId,
+                String priority,
+                Long reporterId,
+                Map<String, Object> attributes,
+                Instant beginTime,
+                Instant endTime,
+                Instant resolvedTime,
+                Instant createdAt,
+                Instant modifiedAt,
+                Long createdBy,
+                Long modifiedBy
+        ) {
+            this(id, projectId, parentTaskId, title, descriptionMarkdown, statusId, priority, reporterId, attributes,
+                    beginTime, endTime, resolvedTime, createdAt, modifiedAt, createdBy, modifiedBy, 1L);
+        }
+    }
 
     public record TaskCreateData(
             Long projectId,
@@ -451,7 +543,7 @@ public class MsTaskRepository {
                 select distinct t.id as task_id, t.title, tm.user_id
                 from ms_tasks t
                 join ms_task_statuses s on s.id = t.status_id and s.is_terminal = false
-                join ms_task_members tm on tm.task_id = t.id
+                join ms_task_members tm on tm.task_id = t.id and tm.involve_kind in ('R', 'E')
                 where t.end_time is not null
                   and t.end_time > now()
                   and t.end_time <= now() + cast(:windowSeconds || ' seconds' as interval)
@@ -475,7 +567,24 @@ public class MsTaskRepository {
             Map<String, Object> attributes,
             Instant beginTime,
             Instant endTime,
-            Instant resolvedTime
-    ) {}
+            Instant resolvedTime,
+            Long expectedRevision
+    ) {
+        public TaskUpdateData(
+                Long projectId,
+                String title,
+                String descriptionMarkdown,
+                Long statusId,
+                String priority,
+                Long parentTaskId,
+                Map<String, Object> attributes,
+                Instant beginTime,
+                Instant endTime,
+                Instant resolvedTime
+        ) {
+            this(projectId, title, descriptionMarkdown, statusId, priority, parentTaskId, attributes,
+                    beginTime, endTime, resolvedTime, null);
+        }
+    }
 }
 

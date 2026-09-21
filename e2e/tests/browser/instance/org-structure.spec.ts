@@ -194,6 +194,7 @@ async function createRole(page: Page): Promise<Role> {
     { formCode: 'tasks.items', action: 'view' },
     { formCode: 'tasks.projects', action: 'view' },
     { formCode: 'md.custom_fields', action: 'view' },
+    { formCode: 'iam.profile', action: 'view' },
   ]);
   return role;
 }
@@ -252,6 +253,10 @@ async function openActorPanel(page: Page, actorId: number) {
   await page.goto(`/iam/users/${actorId}`);
   const profile = page.getByRole('dialog', { name: 'Профиль пользователя', exact: true });
   await expect(profile).toBeVisible();
+  const orgTab = profile.getByRole('tab', { name: 'Оргструктура' });
+  if (await orgTab.isVisible()) {
+    await orgTab.click();
+  }
   const panel = profile.getByRole('region', { name: 'Подразделения и область данных', exact: true });
   await expect(panel).toBeVisible();
   await expect(panel.getByRole('heading', { name: 'Фактическая область данных', exact: true })).toBeVisible();

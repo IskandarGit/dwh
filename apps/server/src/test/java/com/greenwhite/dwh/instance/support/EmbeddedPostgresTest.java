@@ -40,7 +40,7 @@ public abstract class EmbeddedPostgresTest {
                     "md_user_roles"}) {
                 cleanupJdbc.sql("delete from " + table).update();
             }
-            // M-5: учётка system (сид V101) остаётся — её id кеширует FndActors, удаление дало бы audit_actor_missing
+            // M-5: учётка system (создаётся кодом основы) остаётся — её id кеширует FndActors, удаление дало бы audit_actor_missing
             cleanupJdbc.sql("delete from md_users where login <> :system")
                     .param("system", FndPref.SYSTEM_ACTOR).update();
         });

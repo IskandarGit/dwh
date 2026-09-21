@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, CanActivateFn, Route, Router, RouterStateSnapshot, UrlSegment } from '@angular/router';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { firstValueFrom, isObservable, of } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../../app.routes';
 import { PermissionService } from '../../core/services/permission.service';
+import { ModuleService } from '../../core/services/module.service';
+import { ToastService } from '../../core/services/toast.service';
+import { I18nService } from '../../core/services/i18n.service';
 import { uplFormatMatcher, uplSourceMatcher } from './upl-routes';
 
 function segments(url: string): UrlSegment[] {
@@ -17,12 +21,24 @@ function uplRoutes(): Route[] {
 
 describe('upl routes', () => {
   let permissions: PermissionService;
+  let activeModules: Set<string>;
 
   beforeEach(() => {
+    activeModules = new Set(['upl']);
     TestBed.configureTestingModule({
       providers: [
         PermissionService,
-        { provide: Router, useValue: { createUrlTree: () => 'redirect' } }
+        { provide: Router, useValue: { createUrlTree: (commands: unknown[]) => (commands[0] === '/tasks' ? 'to-tasks' : 'redirect') } },
+        {
+          provide: ModuleService,
+          useValue: {
+            isLoaded: () => true,
+            isModuleActive: (code: string) => activeModules.has(code),
+            loadActiveModules: () => of([])
+          }
+        },
+        { provide: ToastService, useValue: { warning: vi.fn() } },
+        { provide: I18nService, useValue: { translate: (key: string) => key } }
       ]
     });
     permissions = TestBed.inject(PermissionService);
@@ -33,23 +49,37 @@ describe('upl routes', () => {
 
     expect(found.length).toBe(3);
     for (const route of found) {
-      expect(route.canActivate?.length).toBe(1);
+      expect(route.canActivate?.length).toBe(2);
     }
   });
 
-  it('blocks every upl route without upl.sources.view', () => {
+  it('blocks every upl route without upl.sources.view', async () => {
     permissions.setPermissions([]);
 
     for (const route of uplRoutes()) {
-      expect(runGuard(route)).toBe('redirect');
+      expect(await runGuard(route, 1)).toBe('redirect');
     }
   });
 
-  it('opens every upl route with upl.sources.view only', () => {
+  it('opens every upl route with upl.sources.view only', async () => {
     permissions.setPermissions(['upl.sources.view']);
 
     for (const route of uplRoutes()) {
-      expect(runGuard(route)).toBe(true);
+      expect(await runGuard(route, 1)).toBe(true);
+    }
+  });
+
+  it('redirects every upl route to tasks when the upl module is disabled', async () => {
+    activeModules = new Set(['notes']);
+
+    for (const route of uplRoutes()) {
+      expect(await runGuard(route, 0)).toBe('to-tasks');
+    }
+  });
+
+  it('passes the module guard on every upl route when upl is active', async () => {
+    for (const route of uplRoutes()) {
+      expect(await runGuard(route, 0)).toBe(true);
     }
   });
 
@@ -64,12 +94,13 @@ describe('upl routes', () => {
     expect(uplFormatMatcher(segments('upl/sources/7/formats/0'), {} as never, {} as never)).toBeNull();
   });
 
-  function runGuard(route: Route): unknown {
-    const guard = route.canActivate?.[0] as CanActivateFn | undefined;
+  async function runGuard(route: Route, index: number): Promise<unknown> {
+    const guard = route.canActivate?.[index] as CanActivateFn | undefined;
     expect(guard).toBeTypeOf('function');
-    return TestBed.runInInjectionContext(() => guard!(
+    const result = TestBed.runInInjectionContext(() => guard!(
       {} as ActivatedRouteSnapshot,
       {} as RouterStateSnapshot
     ));
+    return isObservable(result) ? await firstValueFrom(result) : result;
   }
 });

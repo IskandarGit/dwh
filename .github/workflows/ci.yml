@@ -189,6 +189,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: 8.28.0
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_IGNORE_PATH: .gitleaksignore
 
       - name: Trivy (resolved backend SBOM)
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
