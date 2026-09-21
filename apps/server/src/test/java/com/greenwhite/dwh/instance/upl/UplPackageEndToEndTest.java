@@ -3,6 +3,7 @@ package com.greenwhite.dwh.instance.upl;
 import com.greenwhite.dwh.instance.config.idempotency.IdempotencyFilter;
 import com.greenwhite.dwh.instance.fnd.FndActors;
 import com.greenwhite.dwh.instance.fnd.jobs.FndJobRunner;
+import com.greenwhite.dwh.instance.fnd.units.FndUnitService;
 import com.greenwhite.dwh.instance.kauth.pref.KauthPref;
 import com.greenwhite.dwh.instance.md.service.MdUserService;
 import com.greenwhite.dwh.instance.support.EmbeddedPostgresTest;
@@ -78,6 +79,8 @@ class UplPackageEndToEndTest extends EmbeddedPostgresTest {
     @Autowired
     private FndActors actors;
     @Autowired
+    private FndUnitService units;
+    @Autowired
     private TransactionTemplate tx;
 
     private MockMvc mvc;
@@ -118,6 +121,7 @@ class UplPackageEndToEndTest extends EmbeddedPostgresTest {
     @MethodSource("com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture#departments")
     @DisplayName("Файл конфигурации экземпляра принят, разобран заданием, счётчики и адреса ошибок сходятся")
     void uploadedFileIsParsedAndErrorsAreAddressed(DepartmentFixture fixture) throws Exception {
+        UplFixtureSources.registerUnits(units, actors, fixture);
         Format format = xlsxFormat(fixture);
         FormatSheet sheet = format.sheets().getFirst();
         long sourceId = UplFixtureSources.publish(sources, format, systemUserId);
@@ -160,6 +164,7 @@ class UplPackageEndToEndTest extends EmbeddedPostgresTest {
     @MethodSource("com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture#departments")
     @DisplayName("Тот же файл второй раз: два пакета с теми же счётчиками, в хранилище один файл")
     void sameFileTwiceKeepsOneStoredFile(DepartmentFixture fixture) throws Exception {
+        UplFixtureSources.registerUnits(units, actors, fixture);
         Format format = xlsxFormat(fixture);
         long sourceId = UplFixtureSources.publish(sources, format, systemUserId);
         Sample sample = sample(format.sheets().getFirst());

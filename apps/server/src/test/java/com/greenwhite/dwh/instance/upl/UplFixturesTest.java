@@ -7,7 +7,6 @@ import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture;
 import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture.Format;
 import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture.FormatColumn;
 import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture.FormatSheet;
-import com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture.Unit;
 import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Column;
 import com.greenwhite.dwh.instance.upl.format.UplFormatModel.FormatVersion;
 import com.greenwhite.dwh.instance.upl.format.UplFormatModel.Sheet;
@@ -25,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,7 +46,7 @@ class UplFixturesTest extends EmbeddedPostgresTest {
     void formatsAreConfiguredWithoutCode(DepartmentFixture dept) {
         assertThat(dept.formats()).isNotEmpty();
         long userId = jdbc.sql("select id from md_users where login = 'system'").query(Long.class).single();
-        registerUnits(dept);
+        UplFixtureSources.registerUnits(units, actors, dept);
         for (Format f : dept.formats()) {
             long id = service.createSource(UplFixtureSources.sourceData(f), userId).source().id();
             service.createDraft(id, null, userId);
@@ -79,17 +77,6 @@ class UplFixturesTest extends EmbeddedPostgresTest {
     private static boolean hasLiteral(String text, List<String> names) {
         return names.stream().anyMatch(name ->
                 text.contains("\"" + name + "\"") || text.contains("'" + name + "'"));
-    }
-
-    private void registerUnits(DepartmentFixture dept) {
-        dept.units().stream().filter(u -> u.code().equals(u.base())).forEach(this::ensureUnit);
-        dept.units().stream().filter(u -> !u.code().equals(u.base())).forEach(this::ensureUnit);
-    }
-
-    private void ensureUnit(Unit u) {
-        if (units.findUnit(u.code()).isEmpty()) {
-            units.registerUnit(u.code(), Map.of("uz", u.nameUz()), u.base(), actors.system());
-        }
     }
 
     private static void assertStored(Format f, FormatVersion stored) {
