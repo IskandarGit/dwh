@@ -172,6 +172,31 @@ describe('PackageCardComponent', () => {
     expect(testId(fixture, 'upl-pkg-errors-table')).toHaveLength(0);
   });
 
+  it('статус «отклонён»: сервер не передаёт пустые поля — расхождение без поля rowNo всё равно показано строкой', async () => {
+    // так запись выглядит в настоящем ответе сервера: полей sheet-адреса строки и value нет вовсе
+    const fromServer = {
+      sheet: 'Sheet2',
+      columnName: 'Summa',
+      code: 'UPL_STRUCT_COLUMN_MISSING',
+      params: { sheet: 'Sheet2', column: 'Summa', headerRow: 4 }
+    } as unknown as UplPackageErrorItem;
+    const rejected = item({
+      status: 'rejected',
+      rowsTotal: null,
+      rowsAccepted: null,
+      rowsRejected: null,
+      errorsTotal: 1,
+      rejectCode: 'UPL_PKG_STRUCTURE',
+      rejectParams: { count: 1 }
+    });
+    const { fixture } = await createFixture(rejected, [of(errorsPage([fromServer]))]);
+
+    const structRows = testId(fixture, 'upl-pkg-struct-row');
+    expect(structRows).toHaveLength(1);
+    expect(structRows[0].textContent).toContain('Summa');
+    expect(testId(fixture, 'upl-pkg-errors-table')).toHaveLength(0);
+  });
+
   it('статус «отклонён» без записей: только причина и подсказка', async () => {
     const rejected = item({
       status: 'rejected',

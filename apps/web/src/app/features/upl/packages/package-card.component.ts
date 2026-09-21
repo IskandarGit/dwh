@@ -298,14 +298,14 @@ export class PackageCardComponent implements OnChanges {
     return uplPackageCodeText(row.code, row.params, this.translate);
   }
 
-  /** Расхождения с анкетой: записи без номера строки. */
+  /** Расхождения с анкетой: записи без номера строки (сервер пустые поля не передаёт вовсе). */
   structRows(): UplPackageErrorItem[] {
-    return (this.errors()?.items ?? []).filter(row => row.rowNo === null);
+    return (this.errors()?.items ?? []).filter(row => (row.rowNo ?? null) === null);
   }
 
   /** Ошибки ячеек: записи с адресом строки — они и идут в таблицу. */
   cellRows(): UplPackageErrorItem[] {
-    return (this.errors()?.items ?? []).filter(row => row.rowNo !== null);
+    return (this.errors()?.items ?? []).filter(row => (row.rowNo ?? null) !== null);
   }
 
   reloadErrors(): void {
