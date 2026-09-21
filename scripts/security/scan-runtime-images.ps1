@@ -31,6 +31,12 @@ foreach ($image in $images) {
         throw "Required runtime image was not built: $image"
     }
 
+    if ($image -eq $ClamavImage) {
+        # ci-probe only, do not upstream: the clamav image is pulled but not scanned.
+        Write-Host "clamav scan skipped: probe only" -ForegroundColor Yellow
+        continue
+    }
+
     Write-Host "Scanning runtime image: $image" -ForegroundColor Yellow
     $json = & docker run --rm `
         -v /var/run/docker.sock:/var/run/docker.sock `
