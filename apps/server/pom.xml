@@ -136,6 +136,19 @@
             <artifactId>archunit-junit5</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Потоковое чтение xlsx при разборе загруженных файлов (модуль upl); Apache POI не используется. -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel-reader</artifactId>
+            <version>0.20.2</version>
+        </dependency>
+        <!-- Сборка синтетических xlsx кодом тестов: двоичных файлов-образцов в репозитории нет. -->
+        <dependency>
+            <groupId>org.dhatim</groupId>
+            <artifactId>fastexcel</artifactId>
+            <version>0.20.2</version>
+            <scope>test</scope>
+        </dependency>
         <!-- Встроенный PostgreSQL для интеграционных тестов модулей DW:
              Docker в среде разработки недоступен, Testcontainers каркаса локально не поднимаются. -->
         <dependency>
