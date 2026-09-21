@@ -19,6 +19,14 @@ $images = @(
 
 foreach ($image in $images) {
     & docker image inspect $image *> $null
+    if ($LASTEXITCODE -ne 0 -and $image -eq $ClamavImage) {
+        Write-Host "Pulling runtime image: $image" -ForegroundColor Yellow
+        & docker pull $image
+        if ($LASTEXITCODE -ne 0) {
+            throw "Required runtime image could not be pulled: $image"
+        }
+        & docker image inspect $image *> $null
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Required runtime image was not built: $image"
     }
