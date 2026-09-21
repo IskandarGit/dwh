@@ -7,7 +7,8 @@ export type SettingsTab =
   | 'preferences'
   | 'languages'
   | 'search'
-  | 'navigation';
+  | 'navigation'
+  | 'webhooks';
 
 export interface LegacyLanguage {
   name: string;

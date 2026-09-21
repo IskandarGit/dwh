@@ -18,6 +18,7 @@ import { SettingsSecurityPanelComponent } from './components/settings-security-p
 import { SettingsStoragePanelComponent } from './components/settings-storage-panel.component';
 import { SettingsPreferencesPanelComponent } from './components/settings-preferences-panel.component';
 import { SettingsLanguagesPanelComponent } from './components/settings-languages-panel.component';
+import { WebhooksSettingsComponent } from './webhooks/webhooks-settings.component';
 
 @Component({
   selector: 'app-settings',
@@ -33,7 +34,8 @@ import { SettingsLanguagesPanelComponent } from './components/settings-languages
     SettingsSecurityPanelComponent,
     SettingsStoragePanelComponent,
     SettingsPreferencesPanelComponent,
-    SettingsLanguagesPanelComponent
+    SettingsLanguagesPanelComponent,
+    WebhooksSettingsComponent
   ],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
@@ -123,6 +125,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   canViewNavigationSettings(): boolean {
     return this.permService.hasPermission('platform.navigation', 'view');
+  }
+
+  canViewWebhookSettings(): boolean {
+    return this.permService.hasPermission('platform.webhooks', 'view') ||
+           this.permService.hasPermission('platform.webhooks', 'manage');
   }
 
   userThemePreference(): string {
@@ -318,6 +325,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
         return this.canViewSearchSettings();
       case 'navigation':
         return this.canViewNavigationSettings();
+      case 'webhooks':
+        return this.canViewWebhookSettings();
       default:
         return false;
     }
@@ -338,7 +347,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   onTabKeydown(event: KeyboardEvent, currentTab: string): void {
     const tabs: SettingsTab[] = [
-      'general', 'security', 'storage', 'preferences', 'languages', 'search', 'navigation'
+      'general', 'security', 'storage', 'preferences', 'languages', 'search', 'navigation', 'webhooks'
     ];
     const availableTabs = tabs.filter(t => this.isTabAvailable(t));
     const currentIndex = availableTabs.indexOf(currentTab as any);

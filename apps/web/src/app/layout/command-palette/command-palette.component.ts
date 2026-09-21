@@ -104,8 +104,10 @@ export {
             <button
               *ngFor="let cat of categories()"
               type="button"
+              role="tab"
               class="cat-pill"
               [class.active]="entityType === cat.value"
+              [attr.aria-selected]="entityType === cat.value"
               (click)="setCategory(cat.value)"
             >
               <span class="material-symbols-outlined pill-icon" aria-hidden="true">{{ cat.icon }}</span>

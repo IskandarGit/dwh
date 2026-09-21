@@ -14,12 +14,14 @@ interface ApiDouble {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
 }
 
 const emptyApi = (): ApiDouble => ({
   get: vi.fn(() => of([])),
   post: vi.fn(() => of({})),
-  patch: vi.fn(() => of({}))
+  patch: vi.fn(() => of({})),
+  delete: vi.fn(() => of({}))
 });
 
 describe('ProjectsComponent UI contracts', () => {
@@ -812,5 +814,49 @@ describe('ProjectsComponent UI contracts', () => {
     expect(component.selectedState).toBe('all');
     expect(component.currentPage).toBe(2);
     expect(component.paginatedProjects().map(row => row.id)).toContain(created.id);
+  });
+
+  it('manages project members modal: opens, loads members, adds and removes members', async () => {
+    const api = emptyApi();
+    const testProject = project(42);
+    const mockMembers = [
+      { projectId: 42, userId: 10, userName: 'Alice', userEmail: 'alice@example.com', accessKind: 'MANAGER' as const }
+    ];
+
+    api.get.mockImplementation((url: string) => {
+      if (url === '/tasks/projects/42/members') return of(mockMembers);
+      return of([]);
+    });
+    api.post.mockImplementation((url: string, body: any) => {
+      if (url === '/tasks/projects/42/members') return of({ projectId: 42, ...body });
+      return of({});
+    });
+    api.delete.mockImplementation((url: string) => {
+      return of({});
+    });
+
+    const { fixture, toast } = await createFixture({ api });
+    const component = fixture.componentInstance;
+
+    // 1. Open members modal
+    component.openMembersModal(testProject);
+    expect(component.selectedProjectForMembers()).toEqual(testProject);
+    expect(api.get).toHaveBeenCalledWith('/tasks/projects/42/members');
+    expect(component.projectMembers()).toEqual(mockMembers);
+
+    // 2. Add member
+    component.onAddProjectMember({ projectId: 42, userId: 20, accessKind: 'MEMBER' });
+    expect(api.post).toHaveBeenCalledWith('/tasks/projects/42/members', { userId: 20, accessKind: 'MEMBER' });
+    expect(toast.success).toHaveBeenCalled();
+
+    // 3. Remove member
+    component.onRemoveProjectMember({ projectId: 42, userId: 10 });
+    expect(api.delete).toHaveBeenCalledWith('/tasks/projects/42/members/10');
+    expect(toast.success).toHaveBeenCalled();
+
+    // 4. Close modal
+    component.closeMembersModal();
+    expect(component.selectedProjectForMembers()).toBeNull();
+    expect(component.projectMembers()).toEqual([]);
   });
 });

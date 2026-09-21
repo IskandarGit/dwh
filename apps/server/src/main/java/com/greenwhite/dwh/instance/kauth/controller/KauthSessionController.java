@@ -74,6 +74,13 @@ public class KauthSessionController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping({"/users/{userId}/sessions/{id}", "/profile/sessions/users/{userId}/{id}"})
+    @RequiresPermission(form = MdPref.FORM_USERS, action = "block")
+    public ResponseEntity<Void> closeUserSession(@PathVariable("userId") Long userId, @PathVariable("id") Long id) {
+        sessionService.closeSession(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping({"/users/{userId}/security", "/profile/sessions/users/{userId}/security"})
     @RequiresPermission(form = MdPref.FORM_USERS, action = "view")
     public ResponseEntity<com.greenwhite.dwh.instance.kauth.service.UserSecuritySummary> getUserSecuritySummary(

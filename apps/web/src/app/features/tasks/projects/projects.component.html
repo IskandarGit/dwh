@@ -117,6 +117,7 @@
     [statsLoaded]="statsLoaded()"
     (viewTasks)="viewProjectTasks($event)"
     (editProject)="openEditModal($event)"
+    (manageMembers)="openMembersModal($event)"
     (pageChange)="setPage($event)"
     (pageSizeChange)="setPageSize($event)"
   ></app-project-table-view>
@@ -136,6 +137,7 @@
     [statsLoaded]="statsLoaded()"
     (viewTasks)="viewProjectTasks($event)"
     (editProject)="openEditModal($event)"
+    (manageMembers)="openMembersModal($event)"
     (pageChange)="setPage($event)"
     (pageSizeChange)="setPageSize($event)"
   ></app-project-cards-view>
@@ -178,3 +180,16 @@
   [isSubmitting]="forms.isSubmitting()"
   [projectCustomFields]="projectCustomFields()"
 ></app-project-modals>
+
+<app-project-members-modal
+  [isOpen]="selectedProjectForMembers() !== null"
+  [project]="selectedProjectForMembers()"
+  [members]="projectMembers()"
+  [isLoadingMembers]="isLoadingMembers()"
+  [isAddingMember]="isAddingMember()"
+  [isRemovingMember]="isRemovingMember()"
+  [canUpdateProject]="canUpdateProject()"
+  (close)="closeMembersModal()"
+  (addMember)="onAddProjectMember($event)"
+  (removeMember)="onRemoveProjectMember($event)"
+></app-project-members-modal>

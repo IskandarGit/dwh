@@ -9,12 +9,14 @@ import { PermissionService } from '../../../core/services/permission.service';
 import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
 import { Project, ProjectTaskStats } from '../../../core/models/task.models';
 import { CustomField } from '../../../core/models/custom-field.models';
-import { TranslatePipe } from '../../../core/services/i18n.service';
-import { ProjectCreateForm, ProjectEditForm, ProjectViewState, ProjectStateFilter } from './projects.models';
+import { ToastService } from '../../../core/services/toast.service';
+import { TranslatePipe, I18nService } from '../../../core/services/i18n.service';
+import { ProjectCreateForm, ProjectEditForm, ProjectViewState, ProjectStateFilter, ProjectMember } from './projects.models';
 import { ProjectFilterBarComponent } from './components/project-filter-bar.component';
 import { ProjectTableViewComponent } from './components/project-table-view.component';
 import { ProjectCardsViewComponent } from './components/project-cards-view.component';
 import { ProjectModalsComponent } from './components/project-modals.component';
+import { ProjectMembersModalComponent } from './components/project-members-modal.component';
 import { ProjectFormsService } from './services/project-forms.service';
 
 @Component({
@@ -29,7 +31,8 @@ import { ProjectFormsService } from './services/project-forms.service';
     ProjectFilterBarComponent,
     ProjectTableViewComponent,
     ProjectCardsViewComponent,
-    ProjectModalsComponent
+    ProjectModalsComponent,
+    ProjectMembersModalComponent
   ],
   providers: [ProjectFormsService],
   templateUrl: './projects.component.html',
@@ -49,6 +52,15 @@ export class ProjectsComponent implements OnInit, OnDestroy {
   private listRequest?: Subscription;
   private statsRequest?: Subscription;
   private destroyed = false;
+
+  private readonly toast = inject(ToastService);
+  private readonly uiI18n = inject(I18nService);
+
+  readonly selectedProjectForMembers = signal<Project | null>(null);
+  readonly projectMembers = signal<ProjectMember[]>([]);
+  readonly isLoadingMembers = signal<boolean>(false);
+  readonly isAddingMember = signal<boolean>(false);
+  readonly isRemovingMember = signal<boolean>(false);
 
   readonly projects = signal<Project[]>([]);
   readonly projectStats = signal<Record<number, ProjectTaskStats>>({});
@@ -301,6 +313,63 @@ export class ProjectsComponent implements OnInit, OnDestroy {
   }
 
   closeRecordView() { this.router.navigate(['/tasks/projects'], { queryParamsHandling: 'preserve' }); }
+
+  openMembersModal(project: Project): void {
+    this.selectedProjectForMembers.set(project);
+    this.loadProjectMembers(project.id);
+  }
+
+  closeMembersModal(): void {
+    this.selectedProjectForMembers.set(null);
+    this.projectMembers.set([]);
+  }
+
+  loadProjectMembers(projectId: number): void {
+    this.isLoadingMembers.set(true);
+    this.api.get<ProjectMember[]>(`/tasks/projects/${projectId}/members`).subscribe({
+      next: (res) => {
+        this.projectMembers.set(res || []);
+        this.isLoadingMembers.set(false);
+      },
+      error: () => {
+        this.isLoadingMembers.set(false);
+        this.toast.error(this.uiI18n.translate('projects.oshibka_zagruzki_uchastnikov'));
+      }
+    });
+  }
+
+  onAddProjectMember(event: { projectId: number; userId: number; accessKind: string }): void {
+    this.isAddingMember.set(true);
+    this.api.post<void>(`/tasks/projects/${event.projectId}/members`, {
+      userId: event.userId,
+      accessKind: event.accessKind
+    }).subscribe({
+      next: () => {
+        this.isAddingMember.set(false);
+        this.toast.success(this.uiI18n.translate('projects.uchastnik_uspeshno_dobavlen'));
+        this.loadProjectMembers(event.projectId);
+      },
+      error: (err: any) => {
+        this.isAddingMember.set(false);
+        this.toast.error(err?.error?.detail || this.uiI18n.translate('projects.oshibka_dobavleniya_uchastnika'));
+      }
+    });
+  }
+
+  onRemoveProjectMember(event: { projectId: number; userId: number }): void {
+    this.isRemovingMember.set(true);
+    this.api.delete(`/tasks/projects/${event.projectId}/members/${event.userId}`).subscribe({
+      next: () => {
+        this.isRemovingMember.set(false);
+        this.toast.success(this.uiI18n.translate('projects.uchastnik_uspeshno_udalen'));
+        this.loadProjectMembers(event.projectId);
+      },
+      error: (err: any) => {
+        this.isRemovingMember.set(false);
+        this.toast.error(err?.error?.detail || this.uiI18n.translate('projects.oshibka_udaleniya_uchastnika'));
+      }
+    });
+  }
 
   loadProjectCustomFields() {
     this.api.get<CustomField[]>('/custom-fields', { entity_type: 'PROJECT' }).subscribe({

@@ -405,11 +405,11 @@ class AuthenticationGenerationConcurrencyTest {
 
     @Test void missingUserAndVersionOverflowCannotPartiallyRevokeAccess(){
         try(var f=new AuthenticationGenerationFixture(ds)){
-            assertThatThrownBy(() -> f.invalidator.invalidateAllAccess(Long.MAX_VALUE)).isInstanceOf(ApiException.class);
+            assertThatThrownBy(() -> f.userService.incrementAuthenticationVersion(Long.MAX_VALUE)).isInstanceOf(ApiException.class);
             Long id=f.user(false,false);
             f.jdbc.sql("update md_users set auth_version=9223372036854775807 where id=:id").param("id",id).update();
             var cookie=f.principal(id,false);var bearer=f.principal(id,true);
-            assertThatThrownBy(() -> f.invalidator.invalidateAllAccess(id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+            assertThatThrownBy(() -> f.userService.incrementAuthenticationVersion(id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
             assertThat(f.users.findById(id).orElseThrow().authenticationVersion()).isEqualTo(Long.MAX_VALUE);
             assertThat(f.sessions.findActiveById(cookie.sessionId()).isPresent()).isTrue();
             assertThat(f.tokens.findActiveById(bearer.apiTokenId()).isPresent()).isTrue();

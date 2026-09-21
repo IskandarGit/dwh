@@ -251,3 +251,23 @@ export function exportUsersToCsv(users: User[], uiI18n: I18nService, toast: Toas
   document.body.removeChild(link);
   toast.success(uiI18n.translate('iam.eksport_vypolnen'));
 }
+
+export interface EffectivePermissionItem {
+  form: string;
+  action: string;
+  source: 'role' | 'personal';
+}
+
+export interface PersonalGrant {
+  form: string;
+  action: string;
+}
+
+export interface EffectivePermissionsResponse {
+  items: EffectivePermissionItem[];
+}
+
+export interface PersonalPermissionsResponse {
+  grants: PersonalGrant[];
+}
+

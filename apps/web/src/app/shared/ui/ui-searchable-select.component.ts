@@ -136,9 +136,19 @@ export interface SelectOption {
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
     .searchable-select-container {
       position: relative;
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .searchable-select-container.disabled {
       opacity: 0.6;
@@ -147,6 +157,10 @@ export interface SelectOption {
 
     .select-control {
       position: relative;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .select-trigger {
@@ -154,6 +168,9 @@ export interface SelectOption {
       align-items: center;
       justify-content: space-between;
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
       height: 34px;
       padding: 0 10px;
       background-color: var(--bg-surface);

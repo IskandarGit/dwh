@@ -371,4 +371,18 @@ describe('SettingsComponent UI contracts', () => {
     expect(fixture.componentInstance.formatQuotaMb('5120')).toBe('5120 МБ (~5 ГБ)');
     expect(fixture.componentInstance.formatQuotaMb('500')).toBe('500 МБ');
   });
+
+  it('supports webhooks tab when user has platform.webhooks permission', async () => {
+    const fixture = await createFixture(undefined, (form) => form === 'platform.webhooks');
+    expect(fixture.componentInstance.canViewWebhookSettings()).toBe(true);
+    expect(fixture.componentInstance.isTabAvailable('webhooks')).toBe(true);
+
+    fixture.componentInstance.setTab('webhooks');
+    fixture.detectChanges();
+
+    const panel = fixture.nativeElement.querySelector('#settings-webhooks-panel');
+    expect(panel).not.toBeNull();
+    const webhooksCmp = panel.querySelector('app-webhooks-settings');
+    expect(webhooksCmp).not.toBeNull();
+  });
 });
