@@ -68,5 +68,7 @@ public abstract class EmbeddedPostgresTest {
                 () -> System.getProperty("java.io.tmpdir") + "/dwh-test-storage");
         registry.add("platform.bootstrap.admin-password-file",
                 () -> System.getProperty("java.io.tmpdir") + "/dwh-test-bootstrap-password.txt");
+        // Запускатель очереди заданий в тестах выключен: очередь снимают сами тесты вызовом runQueued()
+        registry.add("dwh.fnd.jobs.ticker-enabled", () -> false);
     }
 }
