@@ -1,0 +1,3046 @@
+[ {
+  "table_name" : "audit_log",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_08",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_09",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_10",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_11",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2026_12",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_01",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_02",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_03",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_04",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_05",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_06",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_07",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_08",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_09",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_10",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_11",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_2027_12",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "table_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "row_pk",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "event",
+  "data_type" : "character",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "changed_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "session_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "is_api",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "changed_columns",
+  "data_type" : "ARRAY",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "old_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "audit_log_default",
+  "column_name" : "new_row",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "installed_rank",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "version",
+  "data_type" : "character varying",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "description",
+  "data_type" : "character varying",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "type",
+  "data_type" : "character varying",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "script",
+  "data_type" : "character varying",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "checksum",
+  "data_type" : "integer",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "installed_by",
+  "data_type" : "character varying",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "installed_on",
+  "data_type" : "timestamp without time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "execution_time",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "flyway_schema_history",
+  "column_name" : "success",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "key",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "request_hash",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "response_status",
+  "data_type" : "integer",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "response_body",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "state",
+  "data_type" : "character varying",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "idempotency_keys",
+  "column_name" : "reservation_token",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "token_prefix",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "token_hash",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "expires_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "last_used_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "revoked_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_api_tokens",
+  "column_name" : "auth_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "login",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "ip",
+  "data_type" : "inet",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "is_success",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "failure_reason",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_login_attempts",
+  "column_name" : "attempt_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "channel",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "code_hash",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "attempts_left",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "expires_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "is_used",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "otp_token_hash",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "purpose",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_otp_codes",
+  "column_name" : "auth_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "code_hash",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "expires_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_password_reset_codes",
+  "column_name" : "is_used",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "token_hash",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "ip",
+  "data_type" : "inet",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "user_agent",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "device_info",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "last_seen_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "closed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kauth_sessions",
+  "column_name" : "auth_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "channel",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "address",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "is_verified",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kauth_user_channels",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "subscription_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "event_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "http_status",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "duration_ms",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "is_success",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_logs",
+  "column_name" : "sent_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "subscription_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "event_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "payload",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "status",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "attempts",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "max_attempts",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "next_attempt_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "last_error",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "last_http_status",
+  "data_type" : "integer",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "processed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "claim_token",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kwh_outbox",
+  "column_name" : "claimed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "target_url",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "secret_token",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "subscribed_events",
+  "data_type" : "ARRAY",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "kwh_subscriptions",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "entity_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "field_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "is_required",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "default_value",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "options_json",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "order_no",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_fields",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "version",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "description",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "category",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "icon",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "route_path",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "entrypoint_url",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "permissions_json",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "settings_schema_json",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "status",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "rejection_reason",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "legacy_approval_reference",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "approved_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_custom_modules",
+  "column_name" : "updated_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_effective_permissions",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_effective_permissions",
+  "column_name" : "form_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_effective_permissions",
+  "column_name" : "action",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_effective_permissions",
+  "column_name" : "source_role_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_effective_scope",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_effective_scope",
+  "column_name" : "org_unit_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_form_actions",
+  "column_name" : "form_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_form_actions",
+  "column_name" : "action",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_form_actions",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_form_actions",
+  "column_name" : "is_deprecated",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_forms",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_forms",
+  "column_name" : "module",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_forms",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_forms",
+  "column_name" : "is_deprecated",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "is_builtin",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "is_active",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "revision",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "modified_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_languages",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_translation_overrides",
+  "column_name" : "language_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_translation_overrides",
+  "column_name" : "translation_key",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_translation_overrides",
+  "column_name" : "value",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_i18n_translation_overrides",
+  "column_name" : "modified_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_i18n_translation_overrides",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "client_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "client_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "resource_profile",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_instance_info",
+  "column_name" : "storage_quota_bytes",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "parent_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "kind",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "order_no",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_org_units",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_permissions",
+  "column_name" : "role_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_permissions",
+  "column_name" : "form_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_permissions",
+  "column_name" : "action",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_scope_rules",
+  "column_name" : "role_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_scope_rules",
+  "column_name" : "rule",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_role_scope_rules",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "pcode",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "order_no",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_roles",
+  "column_name" : "storage_quota_bytes",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_settings",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_settings",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_settings",
+  "column_name" : "key",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_settings",
+  "column_name" : "value",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "provider_id",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "icon",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "client_id",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "client_secret",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "authorization_url",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "token_url",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "userinfo_url",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "scopes",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "is_enabled",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "auto_provision",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_sso_providers",
+  "column_name" : "updated_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_org_units",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_org_units",
+  "column_name" : "org_unit_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permission_versions",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permission_versions",
+  "column_name" : "permissions_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permission_versions",
+  "column_name" : "is_recalculating",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permissions",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permissions",
+  "column_name" : "form_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_permissions",
+  "column_name" : "action",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_roles",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_roles",
+  "column_name" : "role_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_scope",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_scope",
+  "column_name" : "rule",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_user_scope",
+  "column_name" : "recalculated_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "login",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "email",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "phone",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "password_hash",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "manager_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "language",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "timezone",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "avatar_file_id",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "attributes",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "is_2fa_enabled",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "force_password_change",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "password_changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "modified_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "storage_quota_bytes",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "org_unit_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "md_users",
+  "column_name" : "auth_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "sha256",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "original_name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "size_bytes",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "mime_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "storage_bucket",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "storage_key",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "mf_files",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_announcement_reads",
+  "column_name" : "announcement_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcement_reads",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcement_reads",
+  "column_name" : "read_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "title_json",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "body_json",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "banner_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "published_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "archived_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_announcements",
+  "column_name" : "lock_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "channel",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "recipient",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "template_code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "payload",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "status",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "attempts",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "max_attempts",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "next_attempt_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "idempotency_key",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "last_error",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "processed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "claim_token",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notification_outbox",
+  "column_name" : "claimed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notification_prefs",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_prefs",
+  "column_name" : "event_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_prefs",
+  "column_name" : "channel",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notification_prefs",
+  "column_name" : "is_enabled",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "title",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "body",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "form_link",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "source_code",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "is_read",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_notifications",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comment_files",
+  "column_name" : "comment_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comment_files",
+  "column_name" : "file_id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comments",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comments",
+  "column_name" : "task_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comments",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comments",
+  "column_name" : "text_markdown",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_comments",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_files",
+  "column_name" : "task_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_files",
+  "column_name" : "file_id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_files",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_members",
+  "column_name" : "task_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_members",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_members",
+  "column_name" : "involve_kind",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_members",
+  "column_name" : "is_viewed",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_project_members",
+  "column_name" : "project_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_project_members",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_project_members",
+  "column_name" : "access_kind",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "description",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "attributes",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_projects",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "pcode",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "color",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "order_no",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_statuses",
+  "column_name" : "is_terminal",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "code",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "name",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "icon",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "color",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "order_no",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "is_system",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_task_types",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "project_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "parent_task_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "title",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "description_markdown",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "status_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "priority",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "reporter_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "attributes",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "begin_time",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "end_time",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "resolved_time",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "modified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "created_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "ms_tasks",
+  "column_name" : "modified_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "generation_id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "entity_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "entity_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "delivered_revision",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "attempted_revision",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "attempts",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "next_attempt_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "error_code",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "owner_token",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generation_delivery",
+  "column_name" : "delivered_fingerprint",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "task_collection",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "project_collection",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "user_collection",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "schema_version",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "schema_profile",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "settings_version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "discovery_entity",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "discovery_after_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "verified_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_generations",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "id",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "active_generation_id",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "initialized",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "worker_owner",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_index_state",
+  "column_name" : "worker_started_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "request_id",
+  "data_type" : "uuid",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "action",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "generation_id",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "state",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "actor_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "owner_token",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "processed_count",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "failed_count",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "verification",
+  "data_type" : "jsonb",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "error_code",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "updated_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "finished_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "requested_generation_id",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "retry_of_job_id",
+  "data_type" : "uuid",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_jobs",
+  "column_name" : "request_metadata_recorded",
+  "data_type" : "boolean",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_projection_versions",
+  "column_name" : "entity_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_projection_versions",
+  "column_name" : "entity_id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_projection_versions",
+  "column_name" : "revision",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_projection_versions",
+  "column_name" : "changed_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_settings",
+  "column_name" : "id",
+  "data_type" : "integer",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_settings",
+  "column_name" : "version",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_settings",
+  "column_name" : "configuration",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "search_settings",
+  "column_name" : "updated_by",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "search_settings",
+  "column_name" : "updated_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "id",
+  "data_type" : "bigint",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "event_type",
+  "data_type" : "text",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "user_id",
+  "data_type" : "bigint",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "ip",
+  "data_type" : "inet",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "user_agent",
+  "data_type" : "text",
+  "is_nullable" : "YES"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "details",
+  "data_type" : "jsonb",
+  "is_nullable" : "NO"
+}, {
+  "table_name" : "security_events",
+  "column_name" : "created_at",
+  "data_type" : "timestamp with time zone",
+  "is_nullable" : "NO"
+} ]

@@ -61,7 +61,7 @@ describe('AppShellComponent', () => {
     toggle: vi.fn(),
     search: vi.fn(() => of({ query: '', totalHits: 0, hits: [] }))
   };
-  const activeCodes = signal<Set<string>>(new Set(['notes']));
+  const activeCodes = signal<Set<string>>(new Set(['notes', 'upl']));
   const moduleService = {
     isModuleActive: vi.fn((code: string) => activeCodes().has(code)),
     getActiveCustomModules: vi.fn((): InstalledModule[] => []),
@@ -90,7 +90,7 @@ describe('AppShellComponent', () => {
     notificationService.unreadCount.set(3);
     permissionService.canView.mockImplementation((_form: string) => true);
     permissionService.canUpdate.mockImplementation((_form: string) => true);
-    activeCodes.set(new Set(['notes']));
+    activeCodes.set(new Set(['notes', 'upl']));
     moduleService.isModuleActive.mockImplementation((code: string) => activeCodes().has(code));
     moduleService.getActiveCustomModules.mockReturnValue([]);
     navigationService.activeItems.set([]);
@@ -314,7 +314,7 @@ describe('AppShellComponent', () => {
     // Check items per section
     const workspaceSection = sections.find(s => s.id === 'workspace');
     expect(workspaceSection?.items.map(i => i.id)).toEqual([
-      'tasks', 'projects', 'notes', 'files', 'analytics', 'notifications'
+      'tasks', 'projects', 'notes', 'upl-sources', 'files', 'analytics', 'notifications'
     ]);
 
     const iamSection = sections.find(s => s.id === 'iam');
@@ -642,5 +642,39 @@ describe('AppShellComponent', () => {
     comp.onProfileFlyoutClick();
     fixture.detectChanges();
     expect(comp.isProfileFlyoutVisible()).toBe(false);
+  });
+
+  it('keeps the sources and formats link in the workspace section for upl.sources view', () => {
+    permissionService.canView.mockImplementation(form => form === 'upl.sources');
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const sourcesItem = workspaceSection.items.find(i => i.route === '/upl/sources');
+    expect(sourcesItem).toBeDefined();
+    expect(sourcesItem!.permission()).toBe(true);
+  });
+
+  it('hides the sources and formats link without upl.sources view', () => {
+    permissionService.canView.mockImplementation(form => form !== 'upl.sources');
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const sourcesItem = workspaceSection.items.find(i => i.route === '/upl/sources');
+    expect(sourcesItem).toBeDefined();
+    expect(sourcesItem!.permission()).toBe(false);
+  });
+
+  it('hides the sources and formats link when the upl module is disabled', () => {
+    permissionService.canView.mockImplementation(() => true);
+    activeCodes.set(new Set(['notes']));
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const sourcesItem = workspaceSection.items.find(i => i.route === '/upl/sources');
+    expect(sourcesItem).toBeDefined();
+    expect(sourcesItem!.permission()).toBe(false);
   });
 });

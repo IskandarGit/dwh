@@ -117,6 +117,7 @@ export class ApiService {
         status: error.status || 400,
         code: p.code || 'API_ERROR',
         detail: detail || p.title || 'Произошла ошибка при выполнении операции',
+        errors: Array.isArray(p.errors) ? p.errors : undefined,
         invalid_params: p.invalid_params
       };
     } else {
