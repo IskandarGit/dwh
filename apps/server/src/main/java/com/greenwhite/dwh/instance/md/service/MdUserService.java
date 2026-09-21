@@ -66,7 +66,8 @@ public class MdUserService {
         if (userRepository.existsByEmail(email)) {
             throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Пользователь с таким email уже существует");
         }
-        if (phone != null && !phone.isBlank() && userRepository.existsByPhone(phone)) {
+        String normalizedPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
+        if (normalizedPhone != null && userRepository.existsByPhone(normalizedPhone)) {
             throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Активный пользователь с таким номером телефона уже существует");
         }
 
@@ -83,7 +84,7 @@ public class MdUserService {
                 : null;
 
         var user = userRepository.create(new MdUserRepository.UserCreateData(
-                name, login, email, phone, passwordHash, MdPref.STATE_ACTIVE,
+                name, login, email, normalizedPhone, passwordHash, MdPref.STATE_ACTIVE,
                 managerId, language, timezone, avatarFileId, attributes, is2faEnabled, forcePasswordChange
         ), createdBy);
 
@@ -186,8 +187,9 @@ public class MdUserService {
         }
         var existingUser = getUserById(userId);
 
-        if (phone != null && !phone.isBlank() && !phone.equals(existingUser.phone())) {
-            if (userRepository.existsByPhone(phone)) {
+        String normalizedPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
+        if (normalizedPhone != null && !normalizedPhone.equals(existingUser.phone())) {
+            if (userRepository.existsByPhone(normalizedPhone)) {
                 throw ApiException.conflict(ErrorCode.CODE_ALREADY_EXISTS, "Активный пользователь с таким номером телефона уже существует");
             }
         }
@@ -197,7 +199,7 @@ public class MdUserService {
         }
 
         userRepository.update(userId, new MdUserRepository.UserUpdateData(
-                name, phone, managerId, language, timezone, avatarFileId, attributes, is2faEnabled
+                name, normalizedPhone, managerId, language, timezone, avatarFileId, attributes, is2faEnabled
         ), modifiedBy);
 
         if (roleIds != null) {
@@ -240,6 +242,7 @@ public class MdUserService {
         if (!userRepository.compareAndSetPassword(userId, authenticatedVersion, user.passwordHash(), newHash)) {
             throw ApiException.invalidCredentials();
         }
+        userRepository.incrementAuthenticationVersion(userId);
         sessionInvalidator.invalidateAllAccess(userId);
 
         auditLogService.logSecurityEvent("PASSWORD_CHANGED", userId, null, null, Map.of("login", user.login()));
@@ -260,6 +263,7 @@ public class MdUserService {
         // I-U1 (FR-USR-4): блокировка атомарно закрывает сессии и отзывает токены —
         // в ТОЙ ЖЕ транзакции, никаких «окон», когда state=P, а сессия жива.
         if (MdPref.STATE_PASSIVE.equals(newState)) {
+            userRepository.incrementAuthenticationVersion(targetUserId);
             sessionInvalidator.invalidateAllAccess(targetUserId);
         }
 
@@ -276,6 +280,7 @@ public class MdUserService {
         var targetUser = getUserById(targetUserId);
         userRepository.setForcePasswordChange(targetUserId, force, currentUserId);
         if (force) {
+            userRepository.incrementAuthenticationVersion(targetUserId);
             sessionInvalidator.invalidateAllAccess(targetUserId);
         }
         searchChangePublisher.changed("USER", targetUserId);
@@ -289,6 +294,7 @@ public class MdUserService {
     public void reset2fa(Long targetUserId, Long currentUserId) {
         var targetUser = getUserById(targetUserId);
         userRepository.set2faEnabled(targetUserId, false, currentUserId);
+        userRepository.incrementAuthenticationVersion(targetUserId);
         sessionInvalidator.invalidateAllAccess(targetUserId);
         searchChangePublisher.changed("USER", targetUserId);
         auditLogService.logChange("md_users", String.valueOf(targetUserId), "U",
@@ -310,6 +316,7 @@ public class MdUserService {
         userRepository.anonymizeUser(targetUserId, currentUserId);
 
         // Закрытие всех сессий и отзыв токенов
+        userRepository.incrementAuthenticationVersion(targetUserId);
         sessionInvalidator.invalidateAllAccess(targetUserId);
 
         searchChangePublisher.changed("USER", targetUserId);

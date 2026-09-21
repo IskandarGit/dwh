@@ -74,6 +74,7 @@ Assert-Matches $restorePs 'Get-FileHash' 'PowerShell restore must verify the enc
 foreach ($scriptPath in @($deployPsPath, (Join-Path $PSScriptRoot 'backup.ps1'), $restorePsPath,
         $backupObjectsPsPath, $restoreCombinedPsPath, $rollbackPsPath, $testRecoveryPsPath,
         (Join-Path $PSScriptRoot 'test-backup-status.ps1'),
+        (Join-Path $PSScriptRoot 'init-production-env.ps1'),
         (Join-Path $repoRoot 'scripts/release/test-release-gates.ps1'),
         (Join-Path $repoRoot 'scripts/security/test-secret-scan.ps1'))) {
     [scriptblock]::Create((Get-Content -LiteralPath $scriptPath -Raw)) | Out-Null
@@ -160,7 +161,7 @@ Assert-Matches ($nginxConfigOutput -join [Environment]::NewLine) `
 $bashSyntaxCheck = @'
 set -eu
 mkdir -p /tmp/release-scripts /tmp/backup-scripts
-for script in deploy.sh backup.sh restore.sh rollback.sh test-deploy-fail-closed.sh; do
+for script in deploy.sh backup.sh restore.sh rollback.sh test-deploy-fail-closed.sh init-production-env.sh; do
     sed 's/\r$//' "/release/$script" > "/tmp/release-scripts/$script"
 done
 for script in write-status.sh backup-loop.sh bootstrap-role.sh; do

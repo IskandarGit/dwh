@@ -80,7 +80,7 @@ final class AuthenticationGenerationFixture implements AutoCloseable {
         context.registerBean(MdPermissionService.class,() -> permissions);
         context.registerBean(KauthSessionService.class,() -> new KauthSessionService(sessions));
         context.registerBean(PlatformTransactionManager.class,() -> new DataSourceTransactionManager(ds));
-        context.registerBean(KauthUserSessionInvalidator.class,() -> new KauthUserSessionInvalidator(sessions,tokens,users));
+        context.registerBean(KauthUserSessionInvalidator.class,() -> new KauthUserSessionInvalidator(sessions,tokens));
         context.registerBean(MdUserService.class,() -> new MdUserService(users,new MdRoleRepository(jdbc),
                 new MdCustomFieldService(new MdCustomFieldRepository(jdbc,mapper),audit),hasher,new PasswordValidator(),
                 context.getBean(UserSessionInvalidator.class),mock(SearchChangePublisher.class),audit,scopes));

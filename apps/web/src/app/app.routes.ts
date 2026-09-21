@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { AppShellComponent } from './layout/app-shell/app-shell.component';
 import { permissionGuard } from './core/services/permission.service';
 import { projectRecordMatcher, taskRecordMatcher, userRecordMatcher } from './core/services/search-target';
 import { recordNavigationGuard } from './core/guards/record-navigation.guard';
@@ -15,7 +14,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    component: AppShellComponent,
+    loadComponent: () => import('./layout/app-shell/app-shell.component').then(m => m.AppShellComponent),
     canActivate: [authGuard],
     children: [
       {

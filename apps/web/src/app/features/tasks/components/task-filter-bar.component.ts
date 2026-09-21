@@ -18,7 +18,7 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
     <div class="toolbar">
       <div class="toolbar-left-row">
         <!-- Smart View Presets -->
-        <div class="preset-filter-group" role="group" [attr.aria-label]="'tasks.filtr_po_statusu' | t">
+        <div class="preset-filter-group" role="group" [attr.aria-label]="'tasks.bystrye_filtry' | t">
           <button
             type="button"
             class="preset-btn"
@@ -186,6 +186,11 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+    }
     .toolbar {
       display: flex;
       align-items: center;
@@ -196,12 +201,16 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       padding: 8px 12px;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .toolbar-left-row {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+      max-width: 100%;
+      min-width: 0;
     }
     .preset-filter-group {
       display: flex;
@@ -210,6 +219,9 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
       border-radius: var(--radius-sm);
       padding: 2px;
       gap: 2px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .preset-btn {
       border: none;
@@ -273,6 +285,8 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .status-tabs {
@@ -282,6 +296,9 @@ export type TaskPreset = 'all' | 'my' | 'executor' | 'observer' | 'reported' | '
       border-radius: var(--radius-sm);
       padding: 2px;
       gap: 2px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .status-tab {
       border: none;

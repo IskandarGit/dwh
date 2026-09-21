@@ -92,9 +92,19 @@ import { TranslatePipe } from '../../core/services/i18n.service';
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
     .user-multi-select-container {
       position: relative;
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .selected-tags-box {
@@ -107,6 +117,10 @@ import { TranslatePipe } from '../../core/services/i18n.service';
       flex-wrap: wrap;
       align-items: center;
       gap: 4px;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
       transition: border-color 0.15s ease;
     }
     .selected-tags-box:hover { border-color: var(--primary); }

@@ -148,11 +148,10 @@ class ModularArchitectureTest {
     }
 
     @Test
-    @DisplayName("9. Модуль аутентификации (kauth) не должен напрямую зависеть от репозиториев мастер-данных (md), кроме адаптера KauthUserSessionInvalidator")
+    @DisplayName("9. Модуль аутентификации (kauth) не должен напрямую зависеть от репозиториев мастер-данных (md)")
     void kauthShouldNotDependOnMdRepositoriesDirectly() {
         noClasses()
                 .that().resideInAPackage("com.greenwhite.dwh.instance.kauth..")
-                .and().doNotHaveSimpleName("KauthUserSessionInvalidator")
                 .should().dependOnClassesThat(
                         JavaClass.Predicates.resideInAPackage("com.greenwhite.dwh.instance.md.repository..")
                                 .and(JavaClass.Predicates.simpleNameEndingWith("Repository")))

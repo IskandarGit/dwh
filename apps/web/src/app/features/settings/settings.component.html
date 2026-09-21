@@ -140,6 +140,22 @@
             <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">menu_open</span>
             <span>{{ 'settings.navigation.tab' | t }}</span>
           </button>
+
+          <button
+            *ngIf="canViewWebhookSettings()"
+            id="settings-webhooks-tab"
+            type="button"
+            role="tab"
+            class="status-tab"
+            [class.active]="activeTab === 'webhooks'"
+            [attr.aria-selected]="activeTab === 'webhooks'"
+            aria-controls="settings-webhooks-panel"
+            (click)="setTab('webhooks')"
+            (keydown)="onTabKeydown($event, 'webhooks')"
+          >
+            <span class="material-symbols-outlined" style="font-size: 16px;" aria-hidden="true">webhook</span>
+            <span>{{ 'settings.webhooks.tab' | t }}</span>
+          </button>
         </div>
       </div>
 
@@ -151,6 +167,11 @@
       <!-- TAB: Navigation Settings -->
       <div id="settings-navigation-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-navigation-tab" *ngIf="activeTab === 'navigation' && canViewNavigationSettings()">
         <app-navigation-settings />
+      </div>
+
+      <!-- TAB: Webhook Subscriptions -->
+      <div id="settings-webhooks-panel" class="tab-content" role="tabpanel" aria-labelledby="settings-webhooks-tab" *ngIf="activeTab === 'webhooks' && canViewWebhookSettings()">
+        <app-webhooks-settings />
       </div>
 
       <!-- TAB 1: General Settings -->

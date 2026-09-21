@@ -30,7 +30,7 @@ public class MsTaskStatusService {
             MsTaskStatusRepository statusRepository,
             MsTaskTypeRepository typeRepository,
             SearchChangePublisher searchChangePublisher,
-            AuditLogService auditLogService) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) AuditLogService auditLogService) {
         this.statusRepository = statusRepository;
         this.typeRepository = typeRepository;
         this.searchChangePublisher = searchChangePublisher;

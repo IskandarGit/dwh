@@ -1,6 +1,6 @@
 # Контекст SmartupCMS для AI-ассистентов
 
-**Актуализировано:** 2026-09-10
+**Актуализировано:** 2026-09-19
 
 **Назначение:** краткий воспроизводимый handoff для следующей AI-сессии
 
@@ -679,6 +679,19 @@ actions по-прежнему зафиксированы immutable SHA; `verify-
 запрещает возврат этих пяти action families на неутверждённый pin. Локальные
 `actionlint` и supply-chain contract зелёные; remote CI `33919377814` подтвердил
 все пять jobs без прежних Node 20 annotations.
+
+Срез 2026-09-19:
+- Выполнен полный сквозной аудит качества проекта (Backend, Frontend, DB, Security, E2E).
+- Полный прогон Playwright E2E: 14 сьютов, 50/50 passed (включая a11y axe-core, mobile viewports 320/390px, смену паролей, вебхуки).
+- Angular Vitest: 63 тестовых файла, 626/626 passed.
+- Устранена рассинхронизация каталогов локализации: добавлен ключ `tasks.bystrye_filtry` в `ru.json` и `en.json`, синхронизирован `packaged-russian.ts`, аудит `i18n:audit` даёт 100% совпадение (1304 используемых ключа).
+- Исправлен тест многопоточности `AuthenticationGenerationConcurrencyTest` (переведён на `incrementAuthenticationVersion`, 45/45 passed).
+- Тест `S3StorageProviderIntegrationTest` переведён на канонический образ `quay.io/minio/minio:latest` (passed).
+- Исправлен формат секрета в `webhooks-settings.component.spec.ts`.
+- Оптимизирован начальный бандл веб-приложения: `AppShellComponent` переведён на динамический импорт (`loadComponent`) в роутере, размер `Initial total` снизился с 561.35 kB до 394.45 kB (бюджет 500 kB выполнен, 0 warnings).
+- Контракт сетевой изоляции `scripts/security/test-no-default-egress.ps1` успешно подтвердил 0 внешних исходящих сетевых пакетов в runtime под нагрузкой.
+- Формализованы решения по всем 4 направлениям Раздела 7 ТЗ (нагрузка/задержки, Privacy & Retention, боевая топология, On-call/Rollback).
+- Следующий этап: развитие и унификация переиспользуемой библиотеки компонентов (`shared/ui`) по методологии `smartup5x_biruni`, чтобы исключить написание типовых компонентов (таблицы, гриды, фильтры, селекты, формы) с нуля.
 
 ## 7. Открытые release gates
 

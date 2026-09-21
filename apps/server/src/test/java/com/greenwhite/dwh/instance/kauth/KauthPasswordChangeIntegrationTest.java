@@ -102,7 +102,7 @@ class KauthPasswordChangeIntegrationTest {
         users = new MdUserRepository(jdbc, mapper);
         sessions = new KauthSessionRepository(jdbc);
         tokens = new KauthApiTokenRepository(jdbc);
-        invalidator = new KauthUserSessionInvalidator(sessions, tokens, users);
+        invalidator = new KauthUserSessionInvalidator(sessions, tokens);
         context = serviceContext(invalidator);
         var userService = context.getBean(MdUserService.class);
         var sessionService = new KauthSessionService(sessions);

@@ -111,7 +111,7 @@ abstract class SearchDeliveryTestSupport {
         users = SearchRevisionIntegrationTest.proxied(new MdUserService(new MdUserRepository(jdbc, mapper),
                 new MdRoleRepository(jdbc), mock(MdCustomFieldService.class), mock(PasswordHasher.class),
                 mock(PasswordValidator.class), new KauthUserSessionInvalidator(new KauthSessionRepository(jdbc),
-                new KauthApiTokenRepository(jdbc), new MdUserRepository(jdbc, mapper)), publisher, audit, scopes), manager);
+                new KauthApiTokenRepository(jdbc)), publisher, audit, scopes), manager);
         http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpThreads = Executors.newCachedThreadPool();
         http.setExecutor(httpThreads);

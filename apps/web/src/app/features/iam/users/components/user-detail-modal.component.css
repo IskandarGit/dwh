@@ -1,46 +1,57 @@
+:host {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
 .view-body {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .view-header-card {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px;
-      background-color: var(--bg-hover);
-      border-radius: var(--radius-sm);
-    }
-    .view-header-card .info { display: flex; flex-direction: column; }
-    .view-header-card .name { font-size: 15px; font-weight: 600; margin: 0; }
-    .view-header-card .handle { font-size: 12px; color: var(--text-muted); }
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+.view-header-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background-color: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+.view-header-card .info { display: flex; flex-direction: column; min-width: 0; }
+.view-header-card .name { font-size: 15px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.view-header-card .handle { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 
-    .avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .avatar.lg {
-      width: 44px;
-      height: 44px;
-      font-size: 18px;
-    }
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.avatar.lg {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
 
-    /* Modal Tabs */
-    .modal-tab-bar {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 2px;
-    }
+/* Modal Tabs */
+.modal-tab-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
     .modal-tab-btn {
       display: inline-flex;
       align-items: center;
@@ -281,4 +292,14 @@
       outline: 2px solid var(--primary);
       outline-offset: 2px;
       border-radius: var(--radius-sm);
+    }
+
+    @media (max-width: 640px) {
+      .modal-tab-btn {
+        padding: 5px 8px;
+        font-size: 11px;
+      }
+      .sec-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }

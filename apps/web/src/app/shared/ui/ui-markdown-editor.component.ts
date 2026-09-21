@@ -116,6 +116,13 @@ import { TranslatePipe, I18nService } from '../../core/services/i18n.service';
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
     .md-editor-container {
       border: 1px solid var(--border-color);
       border-radius: var(--radius-sm);
@@ -123,6 +130,10 @@ import { TranslatePipe, I18nService } from '../../core/services/i18n.service';
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     .md-editor-container.focused {

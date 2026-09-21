@@ -144,7 +144,7 @@ export class UsersComponent implements OnInit, OnDestroy {
   nextCursor: string | null = null;
   readonly isViewModalOpen = signal<boolean>(false);
   readonly isDeleteModalOpen = signal<boolean>(false);
-  readonly activeViewTab = signal<'info' | 'security' | 'orgUnits'>('info');
+  readonly activeViewTab = signal<'info' | 'security' | 'orgUnits' | 'permissions'>('info');
 
   viewingUser: User | null = null;
   deletingUser: User | null = null;
@@ -210,6 +210,13 @@ export class UsersComponent implements OnInit, OnDestroy {
     return this.permService.hasPermission('iam.org_units', 'view') ||
            this.permService.hasPermission('iam.org_units', 'assign') ||
            this.orgPanelBusy();
+  }
+  canViewAssignments() {
+    return this.permService.hasPermission('rbac.assignments', 'view') ||
+           this.permService.hasPermission('rbac.assignments', 'assign');
+  }
+  canAssignPermissions() {
+    return this.permService.hasPermission('rbac.assignments', 'assign');
   }
   canLeaveRecordPage(): boolean | Observable<boolean> {
     return this.userOrgUnitsPanel?.canLeave() ?? true;
@@ -456,7 +463,7 @@ export class UsersComponent implements OnInit, OnDestroy {
   exportToCsv() { exportUsersToCsv(this.sortedUsers(), this.uiI18n, this.toast); }
 
   // Security actions
-  switchViewTab(tab: 'info' | 'security' | 'orgUnits', userId?: number) {
+  switchViewTab(tab: 'info' | 'security' | 'orgUnits' | 'permissions', userId?: number) {
     this.activeViewTab.set(tab);
     if (tab === 'security' && userId && (!this.userSecurity() || this.userSecurity()?.userId !== userId)) {
       this.loadUserSecurity(userId);

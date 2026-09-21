@@ -133,6 +133,18 @@ import { TranslatePipe } from '../../core/services/i18n.service';
       border-bottom-right-radius: var(--radius-lg);
     }
 
+    @media (max-width: 640px) {
+      .modal-backdrop {
+        padding: 8px;
+      }
+      .modal-body {
+        padding: 14px 12px;
+      }
+      .modal-header,
+      .modal-footer {
+        padding: 12px 14px;
+      }
+    }
   `]
 })
 export class UiModalComponent implements OnChanges, OnDestroy {

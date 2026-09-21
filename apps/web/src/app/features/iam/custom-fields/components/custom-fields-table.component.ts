@@ -13,7 +13,7 @@ import { TranslatePipe, I18nService } from '../../../../core/services/i18n.servi
     TranslatePipe
   ],
   template: `
-    <div class="card">
+    <div class="card table-card">
       <div class="table-wrapper" role="region" [attr.aria-label]="'iam.tablica_dinamicheskih_atributov' | t" tabindex="0">
         <table class="data-table" [attr.aria-label]="'iam.dinamicheskie_atributy' | t">
           <thead>

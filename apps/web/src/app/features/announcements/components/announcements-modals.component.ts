@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { A11yModule } from '@angular/cdk/a11y';
 import { I18nService, TranslatePipe } from '../../../core/services/i18n.service';
 import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
 import { UiModalComponent } from '../../../shared/ui/ui-modal.component';
@@ -9,7 +10,7 @@ import { AnnouncementAdminRecord, AnnouncementBannerType, Confirmation } from '.
 @Component({
   selector: 'app-announcements-modals',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe, UiButtonComponent, UiModalComponent],
+  imports: [CommonModule, FormsModule, A11yModule, TranslatePipe, UiButtonComponent, UiModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Create / Edit Draft Modal -->
@@ -53,6 +54,8 @@ import { AnnouncementAdminRecord, AnnouncementBannerType, Confirmation } from '.
               type="text"
               maxlength="10000"
               required
+              cdkFocusInitial
+              autofocus
               [(ngModel)]="titleRu"
               [attr.aria-invalid]="titleRu.trim().length === 0"
               aria-describedby="announcement-title-hint"
@@ -157,7 +160,7 @@ import { AnnouncementAdminRecord, AnnouncementBannerType, Confirmation } from '.
           [variant]="confirmation()?.action === 'archive' ? 'danger' : 'primary'"
           [loading]="isSaving()"
           (onClick)="confirmAction.emit()"
-        >{{ (confirmation()?.action === 'archive' ? 'announcements.arhivirovat' : 'announcements.opublikovat') | t }}</ui-button>
+        >{{ 'common.confirm' | t }}</ui-button>
       </div>
     </ui-modal>
   `,

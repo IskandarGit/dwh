@@ -102,6 +102,16 @@ import { Project, ProjectTaskStats } from '../../../../core/models/task.models';
                   >
                     <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                   </button>
+                  <button
+                    *ngIf="canUpdateProject"
+                    type="button"
+                    class="icon-ghost-btn members-btn"
+                    [attr.aria-label]="'projects.manage_members_named' | t:{name: p.name}"
+                    [title]="'projects.uchastniki_proekta' | t"
+                    (click)="manageMembers.emit(p)"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">group</span>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -288,6 +298,7 @@ export class ProjectTableViewComponent {
 
   @Output() viewTasks = new EventEmitter<Project>();
   @Output() editProject = new EventEmitter<Project>();
+  @Output() manageMembers = new EventEmitter<Project>();
   @Output() pageChange = new EventEmitter<number>();
   @Output() pageSizeChange = new EventEmitter<number>();
 

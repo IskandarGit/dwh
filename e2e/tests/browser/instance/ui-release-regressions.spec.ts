@@ -65,6 +65,7 @@ test('critical pages and create forms fit a mobile viewport', async ({ page }) =
 
   await page.goto('/tasks');
   await page.locator('.view-header').getByRole('button', { name: 'Новая задача', exact: true }).click();
+  await page.waitForSelector('.modal-body');
   await expect.poll(() => page.locator('.modal-body').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
   await page.goto('/iam/users');
