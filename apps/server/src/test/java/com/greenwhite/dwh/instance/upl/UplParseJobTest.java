@@ -19,6 +19,7 @@ import com.greenwhite.dwh.instance.upl.upload.UplPackageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -32,6 +33,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 /** Задание разбора: файл из хранилища превращается в счётчики и ошибки пакета (контракт И5). */
 class UplParseJobTest extends EmbeddedPostgresTest {
@@ -135,6 +138,27 @@ class UplParseJobTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("Сбой чтения анкеты: пакет не остаётся «получен» — отклонён с внутренней ошибкой")
+    void formatReadFailureRejectsPackage() {
+        PackageRow row = register(UplPackageTestData.workbook(2, 0));
+        enqueue(row.publicId());
+        FndJobRunner runner = new FndJobRunner(jdbc, json, transactions,
+                List.of(new UplParseJob(packages, failingSources(), files, new UplXlsxParser())));
+
+        assertThat(runner.runQueued()).isZero();
+
+        PackageRow saved = packages.get(row.publicId().toString());
+        assertThat(saved.status()).isEqualTo(UplPackageModel.REJECTED);
+        assertThat(saved.rejectCode()).isEqualTo(UplParseJob.UPL_PKG_INTERNAL);
+        assertThat(saved.rowsTotal()).isNull();
+        assertThat(saved.rowsAccepted()).isNull();
+        assertThat(saved.rowsRejected()).isNull();
+        assertThat(runStatuses()).containsExactly("failed");
+        assertThat(jdbc.sql("select error from fnd_job_runs").query(String.class).single())
+                .contains("TEST сбой чтения анкеты");
+    }
+
+    @Test
     @DisplayName("Повторное задание на уже проверенный пакет ничего не меняет")
     void secondJobLeavesVerifiedPackage() {
         PackageRow row = register(UplPackageTestData.workbook(7, 3));
@@ -164,6 +188,14 @@ class UplParseJobTest extends EmbeddedPostgresTest {
 
     private List<String> runStatuses() {
         return jdbc.sql("select status from fnd_job_runs order by id").query(String.class).list();
+    }
+
+    /** Анкеты, чтение которых падает: подменяют бин в раннере теста. */
+    private static UplSourceService failingSources() {
+        UplSourceService failing = Mockito.mock(UplSourceService.class);
+        Mockito.when(failing.getVersion(anyLong(), anyInt()))
+                .thenThrow(new IllegalStateException("TEST сбой чтения анкеты"));
+        return failing;
     }
 
     /** Разборщик, падающий на любом файле: подменяет бин в раннере теста. */

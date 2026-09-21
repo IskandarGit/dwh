@@ -66,6 +66,7 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
     private String adminLogin;
     private String analystLogin;
     private String strangerLogin;
+    private String viewerLogin;
     private long systemUserId;
     private long sourceId;
 
@@ -98,6 +99,8 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
         createUser(adminLogin, roleId("chief_admin"));
         createUser(analystLogin, roleId("analyst"));
         createUser(strangerLogin, null);
+        viewerLogin = "upl_viewer_" + rnd();
+        createUser(viewerLogin, viewOnlyRoleId());
     }
 
     @Test
@@ -253,6 +256,25 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
         assertThat(mvc.perform(get(BASE)).andReturn().getResponse().getStatus()).isEqualTo(401);
     }
 
+    @Test
+    @DisplayName("Права: роль только с просмотром видит список и ошибки, загрузка — 403, пакет не создан")
+    void viewOnlyRoleCannotUpload() throws Exception {
+        Session analyst = login(analystLogin);
+        var accepted = upload(analyst, String.valueOf(sourceId), PERIOD_FROM, PERIOD_TO,
+                UplPackageTestData.workbook(1, 0));
+        assertThat(accepted.getStatus()).as(accepted.getContentAsString()).isEqualTo(202);
+        String id = read(accepted, "$.id");
+
+        Session viewer = login(viewerLogin);
+        sendGet(viewer, BASE, 200);
+        sendGet(viewer, BASE + "/" + id + "/errors", 200);
+
+        var refused = upload(viewer, String.valueOf(sourceId), PERIOD_FROM, PERIOD_TO,
+                UplPackageTestData.workbook(1, 0));
+        assertThat(refused.getStatus()).as(refused.getContentAsString()).isEqualTo(403);
+        assertThat(packageCount()).isEqualTo(1);
+    }
+
     // ---------- помощники ----------
 
     private MockHttpServletResponse upload(Session session, String source, String from, String to, byte[] content)
@@ -300,6 +322,22 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
     private void createUser(String login, Long roleId) {
         users.createUser("TEST " + login, login, login + "@test.local", null, PASSWORD, null, "ru", "UTC", null,
                 Map.of(), false, false, roleId == null ? List.of() : List.of(roleId), systemUserId);
+    }
+
+    /** Роль с единственной парой «загрузки — просмотр»: такой роли в миграциях нет, граница прав проверяется на ней. */
+    private Long viewOnlyRoleId() {
+        String suffix = rnd();
+        return tx.execute(status -> {
+            actors.apply(actors.system());
+            Long id = jdbc.sql("insert into md_roles (name, pcode) values (:name, :pcode) returning id")
+                    .param("name", "TEST только просмотр " + suffix)
+                    .param("pcode", "test_view_" + suffix)
+                    .query(Long.class).single();
+            jdbc.sql("insert into md_role_permissions (role_id, form_code, action) values (:role, :form, :action)")
+                    .param("role", id).param("form", UplPref.FORM_PACKAGES).param("action", UplPref.ACTION_VIEW)
+                    .update();
+            return id;
+        });
     }
 
     private Long roleId(String role) {

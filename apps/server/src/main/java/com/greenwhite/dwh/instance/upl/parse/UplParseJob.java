@@ -56,14 +56,17 @@ public class UplParseJob implements FndJobHandler {
         if (!UplPackageModel.RECEIVED.equals(row.status())) {
             return;
         }
-        FormatVersion format = sources.getVersion(row.sourceId(), row.formatVersion());
-        UplParseResult result = parse(row, format);
+        UplParseResult result = parse(row);
         packages.saveParseResult(row.id(), result);
     }
 
-    /** Разбирает файл пакета; любой сбой чтения или разбора закрывает пакет внутренней ошибкой. */
-    private UplParseResult parse(PackageRow row, FormatVersion format) {
+    /**
+     * Читает анкету и разбирает файл пакета; любой сбой чтения анкеты, файла или разбора
+     * закрывает пакет внутренней ошибкой.
+     */
+    private UplParseResult parse(PackageRow row) {
         try (FileDownloadStream file = files.downloadFile(row.fileId())) {
+            FormatVersion format = sources.getVersion(row.sourceId(), row.formatVersion());
             return parser.parse(file.inputStream(), format);
         } catch (IOException failure) {
             packages.rejectInNewTransaction(row.id(), UPL_PKG_INTERNAL);
