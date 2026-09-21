@@ -314,7 +314,7 @@ describe('AppShellComponent', () => {
     // Check items per section
     const workspaceSection = sections.find(s => s.id === 'workspace');
     expect(workspaceSection?.items.map(i => i.id)).toEqual([
-      'tasks', 'projects', 'notes', 'upl-sources', 'files', 'analytics', 'notifications'
+      'tasks', 'projects', 'notes', 'upl-sources', 'upl-packages', 'files', 'analytics', 'notifications'
     ]);
 
     const iamSection = sections.find(s => s.id === 'iam');
