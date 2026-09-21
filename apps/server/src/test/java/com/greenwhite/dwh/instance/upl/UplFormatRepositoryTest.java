@@ -111,7 +111,8 @@ class UplFormatRepositoryTest extends EmbeddedPostgresTest {
                          where enabled and table_name like 'upl\\_%' order by 1
                         """).query(String.class).list();
         assertThat(registered).containsExactlyInAnyOrder(
-                "upl_sources", "upl_format_versions", "upl_format_sheets", "upl_format_columns");
+                "upl_sources", "upl_format_versions", "upl_format_sheets", "upl_format_columns",
+                "upl_packages", "upl_package_errors");
 
         inRolledBackTx(() -> {
             long id = repo.insertSource(data(PREFIX + "audit", "TEST audit"), actors.system().name());

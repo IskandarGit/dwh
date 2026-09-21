@@ -34,8 +34,8 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             "notify.preferences:view", "notify.preferences:update",
             "platform.announcements:view");
 
-    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources). */
-    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view");
+    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages). */
+    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload");
 
     private static List<String> allAnalystPairs() {
         return java.util.stream.Stream.concat(ANALYST_PAIRS.stream(), LATER_MODULE_ANALYST_PAIRS.stream()).toList();
