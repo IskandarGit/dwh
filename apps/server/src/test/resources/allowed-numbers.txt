@@ -5,3 +5,5 @@ src/main/resources/db/migration/V105__fnd_seed_jobs.sql:3600 # период за
 src/main/resources/db/migration/V105__fnd_seed_jobs.sql:86400 # период задания fnd.xdb_check, секунды
 src/main/resources/db/migration/V111__upl_formats.sql:1251 # имя кодировки windows-1251 в проверке upl_format_versions, не норматив
 src/main/java/com/greenwhite/dwh/instance/upl/api/UplSourceDtos.java:1251 # имя кодировки windows-1251 в проверке DTO, не норматив
+src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1024 # предел загрузки, не норматив: байты → мегабайты
+src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1000000 # предел загрузки, не норматив: число заполненных ячеек в файле
