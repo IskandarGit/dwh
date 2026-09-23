@@ -100,6 +100,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/upl/packages/packages.component').then(m => m.PackagesComponent)
       },
       {
+        path: 'ovw/data',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('ovw'), permissionGuard('ovw.data', 'view')],
+        loadComponent: () => import('./features/ovw/overview/ovw-data.page').then(m => m.OvwDataPage)
+      },
+      {
         matcher: uplFormatMatcher,
         canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         canDeactivate: [recordNavigationGuard],
