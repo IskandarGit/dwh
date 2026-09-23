@@ -147,6 +147,112 @@ describe('sanitizeOvwView', () => {
     expect(result.view.group).toBeNull();
     expect(result.dropped).toEqual([]);
   });
+
+  it('drops a range with "from" after "to", comparing numbers as numbers and dates as dates', () => {
+    const view: OvwView = {
+      ...FULL_VIEW,
+      filters: [
+        { field: 'amount', kind: 'r', from: '9', to: '10' },
+        { field: 'amount', kind: 'r', from: '10', to: '9' },
+        { field: 'qty', kind: 'r', from: '5', to: '5' },
+        { field: 'doc_date', kind: 'r', from: '2024-12-31', to: '2024-01-01' },
+        { field: 'doc_date', kind: 'r', from: '2024-01-01', to: '2024-12-31' },
+      ],
+    };
+    const result = sanitizeOvwView(view, COLUMNS);
+    expect(result.dropped).toEqual([
+      { reason: 'value', field: 'amount' },
+      { reason: 'value', field: 'doc_date' },
+    ]);
+    expect(result.view.filters).toEqual([
+      { field: 'amount', kind: 'r', from: '9', to: '10' },
+      { field: 'qty', kind: 'r', from: '5', to: '5' },
+      { field: 'doc_date', kind: 'r', from: '2024-01-01', to: '2024-12-31' },
+    ]);
+  });
+
+  it('drops a date that is not in the calendar and keeps 29 February of a leap year', () => {
+    const view: OvwView = {
+      ...FULL_VIEW,
+      filters: [
+        { field: 'doc_date', kind: 'r', from: '2024-02-30', to: null },
+        { field: 'doc_date', kind: 'r', from: null, to: '2023-02-29' },
+        { field: 'doc_date', kind: 'r', from: '2024-13-01', to: null },
+        { field: 'doc_date', kind: 'r', from: '2024-02-29', to: null },
+      ],
+    };
+    const result = sanitizeOvwView(view, COLUMNS);
+    expect(result.dropped.map((d) => d.reason)).toEqual(['value', 'value', 'value']);
+    expect(result.view.filters).toEqual([{ field: 'doc_date', kind: 'r', from: '2024-02-29', to: null }]);
+  });
+
+  it('drops a number with an exponent or with more than 30 digits in a part, keeps 30 digits', () => {
+    const digits30 = '1'.repeat(30);
+    const view: OvwView = {
+      ...FULL_VIEW,
+      filters: [
+        { field: 'amount', kind: 'r', from: '1e5', to: null },
+        { field: 'amount', kind: 'r', from: '1'.repeat(31), to: null },
+        { field: 'amount', kind: 'r', from: `0.${'1'.repeat(31)}`, to: null },
+        { field: 'amount', kind: 'r', from: `-${digits30}.${digits30}`, to: null },
+      ],
+    };
+    const result = sanitizeOvwView(view, COLUMNS);
+    expect(result.dropped.map((d) => d.reason)).toEqual(['value', 'value', 'value']);
+    expect(result.view.filters).toEqual([{ field: 'amount', kind: 'r', from: `-${digits30}.${digits30}`, to: null }]);
+  });
+
+  it('drops a text filter longer than 200 characters and keeps one of exactly 200', () => {
+    const view: OvwView = {
+      ...FULL_VIEW,
+      filters: [
+        { field: 'region', kind: 'c', text: 'T'.repeat(201) },
+        { field: 'region', kind: 'c', text: '' },
+        { field: 'region', kind: 'c', text: 'T'.repeat(200) },
+      ],
+    };
+    const result = sanitizeOvwView(view, COLUMNS);
+    expect(result.dropped).toEqual([
+      { reason: 'value', field: 'region' },
+      { reason: 'value', field: 'region' },
+    ]);
+    expect(result.view.filters).toEqual([{ field: 'region', kind: 'c', text: 'T'.repeat(200) }]);
+  });
+
+  it('keeps the first 20 filters and drops the rest with one line naming the first dropped', () => {
+    const filters: OvwView['filters'] = Array.from({ length: 22 }, (_, index) => ({
+      field: index < 20 ? 'region' : 'amount',
+      kind: 'c' as const,
+      text: `TEST-${index}`,
+    }));
+    filters[20] = { field: 'amount', kind: 'r', from: '1', to: null };
+    filters[21] = { field: 'qty', kind: 'r', from: '2', to: null };
+    const result = sanitizeOvwView({ ...FULL_VIEW, filters }, COLUMNS);
+    expect(result.view.filters).toEqual(filters.slice(0, 20));
+    expect(result.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
+  });
+
+  it('drops an open group whose value does not fit a number or date grouping column, keeps the grouping', () => {
+    const byNumber = sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy: 'amount', group: { value: 'abc' } }, COLUMNS);
+    expect(byNumber.view.groupBy).toBe('amount');
+    expect(byNumber.view.group).toBeNull();
+    expect(byNumber.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
+
+    const byDate = sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy: 'doc_date', group: { value: '2024-02-30' } }, COLUMNS);
+    expect(byDate.view.groupBy).toBe('doc_date');
+    expect(byDate.view.group).toBeNull();
+    expect(byDate.dropped).toEqual([{ reason: 'value', field: 'doc_date' }]);
+  });
+
+  it('keeps a fitting group value, the "(empty)" group and any text group value', () => {
+    const keep = (groupBy: string, value: string | null) =>
+      sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy, group: { value } }, COLUMNS);
+    expect(keep('amount', '-1234.5').view.group).toEqual({ value: '-1234.5' });
+    expect(keep('doc_date', '2024-02-29').view.group).toEqual({ value: '2024-02-29' });
+    expect(keep('qty', null).view.group).toEqual({ value: null });
+    expect(keep('region', 'T'.repeat(250)).view.group).toEqual({ value: 'T'.repeat(250) });
+    expect(keep('amount', '-1234.5').dropped).toEqual([]);
+  });
 });
 
 describe('toOvwRowsQuery / toOvwGroupsQuery', () => {

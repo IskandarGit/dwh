@@ -58,12 +58,14 @@ const MAX_PACKAGES_SHOWN = 3;
 const MAX_FILTERS = 20;
 const FILTER_ADDRESS = /^filters\[(\d+)\]$/;
 const PAGE_INVALID = 'OVW_PAGE_INVALID';
+const SHEET_UNKNOWN = 'OVW_SHEET_UNKNOWN';
 
 const DROP_KEYS: Record<OvwDropReason, string> = {
   column: 'ovw.url.dropped_column',
   value: 'ovw.url.dropped_value',
   page: 'ovw.url.dropped_page',
-  source: 'ovw.url.dropped_source'
+  source: 'ovw.url.dropped_source',
+  sheet: 'ovw.url.dropped_sheet'
 };
 
 function emptyDraft(): OvwFilterDraft {
@@ -77,6 +79,14 @@ function sameView(left: OvwView, right: OvwView): boolean {
 function shortDate(iso: string): string {
   const [year, month, day] = iso.split('-');
   return year && month && day ? `${day}.${month}.${year.slice(-2)}` : iso;
+}
+
+function hasSheet(layout: OvwLayout, sheet: number): boolean {
+  return layout.sheets.some(item => item.ordinal === sheet);
+}
+
+function isSheetUnknown(problem: ProblemDetail): boolean {
+  return problem?.status === 422 && parseUplFieldErrors(problem?.errors).some(error => error.code === SHEET_UNKNOWN);
 }
 
 function formatCount(value: number): string {
@@ -411,6 +421,9 @@ export class OvwDataPage implements OnInit {
     this.fieldErrors.set({});
     return this.layoutFor(src, parsed.sh).pipe(
       switchMap(layout => {
+        if (parsed.sh !== null && !hasSheet(layout, parsed.sh)) {
+          return this.dropSheet(wanted, [...carried, ...sourceDropped]);
+        }
         const clean = sanitizeOvwView(wanted, layout.columns);
         const dropped = [...carried, ...sourceDropped, ...clean.dropped];
         if (!sameView(parsed, clean.view)) {
@@ -425,10 +438,20 @@ export class OvwDataPage implements OnInit {
         return this.query(clean.view, layout);
       }),
       catchError((problem: ProblemDetail) => {
+        if (parsed.sh !== null && isSheetUnknown(problem)) {
+          return this.dropSheet(wanted, [...carried, ...sourceDropped]);
+        }
         this.showFailure(problem);
         return EMPTY;
       })
     );
+  }
+
+  /** The sheet of the link is not in the questionnaire: the rest of the view goes on the first sheet. */
+  private dropSheet(wanted: OvwView, dropped: OvwDropped[]): Observable<never> {
+    this.carriedDropped = [...dropped, { reason: 'sheet', field: String(wanted.sh) }];
+    this.go({ ...wanted, sh: null }, true);
+    return EMPTY;
   }
 
   private layoutFor(src: number, sheet: number | null): Observable<OvwLayout> {

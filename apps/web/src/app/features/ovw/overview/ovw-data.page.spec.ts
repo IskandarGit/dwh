@@ -75,6 +75,7 @@ interface FixtureOptions {
   params?: Params;
   sources?: OvwSource[];
   rows?: Array<Observable<OvwRowsPage>>;
+  layout?: (sourceId: number, sheet: number | null) => Observable<OvwLayout>;
 }
 
 async function createFixture(options: FixtureOptions = {}) {
@@ -83,7 +84,7 @@ async function createFixture(options: FixtureOptions = {}) {
   let rowsCall = 0;
   const api = {
     sources: vi.fn(() => of(options.sources ?? sourceList)),
-    layout: vi.fn(() => of(layout())),
+    layout: vi.fn(options.layout ?? (() => of(layout()))),
     rows: vi.fn((_sourceId: number, _query: OvwRowsQuery) => rowsResults[Math.min(rowsCall++, rowsResults.length - 1)]),
     groups: vi.fn(() => of(groupsResult))
   };
@@ -276,12 +277,59 @@ describe('OvwDataPage', () => {
     expect(byTestId(fixture, 'ovw-load-error')[0].textContent).toContain(ru('ovw.err.OVW_QUERY_TIMEOUT'));
   });
 
+  it('drops a range of the link with "from" after "to" and asks rows without it', async () => {
+    const { fixture, api, router } = await createFixture({ params: { src: '1', f: ['amount~r~20~10', 'region~c~TEST'] } });
+
+    expect(lastNavigation(router).queryParams['f']).toEqual(['region~c~TEST']);
+    expect(lastNavigation(router).replaceUrl).toBe(true);
+    expect(byTestId(fixture, 'ovw-dropped')[0].textContent).toContain(ru('ovw.url.dropped_value', { field: 'amount' }));
+    expect(api.rows).toHaveBeenCalledTimes(1);
+    expect(lastRowsQuery(api).filters).toEqual([{ field: 'region', op: 'contains', value: 'TEST' }]);
+    expect(byTestId(fixture, 'ovw-load-error')).toHaveLength(0);
+  });
+
+  it('drops a sheet of the link that the questionnaire does not have and shows the first sheet', async () => {
+    const sheetUnknown = problem(422, 'OVW_QUERY_INVALID', [
+      { field: 'sheet', code: 'OVW_SHEET_UNKNOWN', message: 'OVW_SHEET_UNKNOWN' }
+    ]);
+    const { fixture, api, router } = await createFixture({
+      params: { src: '1', sh: '5', f: 'region~c~TEST' },
+      layout: (_sourceId, sheet) => (sheet === 5 ? throwError(() => sheetUnknown) : of(layout()))
+    });
+
+    expect(api.layout).toHaveBeenCalledWith(1, 5);
+    expect(api.layout).toHaveBeenLastCalledWith(1, null);
+    expect(lastNavigation(router).queryParams['sh']).toBeNull();
+    expect(lastNavigation(router).queryParams['f']).toEqual(['region~c~TEST']);
+    expect(lastNavigation(router).replaceUrl).toBe(true);
+    expect(api.rows).toHaveBeenCalledTimes(1);
+    expect(lastRowsQuery(api)).toEqual({
+      sheet: 1,
+      filters: [{ field: 'region', op: 'contains', value: 'TEST' }],
+      sort: null,
+      offset: 0
+    });
+    expect(byTestId(fixture, 'ovw-dropped')[0].textContent).toContain(ru('ovw.url.dropped_sheet'));
+    expect(byTestId(fixture, 'ovw-load-error')).toHaveLength(0);
+    expect(byTestId(fixture, 'ovw-rows-table')).toHaveLength(1);
+  });
+
+  it('drops a sheet of the link that is missing from the sheets of the layout', async () => {
+    const { fixture, api, router } = await createFixture({ params: { src: '1', sh: '3' } });
+
+    expect(api.layout).toHaveBeenCalledWith(1, 3);
+    expect(lastNavigation(router).queryParams['sh']).toBeNull();
+    expect(api.rows).toHaveBeenCalledTimes(1);
+    expect(lastRowsQuery(api).sheet).toBe(1);
+    expect(byTestId(fixture, 'ovw-dropped')[0].textContent).toContain(ru('ovw.url.dropped_sheet'));
+  });
+
   it('shows a filter error of the server next to the filter of that column', async () => {
     const wrongValue = problem(422, 'OVW_QUERY_INVALID', [
       { field: 'filters[0]', code: 'OVW_FILTER_VALUE', message: 'OVW_FILTER_VALUE' }
     ]);
     const { fixture } = await createFixture({
-      params: { src: '1', f: 'amount~r~20~10' },
+      params: { src: '1', f: 'amount~r~10~20' },
       rows: [throwError(() => wrongValue)]
     });
 

@@ -1,5 +1,11 @@
 import { OVW_PAGE_SIZE, OvwColumn, OvwColumnKind, OvwFilter, OvwGroupsQuery, OvwRowsQuery, ovwKind } from './ovw-api';
-import { OVW_DATE_PATTERN, OVW_NUMBER_PATTERN } from './ovw-format';
+import { OVW_DATE_PATTERN } from './ovw-format';
+
+/** Limits of the server (contract, section 6): a link beyond them is cut on the screen, not sent. */
+const MAX_URL_FILTERS = 20;
+const MAX_CONTAINS_LENGTH = 200;
+const MAX_NUMBER_DIGITS = 30;
+const URL_NUMBER_PATTERN = new RegExp(`^-?\\d{1,${MAX_NUMBER_DIGITS}}(\\.\\d{1,${MAX_NUMBER_DIGITS}})?$`);
 
 export type OvwViewFilter =
   | { field: string; kind: 'c'; text: string }
@@ -17,7 +23,7 @@ export interface OvwView {
   page: number;
 }
 
-export type OvwDropReason = 'column' | 'value' | 'page' | 'source';
+export type OvwDropReason = 'column' | 'value' | 'page' | 'source' | 'sheet';
 
 export interface OvwDropped {
   reason: OvwDropReason;
@@ -62,7 +68,7 @@ export function sanitizeOvwView(view: OvwView, columns: OvwColumn[]): { view: Ov
   const kinds = new Map<string, OvwColumnKind>(columns.map((column) => [column.field, ovwKind(column.type)]));
   const dropped: OvwDropped[] = [];
 
-  const filters = view.filters.filter((filter) => {
+  const valid = view.filters.filter((filter) => {
     const kind = kinds.get(filter.field);
     if (kind === undefined) {
       dropped.push({ reason: 'column', field: filter.field });
@@ -74,6 +80,10 @@ export function sanitizeOvwView(view: OvwView, columns: OvwColumn[]): { view: Ov
     }
     return true;
   });
+  const filters = valid.slice(0, MAX_URL_FILTERS);
+  if (valid.length > MAX_URL_FILTERS) {
+    dropped.push({ reason: 'value', field: valid[MAX_URL_FILTERS].field });
+  }
 
   let sort = view.sort;
   if (sort !== null && !kinds.has(sort.field)) {
@@ -86,7 +96,11 @@ export function sanitizeOvwView(view: OvwView, columns: OvwColumn[]): { view: Ov
     dropped.push({ reason: 'column', field: groupBy });
     groupBy = null;
   }
-  const group = groupBy === null ? null : view.group;
+  let group = groupBy === null ? null : view.group;
+  if (groupBy !== null && group !== null && !isGroupValueValid(group.value, kinds.get(groupBy) ?? 'text')) {
+    dropped.push({ reason: 'value', field: groupBy });
+    group = null;
+  }
 
   return { view: { ...view, filters, sort, groupBy, group }, dropped };
 }
@@ -173,13 +187,46 @@ function serializeFilter(filter: OvwViewFilter): string {
 
 function isFilterValid(filter: OvwViewFilter, kind: OvwColumnKind): boolean {
   if (filter.kind === 'c') {
-    return kind === 'text' && filter.text.trim() !== '';
+    return kind === 'text' && filter.text.trim() !== '' && filter.text.length <= MAX_CONTAINS_LENGTH;
   }
   if (kind === 'text' || (filter.from === null && filter.to === null)) {
     return false;
   }
-  const pattern = kind === 'number' ? OVW_NUMBER_PATTERN : OVW_DATE_PATTERN;
-  return [filter.from, filter.to].every((bound) => bound === null || pattern.test(bound));
+  if (![filter.from, filter.to].every((bound) => bound === null || isValueOfKind(bound, kind))) {
+    return false;
+  }
+  return filter.from === null || filter.to === null || !isAfter(filter.from, filter.to, kind);
+}
+
+/** The "(empty)" group (null) fits any column; a text column takes any value. */
+function isGroupValueValid(value: string | null, kind: OvwColumnKind): boolean {
+  return value === null || isValueOfKind(value, kind);
+}
+
+function isValueOfKind(value: string, kind: OvwColumnKind): boolean {
+  if (kind === 'number') {
+    return URL_NUMBER_PATTERN.test(value);
+  }
+  if (kind === 'date') {
+    return isCalendarDate(value);
+  }
+  return true;
+}
+
+/** 2024-02-30 has the right shape but no such day in the calendar. */
+function isCalendarDate(value: string): boolean {
+  if (!OVW_DATE_PATTERN.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/** Both bounds are already valid for the kind; ISO dates of one length compare as text. */
+function isAfter(from: string, to: string, kind: OvwColumnKind): boolean {
+  return kind === 'number' ? Number(from) > Number(to) : from > to;
 }
 
 function toFilter(filter: OvwViewFilter): OvwFilter {
