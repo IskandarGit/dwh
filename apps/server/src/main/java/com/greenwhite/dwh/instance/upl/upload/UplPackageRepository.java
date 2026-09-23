@@ -86,6 +86,14 @@ public class UplPackageRepository {
                 .optional();
     }
 
+    /** Пакет с блокировкой строки до конца транзакции: второе одновременное «Применить» ждёт первое. */
+    public Optional<PackageRow> lockByPublicId(UUID publicId) {
+        return jdbc.sql(PACKAGE_SELECT + " where p.public_id = :publicId for update of p")
+                .param("publicId", publicId)
+                .query(this::mapPackage)
+                .optional();
+    }
+
     /** Страница списка: от новых к старым, {@code beforeId} — последний показанный id. */
     public List<PackageRow> list(Long beforeId, int limit) {
         return jdbc.sql(PACKAGE_SELECT + """
@@ -137,6 +145,51 @@ public class UplPackageRepository {
                 .param("code", rejectCode)
                 .param("params", json.writeValueAsString(rejectParams == null ? Map.of() : rejectParams))
                 .param("errors", errorsTotal)
+                .param("id", id)
+                .update();
+    }
+
+    /** Запоминает номер загрузки основы у пакета «проверен»; 0 — пакет не «проверен» или номер уже есть. */
+    public int setLoadId(long id, long loadId) {
+        return jdbc.sql("""
+                        update upl_packages
+                           set load_id = :load,
+                               modified_at = now()
+                         where id = :id and status = 'verified' and load_id is null
+                        """)
+                .param("load", loadId)
+                .param("id", id)
+                .update();
+    }
+
+    /** Переводит пакет «проверен» в «применён»; 0 — пакет уже не «проверен». */
+    public int markApplied(long id, int rawRows) {
+        return jdbc.sql("""
+                        update upl_packages
+                           set status = 'applied',
+                               raw_rows = :raw,
+                               modified_at = now()
+                         where id = :id and status = 'verified'
+                        """)
+                .param("raw", rawRows)
+                .param("id", id)
+                .update();
+    }
+
+    /** Закрывает пакет «проверен» причиной «отклонён системой» при применении; 0 — пакет уже не «проверен». */
+    public int markApplyRejected(long id, String rejectCode, Map<String, Object> rejectParams, Integer rawRows) {
+        return jdbc.sql("""
+                        update upl_packages
+                           set status = 'rejected',
+                               reject_code = :code,
+                               reject_params = cast(:params as jsonb),
+                               raw_rows = :raw,
+                               modified_at = now()
+                         where id = :id and status = 'verified'
+                        """)
+                .param("code", rejectCode)
+                .param("params", json.writeValueAsString(rejectParams == null ? Map.of() : rejectParams))
+                .param("raw", rawRows)
                 .param("id", id)
                 .update();
     }

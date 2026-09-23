@@ -7,6 +7,7 @@ import { KeysetPage, ProblemDetail } from '../../../core/models/common.models';
 import { PermissionService } from '../../../core/services/permission.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { UplSourceItem } from '../upl-api';
+import { PackageCardComponent } from './package-card.component';
 import { PackagesComponent } from './packages.component';
 import { UplPackageErrors, UplPackageItem, UplPackageUpload, UplPackagesApiService } from './packages-api';
 
@@ -52,6 +53,7 @@ interface FixtureOptions {
   uploadResult?: Observable<UplPackageItem>;
   sourcesResult?: Array<Observable<UplSourceItem[]>>;
   canUpload?: boolean;
+  canApply?: boolean;
 }
 
 async function createFixture(options: FixtureOptions = {}) {
@@ -65,7 +67,11 @@ async function createFixture(options: FixtureOptions = {}) {
     errors: vi.fn(() => of(noErrors)),
     allSources: vi.fn(() => sourcesResults[Math.min(sourcesCall++, sourcesResults.length - 1)])
   };
-  const permissions = { hasPermission: vi.fn(() => options.canUpload !== false) };
+  const permissions = {
+    hasPermission: vi.fn((form: string, action: string) =>
+      action === 'apply' ? options.canApply === true : options.canUpload !== false
+    )
+  };
   const toast = { success: vi.fn(), error: vi.fn() };
   await TestBed.configureTestingModule({
     imports: [PackagesComponent],
@@ -449,5 +455,36 @@ describe('PackagesComponent', () => {
     expect(fixture.debugElement.query(By.css('app-upl-package-card'))).not.toBeNull();
     expect(text(fixture)).toContain('a_jan.xlsx');
     expect(text(fixture)).not.toContain('b_q1.xlsx');
+  });
+
+  it('открытая карточка получает право «Применить» только при праве apply', async () => {
+    const withRight = await createFixture({ canApply: true });
+    clickRow(withRight.fixture);
+    const cardWithRight = withRight.fixture.debugElement.query(By.directive(PackageCardComponent));
+    expect(cardWithRight.componentInstance.canApply).toBe(true);
+
+    TestBed.resetTestingModule();
+    const withoutRight = await createFixture();
+    clickRow(withoutRight.fixture);
+    const cardWithoutRight = withoutRight.fixture.debugElement.query(By.directive(PackageCardComponent));
+    expect(cardWithoutRight.componentInstance.canApply).toBe(false);
+  });
+
+  it('применённый пакет из карточки показывается в ней, а список перечитывается', async () => {
+    const appliedAfterReload = item({ status: 'applied', rowsTotal: 10, rawRows: 10 });
+    const { fixture, api } = await createFixture({
+      canApply: true,
+      pages: [of(page([item()])), of(page([appliedAfterReload]))]
+    });
+    clickRow(fixture);
+    const listCallsBefore = api.list.mock.calls.length;
+    const card = fixture.debugElement.query(By.directive(PackageCardComponent));
+
+    card.triggerEventHandler('applied', item({ status: 'applied', loadId: 42, rawRows: 120 }));
+    fixture.detectChanges();
+
+    const cardAfter = fixture.debugElement.query(By.directive(PackageCardComponent));
+    expect(cardAfter.componentInstance.item.status).toBe('applied');
+    expect(api.list).toHaveBeenCalledTimes(listCallsBefore + 1);
   });
 });

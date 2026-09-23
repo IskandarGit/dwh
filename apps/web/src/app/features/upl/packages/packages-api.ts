@@ -82,6 +82,11 @@ export class UplPackagesApiService {
     return this.api.get<UplPackageErrors>(`${PACKAGES}/${encodeURIComponent(id)}/errors`, undefined, { notifyError: false });
   }
 
+  /** Применяет проверенную загрузку: ответ — пакет «применён» или «отклонён системой» с причиной сверки. */
+  apply(id: string): Observable<UplPackageItem> {
+    return this.api.post<UplPackageItem>(`${PACKAGES}/${id}/apply`, null, { notifyError: false });
+  }
+
   /** Все источники одним массивом: форма выбирает из полного списка, а список сервера постраничный. */
   allSources(): Observable<UplSourceItem[]> {
     return this.upl.listSources(SOURCES_PAGE_SIZE).pipe(

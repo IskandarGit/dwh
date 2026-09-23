@@ -6,6 +6,7 @@ import com.greenwhite.dwh.instance.common.security.SecurityContext;
 import com.greenwhite.dwh.instance.upl.UplPref;
 import com.greenwhite.dwh.instance.upl.api.UplPackageDtos.PackageErrors;
 import com.greenwhite.dwh.instance.upl.api.UplPackageDtos.PackageItem;
+import com.greenwhite.dwh.instance.upl.upload.UplApplyService;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.PackageRow;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageService;
 import com.greenwhite.dwh.instance.upl.upload.UplUploadService;
@@ -24,17 +25,19 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Objects;
 
-/** API загрузок файлов: приём файла, список пакетов и ошибки пакета (контракт И5). */
+/** API загрузок файлов: приём файла, список пакетов и ошибки пакета (контракт И5), применение пакета (И6). */
 @RestController
 @RequestMapping("/api/v1/upl/packages")
 public class UplPackageController {
 
     private final UplUploadService uploads;
     private final UplPackageService packages;
+    private final UplApplyService applies;
 
-    public UplPackageController(UplUploadService uploads, UplPackageService packages) {
+    public UplPackageController(UplUploadService uploads, UplPackageService packages, UplApplyService applies) {
         this.uploads = uploads;
         this.packages = packages;
+        this.applies = applies;
     }
 
     private static long userId() {
@@ -73,5 +76,12 @@ public class UplPackageController {
     @RequiresPermission(form = UplPref.FORM_PACKAGES, action = UplPref.ACTION_VIEW)
     public ResponseEntity<PackageErrors> errors(@PathVariable String id) {
         return ResponseEntity.ok(PackageErrors.of(packages.errors(id)));
+    }
+
+    /** Применяет пакет «проверен»: 200 и пакет «применён» или «отклонён системой» с причиной сверки. */
+    @PostMapping("/{id}/apply")
+    @RequiresPermission(form = UplPref.FORM_PACKAGES, action = UplPref.ACTION_APPLY)
+    public ResponseEntity<PackageItem> apply(@PathVariable String id) {
+        return ResponseEntity.ok(PackageItem.of(applies.apply(id, userId())));
     }
 }
