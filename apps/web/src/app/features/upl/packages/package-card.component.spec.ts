@@ -309,6 +309,10 @@ describe('PackageCardComponent', () => {
       );
       expect(testId(fixture, 'upl-pkg-apply')).toHaveLength(0);
     }
+
+    TestBed.resetTestingModule();
+    const nothingAccepted = await createFixture(item({ rowsAccepted: 0 }), [of(errorsPage([cell()]))], true);
+    expect(testId(nothingAccepted.fixture, 'upl-pkg-apply')).toHaveLength(0);
   });
 
   it('AC-13: «Применить» вызывает сервер и отдаёт применённую загрузку', async () => {
@@ -332,6 +336,15 @@ describe('PackageCardComponent', () => {
     click(fixture, 'upl-pkg-apply');
 
     expect(testId(fixture, 'upl-pkg-apply-error')[0].textContent).toContain('Применить можно только проверенную загрузку');
+  });
+
+  it('AC-12: отказ «нечего применять» — красная полоса текстом словаря', async () => {
+    const { fixture, api } = await createFixture(item(), [of(errorsPage([]))], true);
+    api.apply.mockReturnValue(throwError(() => problem(409, 'UPL_PKG_NOTHING_TO_APPLY', 'conflict')));
+
+    click(fixture, 'upl-pkg-apply');
+
+    expect(testId(fixture, 'upl-pkg-apply-error')[0].textContent).toContain(PACKAGED_RUSSIAN['upl.err.UPL_PKG_NOTHING_TO_APPLY']);
   });
 
   it('AC-13: отказ без кода загрузки — общий текст «Не удалось применить загрузку»', async () => {

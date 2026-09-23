@@ -41,7 +41,7 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
         <ui-button variant="secondary" icon="refresh" data-testid="upl-pkg-card-refresh" (onClick)="refresh.emit()">
           {{ 'upl.pkg.refresh' | t }}
         </ui-button>
-        @if (item.status === 'verified' && canApply) {
+        @if (item.status === 'verified' && canApply && (item.rowsAccepted ?? 0) > 0) {
           <ui-button variant="primary" data-testid="upl-pkg-apply" [disabled]="applying()" (onClick)="apply()">
             {{ 'upl.pkg.card.apply' | t }}
           </ui-button>
