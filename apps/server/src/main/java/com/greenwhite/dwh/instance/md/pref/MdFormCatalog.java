@@ -115,7 +115,8 @@ public final class MdFormCatalog {
 
         forms.put("upl.packages", new FormMeta("upl", "Загрузки файлов", ordered(
                 "view", "Просмотр",
-                "upload", "Загрузка файла")));
+                "upload", "Загрузка файла",
+                "apply", "Применение")));
 
         forms.put("tasks.projects", new FormMeta("ms.task", "Проекты", ordered(
                 "view", "Просмотр проектов",
