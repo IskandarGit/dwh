@@ -62,7 +62,8 @@ class AuditCoverageTest {
             "FndUnitService",
             "FndVersioning",
             "UplSourceService",
-            "UplPackageService"
+            "UplPackageService",
+            "RptDefinitionService"    // аудит — триггером основы (V118)
     );
 
     @Test
