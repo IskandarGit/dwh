@@ -37,14 +37,17 @@ describe('upl package error codes', () => {
     expect(UPL_PACKAGE_CODES.filter(code => !(`upl.err.${code}` in PACKAGED_RUSSIAN))).toEqual([]);
   });
 
-  it('lists exactly the twenty one codes of this increment', () => {
-    expect(UPL_PACKAGE_CODES).toHaveLength(21);
-    expect(new Set(UPL_PACKAGE_CODES).size).toBe(21);
+  it('lists exactly the twenty four codes of this increment', () => {
+    expect(UPL_PACKAGE_CODES).toHaveLength(24);
+    expect(new Set(UPL_PACKAGE_CODES).size).toBe(24);
   });
 
   it('puts the parameters of the code into its text', () => {
     expect(uplPackageCodeText('UPL_PKG_STRUCTURE', { count: 2 }, translate)).toBe(text('UPL_PKG_STRUCTURE').replace('{count}', '2'));
     expect(uplPackageCodeText('UPL_PKG_STRUCTURE', { count: 2 }, translate)).toContain('2');
+    expect(uplPackageCodeText('UPL_PKG_RECONCILIATION', { fileRows: 10, rawRows: 9 }, translate)).toBe(
+      'Сверка не сошлась: в файле 10 строк, в базе 9. Загрузите файл заново'
+    );
   });
 
   it('shows the code itself when the dictionary has no text', () => {

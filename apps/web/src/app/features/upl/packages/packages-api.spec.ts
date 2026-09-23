@@ -75,6 +75,16 @@ describe('UplPackagesApiService', () => {
     expect(api.get).toHaveBeenCalledWith('/upl/packages/1a2b%2F3c/errors', undefined, { notifyError: false });
   });
 
+  it('applies one package with a POST and returns what the server sends', () => {
+    const { service, api } = create();
+    const item = { id: 'p-1', status: 'applied' } as UplPackageItem;
+    api.post.mockReturnValue(of(item) as Observable<unknown>);
+    let seen: UplPackageItem | undefined;
+    service.apply('p-1').subscribe(value => (seen = value));
+    expect(api.post).toHaveBeenCalledWith('/upl/packages/p-1/apply', null, { notifyError: false });
+    expect(seen).toBe(item);
+  });
+
   it('joins every page of sources and stops when the server has no more', () => {
     const { service, upl } = create({
       sourcePages: [sourcePage([source(1), source(2)], true, 'c-2'), sourcePage([source(3)], false, null)]

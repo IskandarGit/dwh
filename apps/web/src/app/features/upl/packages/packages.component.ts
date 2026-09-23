@@ -46,8 +46,10 @@ function emptyFormErrors(): UplPackageFormErrors {
     @if (selected(); as current) {
       <app-upl-package-card
         [item]="current"
+        [canApply]="canApply()"
         (back)="closeCard()"
         (refresh)="load()"
+        (applied)="onApplied($event)"
       ></app-upl-package-card>
     } @else {
       <div class="upl-page">
@@ -420,6 +422,16 @@ export class PackagesComponent implements OnInit {
 
   canUpload(): boolean {
     return this.permissions.hasPermission('upl.packages', 'upload');
+  }
+
+  canApply(): boolean {
+    return this.permissions.hasPermission('upl.packages', 'apply');
+  }
+
+  /** Ответ «Применить» сразу показывается в карточке; список перечитывается, чтобы статус совпал и там. */
+  onApplied(result: UplPackageItem): void {
+    this.selected.set(result);
+    this.load();
   }
 
   dateTime(value: string): string {
