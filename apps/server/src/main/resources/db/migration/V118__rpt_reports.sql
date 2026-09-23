@@ -8,7 +8,7 @@ create table rpt_reports (
   source_id bigint not null references upl_sources (id),
   source_sheet integer not null,                  -- ordinal листа анкеты источника
   date_field text not null,                       -- колонка-дата: период = месяц её значения
-  measure_kind text not null default 'sum',       -- sum — сумма колонки меры; count — число строк
+  measure_kind text not null default 'total',     -- total — сумма колонки меры; count — число строк
   measure_field text,                             -- числовая колонка; при count — null
   divisor integer not null default 1,             -- 1, 1000, 1000000
   decimals integer not null default 2,            -- знаков после запятой на экране
@@ -24,7 +24,7 @@ create table rpt_reports (
   created_at timestamptz not null default now(), created_by text not null,
   modified_at timestamptz not null default now(), modified_by text not null,
   constraint rpt_reports_ck_name check (length(btrim(name)) between 1 and 200),
-  constraint rpt_reports_ck_measure check ((measure_kind = 'sum' and measure_field is not null)
+  constraint rpt_reports_ck_measure check ((measure_kind = 'total' and measure_field is not null)
                                         or (measure_kind = 'count' and measure_field is null)),
   constraint rpt_reports_ck_divisor check (divisor in (1, 1000, 1000000)),
   constraint rpt_reports_ck_decimals check (decimals between 0 and 3),
