@@ -66,6 +66,9 @@ public class OvwDataService {
     private static final String DIR_DESC = "desc";
     private static final Pattern PLAIN_NUMBER = Pattern.compile(
             "^-?\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "})?$");
+    /** Число из группы для {@code eq}: приходит из ответа сервера, может быть длиннее границы «от–до». */
+    private static final Pattern EQ_NUMBER = Pattern.compile(
+            "^-?\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "})?$");
 
     private final UplSourceService sources;
     private final UplPackageRepository packages;
@@ -249,7 +252,7 @@ public class OvwDataService {
             return between(type, item);
         }
         if (OP_EQ.equals(op)) {
-            return new FndRawSpec.Eq(item.field(), item.value() == null ? null : convert(type, item.value()));
+            return new FndRawSpec.Eq(item.field(), item.value() == null ? null : convert(type, item.value(), EQ_NUMBER));
         }
         throw new FilterRejected(OvwErrors.OVW_FILTER_OP);
     }
@@ -269,8 +272,8 @@ public class OvwDataService {
         if (type == FndRawSpec.Type.TEXT) {
             throw new FilterRejected(OvwErrors.OVW_FILTER_OP);
         }
-        Object from = isBlank(item.from()) ? null : convert(type, item.from());
-        Object to = isBlank(item.to()) ? null : convert(type, item.to());
+        Object from = isBlank(item.from()) ? null : convert(type, item.from(), PLAIN_NUMBER);
+        Object to = isBlank(item.to()) ? null : convert(type, item.to(), PLAIN_NUMBER);
         if (from == null && to == null) {
             throw new FilterRejected(OvwErrors.OVW_FILTER_VALUE);
         }
@@ -280,11 +283,11 @@ public class OvwDataService {
         return new FndRawSpec.Between(item.field(), from, to);
     }
 
-    private static Object convert(FndRawSpec.Type type, String value) {
+    private static Object convert(FndRawSpec.Type type, String value, Pattern numberFormat) {
         try {
             return switch (type) {
                 case TEXT -> value;
-                case NUMBER -> number(value);
+                case NUMBER -> number(value, numberFormat);
                 case DATE -> LocalDate.parse(value.trim());
             };
         } catch (NumberFormatException | DateTimeParseException invalid) {
@@ -292,9 +295,9 @@ public class OvwDataService {
         }
     }
 
-    private static BigDecimal number(String value) {
+    private static BigDecimal number(String value, Pattern numberFormat) {
         String trimmed = value.trim();
-        if (!PLAIN_NUMBER.matcher(trimmed).matches()) {
+        if (!numberFormat.matcher(trimmed).matches()) {
             throw new FilterRejected(OvwErrors.OVW_FILTER_VALUE);
         }
         return new BigDecimal(trimmed);

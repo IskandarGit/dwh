@@ -54,6 +54,15 @@ class FndRawValueSqlTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт обзора 3.1: длинный, неразрывный пробел и вертикальная табуляция по краям не роняют запрос")
+    void unicodeWhitespaceDoesNotFailQuery() {
+        assertThat(eval(Type.DATE, "\u000B2024-01-31")).isEqualTo("2024-01-31");
+        assertThat(eval(Type.DATE, "\u20032024-01-31")).isIn("2024-01-31", null);
+        assertThat(eval(Type.DATE, "\u00A031.01.2024")).isIn("2024-01-31", null);
+        assertThat(eval(Type.NUMBER, "\u2003" + "12,5")).isIn("12.5", null);
+    }
+
+    @Test
     @DisplayName("контракт обзора 3.1: несуществующая дата и год 0000 — null, а не ошибка базы")
     void nonExistentDateIsNull() {
         assertThat(eval(Type.DATE, "31.04.2024")).isNull();

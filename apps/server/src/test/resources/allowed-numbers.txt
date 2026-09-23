@@ -11,3 +11,4 @@ src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:2958465 # 
 src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:1899 # дата отсчёта Excel, не норматив: год нулевого дня 1899-12-30
 src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawReader.java:57014 # код SQLSTATE отмены запроса (query_canceled), не норматив
 src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:1000 # предел обзора, не норматив: групп в ответе
+src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:1000 # предел обзора, не норматив: цифр у числа из группы

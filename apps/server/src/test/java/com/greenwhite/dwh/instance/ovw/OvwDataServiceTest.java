@@ -207,6 +207,17 @@ class OvwDataServiceTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("группа по числу длиннее границы «от–до» открывается, а не 422")
+    void longNumberGroupIsAccepted() {
+        applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
+        String longNumber = "0." + "0".repeat(39) + "1";
+
+        RowsPage page = rows(List.of(new FilterItem("amount", "eq", longNumber, null, null)), null);
+
+        assertThat(page.total()).isZero();
+    }
+
+    @Test
     @DisplayName("С-3: группа с текстом длиннее предела фильтра открывает свои строки")
     void longTextGroupOpensItsRows() {
         applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
