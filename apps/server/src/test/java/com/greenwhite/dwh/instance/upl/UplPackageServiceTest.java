@@ -16,6 +16,7 @@ import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ErrorRow;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ErrorsView;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.NewPackage;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.PackageRow;
+import com.greenwhite.dwh.instance.upl.upload.UplPackageRepository;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageService;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +44,8 @@ class UplPackageServiceTest extends EmbeddedPostgresTest {
 
     @Autowired
     private UplPackageService packages;
+    @Autowired
+    private UplPackageRepository repo;
     @Autowired
     private UplSourceService sources;
     @Autowired
@@ -195,6 +198,38 @@ class UplPackageServiceTest extends EmbeddedPostgresTest {
 
         assertValidation(() -> packages.list(0, null), "INVALID_LIMIT");
         assertValidation(() -> packages.list(50, "мусор"), "INVALID_CURSOR");
+    }
+
+    @Test
+    @DisplayName("И6: переходы применения — номер загрузки один раз, «применён» и «отклонён» только из «проверен»")
+    void applyTransitions() {
+        PackageRow first = register();
+        packages.saveParseResult(first.id(), UplParseResult.verified(5, 0, 0, List.of()));
+        PackageRow second = register();
+        packages.saveParseResult(second.id(), UplParseResult.verified(3, 0, 0, List.of()));
+
+        tx.executeWithoutResult(status -> {
+            actors.apply(actors.system());
+
+            assertThat(repo.setLoadId(first.id(), 42)).isEqualTo(1);
+            assertThat(repo.setLoadId(first.id(), 42)).isZero();
+            assertThat(repo.lockByPublicId(first.publicId()))
+                    .hasValueSatisfying(locked -> assertThat(locked.loadId()).isEqualTo(42L));
+
+            assertThat(repo.markApplied(first.id(), 5)).isEqualTo(1);
+            PackageRow applied = repo.findById(first.id()).orElseThrow();
+            assertThat(applied.status()).isEqualTo("applied");
+            assertThat(applied.rawRows()).isEqualTo(5);
+            assertThat(repo.markApplyRejected(first.id(), "X", Map.of(), 5)).isZero();
+
+            assertThat(repo.markApplyRejected(second.id(), "UPL_PKG_RECONCILIATION",
+                    Map.of("fileRows", 3, "rawRows", 2), 2)).isEqualTo(1);
+            PackageRow rejected = repo.findById(second.id()).orElseThrow();
+            assertThat(rejected.status()).isEqualTo(UplPackageModel.REJECTED);
+            assertThat(rejected.rejectCode()).isEqualTo("UPL_PKG_RECONCILIATION");
+            assertThat(rejected.rejectParams()).containsEntry("fileRows", 3).containsEntry("rawRows", 2);
+            assertThat(rejected.rawRows()).isEqualTo(2);
+        });
     }
 
     // ---------- помощники ----------
