@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatOvwValue, parseOvwDateInput, parseOvwNumberInput } from './ovw-format';
+import { OVW_EQ_NUMBER_PATTERN, formatOvwValue, parseOvwDateInput, parseOvwNumberInput } from './ovw-format';
 
 describe('formatOvwValue', () => {
   it('shows an empty cell for null', () => {
@@ -31,6 +31,14 @@ describe('formatOvwValue', () => {
   it('shows a number of 41 digits as a number, not as raw', () => {
     const longNumber = `0.${'0'.repeat(39)}1`;
     expect(formatOvwValue('number', longNumber)).toEqual({ text: `0,${'0'.repeat(39)}1`, raw: false });
+  });
+});
+
+describe('OVW_EQ_NUMBER_PATTERN', () => {
+  it('accepts a group number of 1500 digits and still rejects an exponent', () => {
+    expect(OVW_EQ_NUMBER_PATTERN.test('1'.repeat(1500))).toBe(true);
+    expect(OVW_EQ_NUMBER_PATTERN.test(`-${'9'.repeat(750)}.${'1'.repeat(750)}`)).toBe(true);
+    expect(OVW_EQ_NUMBER_PATTERN.test('1E-40')).toBe(false);
   });
 });
 

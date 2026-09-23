@@ -269,6 +269,13 @@ describe('sanitizeOvwView', () => {
     expect(result.view.filters).toEqual([]);
     expect(result.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
   });
+
+  it('keeps a number group value of 1500 digits: the group value has no length limit', () => {
+    const hugeNumber = `-${'9'.repeat(750)}.${'1'.repeat(750)}`;
+    const result = sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy: 'amount', group: { value: hugeNumber } }, COLUMNS);
+    expect(result.view.group).toEqual({ value: hugeNumber });
+    expect(result.dropped).toEqual([]);
+  });
 });
 
 describe('toOvwRowsQuery / toOvwGroupsQuery', () => {
