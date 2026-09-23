@@ -38,13 +38,36 @@ public final class FndRawValueSql {
     private static String numberSql(String t) {
         // Экспонента ограничена 3 цифрами: иначе переполнение numeric роняет весь запрос вместо null
         return "(case when " + t + " ~ '^\\s*-?\\d+([.,]\\d+)?([eE][-+]?\\d{1,3})?\\s*$'"
-                + " then replace(trim(" + t + "), ',', '.')::numeric end)";
+                + " then replace(" + stripped(t) + ", ',', '.')::numeric end)";
     }
 
     private static String dateSql(String t) {
-        return "(case when " + t + " ~ '^\\s*\\d{1,7}(\\.\\d+)?\\s*$' and trim(" + t + ")::numeric between 1 and 2958465"
-                + " then date '1899-12-30' + floor(trim(" + t + ")::numeric)::int"
-                + " when " + t + " ~ '^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$' then to_date(" + t + ", 'YYYY-MM-DD')"
-                + " when " + t + " ~ '^(0[1-9]|[12]\\d|3[01])\\.(0[1-9]|1[0-2])\\.\\d{4}$' then to_date(" + t + ", 'DD.MM.YYYY') end)";
+        String s = stripped(t);
+        String isoLastDay = "extract(day from make_date(" + part(s, "1, 4") + ", " + part(s, "6, 2") + ", 1) + interval '1 month - 1 day')";
+        String ruLastDay = "extract(day from make_date(" + part(s, "7, 4") + ", " + part(s, "4, 2") + ", 1) + interval '1 month - 1 day')";
+        return "(case when " + t + " ~ '^\\s*\\d{1,7}(\\.\\d+)?\\s*$' and " + s + "::numeric between 1 and 2958465"
+                + " then date '1899-12-30' + floor(" + s + "::numeric)::int"
+                + " when " + t + " ~ '^\\s*[1-9]\\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])\\s*$'"
+                + " then " + existingDate(s, part(s, "9, 2"), isoLastDay, "YYYY-MM-DD")
+                + " when " + t + " ~ '^\\s*(0[1-9]|[12]\\d|3[01])\\.(0[1-9]|1[0-2])\\.[1-9]\\d{3}\\s*$'"
+                + " then " + existingDate(s, part(s, "1, 2"), ruLastDay, "DD.MM.YYYY") + " end)";
+    }
+
+    /** Текст без пробелов, табуляций и переводов строки по краям — то, что допускают {@code \s*} регулярок. */
+    private static String stripped(String t) {
+        return "btrim(" + t + ", E' \\t\\r\\n')";
+    }
+
+    /**
+     * Дата по формату, если такой день есть в месяце, иначе null (31.04 — не ошибка базы).
+     * Вложенный CASE, а не {@code and}: порядок вычисления CASE гарантирован.
+     */
+    private static String existingDate(String s, String day, String lastDay, String format) {
+        return "(case when " + day + " <= " + lastDay + " then to_date(" + s + ", '" + format + "') end)";
+    }
+
+    /** Часть текста числом: {@code fromAndLength} — «начало, длина» для substr. */
+    private static String part(String s, String fromAndLength) {
+        return "substr(" + s + ", " + fromAndLength + ")::int";
     }
 }

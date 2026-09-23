@@ -44,12 +44,33 @@ class FndRawValueSqlTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт обзора 3.1: дата текстом с пробелами, табуляцией и переводом строки по краям переводится")
+    void dateWithSurroundingWhitespace() {
+        assertThat(eval(Type.DATE, " 31.01.2024")).isEqualTo("2024-01-31");
+        assertThat(eval(Type.DATE, "31.01.2024 ")).isEqualTo("2024-01-31");
+        assertThat(eval(Type.DATE, " 2024-01-31 ")).isEqualTo("2024-01-31");
+        assertThat(eval(Type.DATE, "\t31.01.2024")).isEqualTo("2024-01-31");
+        assertThat(eval(Type.DATE, "2024-01-31\n")).isEqualTo("2024-01-31");
+    }
+
+    @Test
+    @DisplayName("контракт обзора 3.1: несуществующая дата и год 0000 — null, а не ошибка базы")
+    void nonExistentDateIsNull() {
+        assertThat(eval(Type.DATE, "31.04.2024")).isNull();
+        assertThat(eval(Type.DATE, "2024-02-30")).isNull();
+        assertThat(eval(Type.DATE, "29.02.2023")).isNull();
+        assertThat(eval(Type.DATE, "0000-01-01")).isNull();
+        assertThat(eval(Type.DATE, "29.02.2024")).isEqualTo("2024-02-29");
+    }
+
+    @Test
     @DisplayName("контракт обзора 3.1: число с точкой, запятой, экспонентой и пробелами; непереводимое и переполнение — null")
     void numberConversion() {
         assertThat(eval(Type.NUMBER, "1234.5")).isEqualTo("1234.5");
         assertThat(eval(Type.NUMBER, "12,5")).isEqualTo("12.5");
         assertThat(eval(Type.NUMBER, "1.5E-3")).isEqualTo("0.0015");
         assertThat(eval(Type.NUMBER, " -7 ")).isEqualTo("-7");
+        assertThat(eval(Type.NUMBER, "\t12,5")).isEqualTo("12.5");
         assertThat(eval(Type.NUMBER, "abc")).isNull();
         assertThat(eval(Type.NUMBER, "1E99999")).isNull();
     }
