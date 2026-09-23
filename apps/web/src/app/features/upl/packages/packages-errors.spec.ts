@@ -37,9 +37,9 @@ describe('upl package error codes', () => {
     expect(UPL_PACKAGE_CODES.filter(code => !(`upl.err.${code}` in PACKAGED_RUSSIAN))).toEqual([]);
   });
 
-  it('lists exactly the twenty four codes of this increment', () => {
-    expect(UPL_PACKAGE_CODES).toHaveLength(24);
-    expect(new Set(UPL_PACKAGE_CODES).size).toBe(24);
+  it('lists exactly the twenty five codes of this increment', () => {
+    expect(UPL_PACKAGE_CODES).toHaveLength(25);
+    expect(new Set(UPL_PACKAGE_CODES).size).toBe(25);
   });
 
   it('puts the parameters of the code into its text', () => {

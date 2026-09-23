@@ -1518,6 +1518,7 @@
   "upl.err.UPL_PKG_FILE_TOO_LARGE": "Файл больше 20 МБ",
   "upl.err.UPL_PKG_INTERNAL": "Внутренняя ошибка разбора. Сообщите администратору",
   "upl.err.UPL_PKG_NO_FORMAT_AT_DATE": "У источника нет опубликованной анкеты на дату начала периода",
+  "upl.err.UPL_PKG_NOTHING_TO_APPLY": "Применять нечего: в загрузке нет принятых строк",
   "upl.err.UPL_PKG_NOT_FOUND": "Загрузка не найдена",
   "upl.err.UPL_PKG_NOT_VERIFIED": "Применить можно только проверенную загрузку",
   "upl.err.UPL_PKG_PERIOD_ORDER": "Начало периода позже конца",
