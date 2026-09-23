@@ -25,11 +25,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -86,6 +88,14 @@ public class UplXlsxParser {
 
     /** Разбирает файл по анкете. Поток закрывает вызывающий. */
     public UplParseResult parse(InputStream content, FormatVersion format) {
+        return parse(content, format, row -> { });
+    }
+
+    /**
+     * Разбирает файл по анкете; строки данных (с ошибками тоже, без пустых и итоговых) отдаёт в {@code rows}
+     * в порядке листов анкеты и строк. Поток закрывает вызывающий.
+     */
+    public UplParseResult parse(InputStream content, FormatVersion format, Consumer<DataRow> rows) {
         try (ReadableWorkbook book = new ReadableWorkbook(content)) {
             List<ErrorRecord> structure = new ArrayList<>();
             List<SheetMatch> sheets = matchStructure(book, format, structure);
@@ -93,7 +103,7 @@ public class UplXlsxParser {
                 return UplParseResult.rejected(UPL_PKG_STRUCTURE, Map.of("count", structure.size()),
                         structure.size(), stored(structure));
             }
-            return readValues(sheets);
+            return readValues(sheets, rows);
         } catch (IOException | ExcelReaderException unreadable) {
             return UplParseResult.rejected(UPL_PKG_UNREADABLE, Map.of(), 0, List.of());
         }
@@ -215,15 +225,15 @@ public class UplXlsxParser {
 
     // --- проход 2: значения ---
 
-    private UplParseResult readValues(List<SheetMatch> sheets) throws IOException {
+    private UplParseResult readValues(List<SheetMatch> sheets, Consumer<DataRow> rows) throws IOException {
         long cells = 0;
         int total = 0;
         int rejected = 0;
         int errorsTotal = 0;
         List<ErrorRecord> errors = new ArrayList<>();
         for (SheetMatch sheet : sheets) {
-            try (Stream<Row> rows = sheet.file().openStream()) {
-                Iterator<Row> reader = rows.iterator();
+            try (Stream<Row> fileRows = sheet.file().openStream()) {
+                Iterator<Row> reader = fileRows.iterator();
                 while (reader.hasNext()) {
                     Row row = reader.next();
                     cells += filledCells(row);
@@ -239,6 +249,7 @@ public class UplXlsxParser {
                         continue;
                     }
                     total++;
+                    rows.accept(dataRow(sheet, row.getRowNum(), values));
                     List<ErrorRecord> rowErrors = checkRow(sheet, row.getRowNum(), values);
                     if (!rowErrors.isEmpty()) {
                         rejected++;
@@ -378,6 +389,14 @@ public class UplXlsxParser {
         return values;
     }
 
+    private static DataRow dataRow(SheetMatch sheet, int rowNo, List<CellValue> values) {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        for (int index = 0; index < sheet.columns().size(); index++) {
+            fields.put(sheet.columns().get(index).column().targetField(), values.get(index).text());
+        }
+        return new DataRow(sheet.spec().sheetName(), rowNo, fields);
+    }
+
     private int filledCells(Row row) {
         int filled = 0;
         for (int index = 0; index < row.getCellCount(); index++) {
@@ -437,6 +456,10 @@ public class UplXlsxParser {
         List<T> sorted = new ArrayList<>(items);
         sorted.sort(Comparator.comparingInt(ordinal));
         return sorted;
+    }
+
+    /** Строка данных как в файле: лист, № строки Excel и значения по полям анкеты ({@code null} — пустая ячейка). */
+    public record DataRow(String sheet, int sourceRowNo, Map<String, Object> fields) {
     }
 
     /** Значение ячейки: текст как в файле ({@code null} — пусто) и признак числовой ячейки. */

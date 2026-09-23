@@ -34,7 +34,7 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             "notify.preferences:view", "notify.preferences:update",
             "platform.announcements:view");
 
-    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages). */
+    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages); V116 — upl.packages:apply только chief_admin и admin. */
     static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload");
 
     private static List<String> allAnalystPairs() {
@@ -120,6 +120,18 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
                 where r.pcode = 'analyst'
                 """).query(String.class).list();
         assertThat(analystPairs).containsExactlyInAnyOrderElementsOf(allAnalystPairs());
+    }
+
+    @Test
+    @DisplayName("И6: право «Применение» загрузки есть у chief_admin и admin, у analyst нет")
+    void uploadApplyRightOnlyForAdmins() {
+        List<String> holders = jdbc.sql("""
+                select r.pcode from md_role_permissions p
+                join md_roles r on r.id = p.role_id
+                where p.form_code = 'upl.packages' and p.action = 'apply'
+                order by r.pcode
+                """).query(String.class).list();
+        assertThat(holders).contains("admin", "chief_admin").doesNotContain("analyst");
     }
 
     @Test

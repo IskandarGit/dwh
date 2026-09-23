@@ -2,7 +2,10 @@ package com.greenwhite.dwh.instance.upl;
 
 import com.greenwhite.dwh.instance.config.idempotency.IdempotencyFilter;
 import com.greenwhite.dwh.instance.fnd.FndActors;
+import com.greenwhite.dwh.instance.fnd.FndPref;
 import com.greenwhite.dwh.instance.fnd.jobs.FndJobRunner;
+import com.greenwhite.dwh.instance.fnd.load.FndLoad;
+import com.greenwhite.dwh.instance.fnd.load.FndLoadService;
 import com.greenwhite.dwh.instance.fnd.units.FndUnitService;
 import com.greenwhite.dwh.instance.kauth.pref.KauthPref;
 import com.greenwhite.dwh.instance.md.service.MdUserService;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
@@ -82,6 +86,11 @@ class UplPackageEndToEndTest extends EmbeddedPostgresTest {
     private FndUnitService units;
     @Autowired
     private TransactionTemplate tx;
+    @Autowired
+    @Qualifier(FndPref.DWH)
+    private JdbcClient dwhJdbc;
+    @Autowired
+    private FndLoadService loads;
 
     private MockMvc mvc;
     private String analystLogin;
@@ -191,6 +200,69 @@ class UplPackageEndToEndTest extends EmbeddedPostgresTest {
             assertThat(item).containsEntry("rowsRejected", sample.rejected());
             assertThat(item).containsEntry("errorsTotal", sample.errors());
         });
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("com.greenwhite.dwh.instance.support.fixtures.DepartmentFixture#departments")
+    @DisplayName("Проверенный файл применён: строки в raw с адресом исходника, второй пакет периода — своя загрузка, первая не тронута")
+    void verifiedPackageIsAppliedToRaw(DepartmentFixture fixture) throws Exception {
+        UplFixtureSources.registerUnits(units, actors, fixture);
+        Format format = xlsxFormat(fixture);
+        FormatSheet sheet = format.sheets().getFirst();
+        long sourceId = UplFixtureSources.publish(sources, format, systemUserId);
+        String adminLogin = "upl-e2e-admin-" + UUID.randomUUID().toString().substring(0, 8);
+        createUser(adminLogin, roleId("admin"));
+        Session admin = login(adminLogin);
+
+        Sample first = sample(sheet);
+        String firstId = uploadAndParse(admin, sourceId, format, first);
+        long firstLoad = applyPackage(admin, firstId, first);
+
+        assertThat(rawRows(firstLoad)).isEqualTo(first.total());
+        assertThat(dwhJdbc.sql("select count(distinct source_row_no) from raw.rows where load_id = :id"
+                        + " and sheet = :sheet and source_row_no is not null")
+                .param("id", firstLoad).param("sheet", sheet.sheetName()).query(Long.class).single())
+                .isEqualTo(first.total());
+        assertThat(dwhJdbc.sql("select min(source_row_no) from raw.rows where load_id = :id")
+                .param("id", firstLoad).query(Long.class).single())
+                .isGreaterThan(sheet.headerRow());
+        assertThat(loads.find(firstLoad).orElseThrow().status()).isEqualTo(FndLoad.APPLIED);
+
+        Sample second = sample(sheet);
+        String secondId = uploadAndParse(admin, sourceId, format, second);
+        long secondLoad = applyPackage(admin, secondId, second);
+
+        assertThat(secondLoad).isNotEqualTo(firstLoad);
+        assertThat(rawRows(secondLoad)).isEqualTo(second.total());
+        assertThat(rawRows(firstLoad)).isEqualTo(first.total());
+        assertThat(loads.find(firstLoad).orElseThrow().status()).isEqualTo(FndLoad.SUPERSEDED);
+        assertThat(loads.find(secondLoad).orElseThrow().status()).isEqualTo(FndLoad.APPLIED);
+
+        var list = sendGet(admin, BASE, 200);
+        List<Map<String, Object>> items = read(list, "$.items");
+        assertThat(items).filteredOn(item -> firstId.equals(item.get("id")))
+                .singleElement()
+                .satisfies(item -> assertThat(item).containsEntry("status", UplPackageModel.APPLIED));
+    }
+
+    private String uploadAndParse(Session session, long sourceId, Format format, Sample sample) throws Exception {
+        var accepted = upload(session, sourceId, format, sample.content());
+        assertThat(accepted.getStatus()).as(accepted.getContentAsString()).isEqualTo(202);
+        assertThat(jobs.runQueued()).isEqualTo(1);
+        return read(accepted, "$.id");
+    }
+
+    private long applyPackage(Session session, String packageId, Sample sample) throws Exception {
+        var applied = send(session, post(BASE + "/" + packageId + "/apply"));
+        assertThat(applied.getStatus()).as(applied.getContentAsString()).isEqualTo(200);
+        assertThat((String) read(applied, "$.status")).isEqualTo(UplPackageModel.APPLIED);
+        assertThat(((Number) read(applied, "$.rawRows")).intValue()).isEqualTo(sample.total());
+        return ((Number) read(applied, "$.loadId")).longValue();
+    }
+
+    private long rawRows(long loadId) {
+        return dwhJdbc.sql("select count(*) from raw.rows where load_id = :id")
+                .param("id", loadId).query(Long.class).single();
     }
 
     // ---------- ожидания по ошибкам ----------

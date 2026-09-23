@@ -59,15 +59,25 @@ function errorsPage(items: UplPackageErrorItem[], total = items.length, shown = 
   return { total, shown, items };
 }
 
-async function createFixture(value: UplPackageItem, results: Array<Observable<UplPackageErrors>> = [of(errorsPage([]))]) {
+async function createFixture(
+  value: UplPackageItem,
+  results: Array<Observable<UplPackageErrors>> = [of(errorsPage([]))],
+  canApply?: boolean
+) {
   let call = 0;
-  const api = { errors: vi.fn(() => results[Math.min(call++, results.length - 1)]) };
+  const api = {
+    errors: vi.fn(() => results[Math.min(call++, results.length - 1)]),
+    apply: vi.fn()
+  };
   await TestBed.configureTestingModule({
     imports: [PackageCardComponent],
     providers: [{ provide: UplPackagesApiService, useValue: api }]
   }).compileComponents();
   const fixture = TestBed.createComponent(PackageCardComponent);
   fixture.componentRef.setInput('item', value);
+  if (canApply !== undefined) {
+    fixture.componentRef.setInput('canApply', canApply);
+  }
   fixture.detectChanges();
   return { fixture, api };
 }
@@ -219,7 +229,6 @@ describe('PackageCardComponent', () => {
 
     expect(testId(fixture, 'upl-pkg-counters')).toHaveLength(1);
     expect(testId(fixture, 'upl-pkg-errors-table')).toHaveLength(1);
-    expect(testId(fixture, 'upl-pkg-apply')).toHaveLength(0);
   });
 
   it('ошибок больше показанных: строка «Показаны первые 500 из 700»', async () => {
@@ -281,15 +290,97 @@ describe('PackageCardComponent', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('кнопки «Применить» нет ни при одном статусе', async () => {
-    const statuses: UplPackageStatus[] = ['received', 'verified', 'rejected', 'applied'];
-    for (const status of statuses) {
+  it('AC-13: кнопка «Применить» есть только у «проверен» при праве', async () => {
+    const withRight = await createFixture(item(), [of(errorsPage([cell()]))], true);
+    expect(testId(withRight.fixture, 'upl-pkg-apply')).toHaveLength(1);
+    expect(testId(withRight.fixture, 'upl-pkg-apply')[0].textContent).toContain(PACKAGED_RUSSIAN['upl.pkg.card.apply']);
+
+    TestBed.resetTestingModule();
+    const noRight = await createFixture(item(), [of(errorsPage([cell()]))], false);
+    expect(testId(noRight.fixture, 'upl-pkg-apply')).toHaveLength(0);
+
+    const otherStatuses: UplPackageStatus[] = ['received', 'rejected', 'applied'];
+    for (const status of otherStatuses) {
       TestBed.resetTestingModule();
       const { fixture } = await createFixture(
         item({ status, rejectCode: status === 'rejected' ? 'UPL_PKG_INTERNAL' : null }),
-        [of(errorsPage([cell()]))]
+        [of(errorsPage([cell()]))],
+        true
       );
       expect(testId(fixture, 'upl-pkg-apply')).toHaveLength(0);
     }
+
+    TestBed.resetTestingModule();
+    const nothingAccepted = await createFixture(item({ rowsAccepted: 0 }), [of(errorsPage([cell()]))], true);
+    expect(testId(nothingAccepted.fixture, 'upl-pkg-apply')).toHaveLength(0);
+  });
+
+  it('AC-13: «Применить» вызывает сервер и отдаёт применённую загрузку', async () => {
+    const { fixture, api } = await createFixture(item(), [of(errorsPage([]))], true);
+    const result = item({ status: 'applied', loadId: 9, rawRows: 120 });
+    api.apply.mockReturnValue(of(result));
+    const applied = vi.fn();
+    fixture.componentInstance.applied.subscribe(applied);
+
+    click(fixture, 'upl-pkg-apply');
+
+    expect(api.apply).toHaveBeenCalledWith(item().id);
+    expect(applied).toHaveBeenCalledWith(result);
+    expect(testId(fixture, 'upl-pkg-apply-error')).toHaveLength(0);
+  });
+
+  it('AC-13: отказ сервера с кодом загрузки — красная полоса текстом словаря', async () => {
+    const { fixture, api } = await createFixture(item(), [of(errorsPage([]))], true);
+    api.apply.mockReturnValue(throwError(() => problem(409, 'UPL_PKG_NOT_VERIFIED', 'conflict')));
+
+    click(fixture, 'upl-pkg-apply');
+
+    expect(testId(fixture, 'upl-pkg-apply-error')[0].textContent).toContain('Применить можно только проверенную загрузку');
+  });
+
+  it('AC-12: отказ «нечего применять» — красная полоса текстом словаря', async () => {
+    const { fixture, api } = await createFixture(item(), [of(errorsPage([]))], true);
+    api.apply.mockReturnValue(throwError(() => problem(409, 'UPL_PKG_NOTHING_TO_APPLY', 'conflict')));
+
+    click(fixture, 'upl-pkg-apply');
+
+    expect(testId(fixture, 'upl-pkg-apply-error')[0].textContent).toContain(PACKAGED_RUSSIAN['upl.err.UPL_PKG_NOTHING_TO_APPLY']);
+  });
+
+  it('AC-13: отказ без кода загрузки — общий текст «Не удалось применить загрузку»', async () => {
+    const { fixture, api } = await createFixture(item(), [of(errorsPage([]))], true);
+    api.apply.mockReturnValue(throwError(() => problem(403, 'Access denied', 'forbidden')));
+
+    click(fixture, 'upl-pkg-apply');
+
+    expect(testId(fixture, 'upl-pkg-apply-error')[0].textContent).toContain('Не удалось применить загрузку');
+  });
+
+  it('AC-13: применённая загрузка с обоими числами — зелёная строка сверки', async () => {
+    const { fixture } = await createFixture(item({ status: 'applied', loadId: 9, rowsTotal: 10, rawRows: 10 }));
+
+    expect(testId(fixture, 'upl-pkg-reconciliation')[0].textContent?.trim()).toBe('В файле 10 строк = в базе 10 строк');
+  });
+
+  it('AC-13: применённая загрузка без числа строк в базе — строки сверки нет', async () => {
+    const { fixture } = await createFixture(item({ status: 'applied', loadId: 9, rowsTotal: 10, rawRows: null }));
+
+    expect(testId(fixture, 'upl-pkg-reconciliation')).toHaveLength(0);
+  });
+
+  it('AC-13: сверка не сошлась — причина отказа словами с обоими числами', async () => {
+    const rejected = item({
+      status: 'rejected',
+      rowsTotal: null,
+      rowsAccepted: null,
+      rowsRejected: null,
+      errorsTotal: 0,
+      rejectCode: 'UPL_PKG_RECONCILIATION',
+      rejectParams: { fileRows: 10, rawRows: 9 }
+    });
+    const { fixture } = await createFixture(rejected);
+
+    expect(testId(fixture, 'upl-pkg-rejected')[0].textContent).toContain('Сверка не сошлась: в файле 10 строк, в базе 9');
+    expect(testId(fixture, 'upl-pkg-reconciliation')).toHaveLength(0);
   });
 });

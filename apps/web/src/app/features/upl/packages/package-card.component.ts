@@ -41,6 +41,11 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
         <ui-button variant="secondary" icon="refresh" data-testid="upl-pkg-card-refresh" (onClick)="refresh.emit()">
           {{ 'upl.pkg.refresh' | t }}
         </ui-button>
+        @if (item.status === 'verified' && canApply && (item.rowsAccepted ?? 0) > 0) {
+          <ui-button variant="primary" data-testid="upl-pkg-apply" [disabled]="applying()" (onClick)="apply()">
+            {{ 'upl.pkg.card.apply' | t }}
+          </ui-button>
+        }
       </div>
 
       <div class="upl-pkg-card-title">
@@ -48,6 +53,9 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
         <ui-badge [variant]="statusVariant[item.status]">{{ statusKey[item.status] | t }}</ui-badge>
       </div>
       <div class="upl-pkg-card-meta" data-testid="upl-pkg-card-meta">{{ metaText() }}</div>
+      @if (applyError(); as message) {
+        <div class="alert alert-error upl-pkg-alert" data-testid="upl-pkg-apply-error">{{ message }}</div>
+      }
 
       @if (item.status === 'received') {
         <p class="upl-pkg-checking" data-testid="upl-pkg-checking">{{ 'upl.pkg.card.checking' | t }}</p>
@@ -76,6 +84,9 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
               <span class="upl-pkg-counter-value">{{ item.rowsRejected ?? '—' }}</span>
             </span>
           </div>
+          @if (reconciliationText(); as line) {
+            <div class="alert alert-success upl-pkg-reconciliation" data-testid="upl-pkg-reconciliation">{{ line }}</div>
+          }
         }
 
         @if (loadError()) {
@@ -254,10 +265,14 @@ export class PackageCardComponent implements OnChanges {
   @Input({ required: true }) item!: UplPackageItem;
   @Output() back = new EventEmitter<void>();
   @Output() refresh = new EventEmitter<void>();
+  @Input() canApply = false;
+  @Output() applied = new EventEmitter<UplPackageItem>();
 
   readonly errors = signal<UplPackageErrors | null>(null);
   readonly isLoading = signal(false);
   readonly loadError = signal<string | null>(null);
+  readonly applying = signal(false);
+  readonly applyError = signal<string | null>(null);
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
   readonly statusKey = UPL_PACKAGE_STATUS_KEY;
@@ -271,6 +286,7 @@ export class PackageCardComponent implements OnChanges {
     }
     this.errors.set(null);
     this.loadError.set(null);
+    this.applyError.set(null);
     this.isLoading.set(false);
     if (this.item.status === 'received') {
       return;
@@ -292,6 +308,30 @@ export class PackageCardComponent implements OnChanges {
   /** Причина отклонения словами; кода отклонения нет — оставляем пусто. */
   rejectText(): string {
     return this.item.rejectCode ? uplPackageCodeText(this.item.rejectCode, this.item.rejectParams, this.translate) : '';
+  }
+
+  /** Строка сверки: только у применённой загрузки и только когда сервер отдал оба числа — экран чисел не выдумывает. */
+  reconciliationText(): string {
+    const { status, rowsTotal, rawRows } = this.item;
+    if (status !== 'applied' || rowsTotal == null || rawRows == null) {
+      return '';
+    }
+    return this.i18n.translate('upl.pkg.card.reconciliation', { n: rowsTotal, m: rawRows });
+  }
+
+  apply(): void {
+    this.applying.set(true);
+    this.applyError.set(null);
+    this.api.apply(this.item.id).subscribe({
+      next: result => {
+        this.applying.set(false);
+        this.applied.emit(result);
+      },
+      error: (problem: ProblemDetail) => {
+        this.applying.set(false);
+        this.applyError.set(this.applyErrorText(problem));
+      }
+    });
   }
 
   codeText(row: UplPackageErrorItem): string {
@@ -322,6 +362,14 @@ export class PackageCardComponent implements OnChanges {
         this.isLoading.set(false);
       }
     });
+  }
+
+  /** Отказ сервера: код загрузки — текстом словаря, прочее (нет права, сбой сети) — общим текстом. */
+  private applyErrorText(problem: ProblemDetail | null | undefined): string {
+    const detail = problem?.detail;
+    return detail && detail.startsWith('UPL_')
+      ? uplPackageCodeText(detail, null, this.translate)
+      : this.i18n.translate('upl.pkg.card.apply_failed');
   }
 
   private loadErrorText(problem: ProblemDetail | null | undefined): string {
