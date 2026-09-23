@@ -44,6 +44,25 @@ public final class FndRawValueSql {
         return "%" + escaped + "%";
     }
 
+    /**
+     * Ключ связи со справочником (контракт отчёта 4.2): число — по значению ({@code 1183} = {@code 1183.0}),
+     * иначе текст без пробелов по краям с регистром; пусто и null — пустая строка (пусто = пусто); длинная ячейка — пусто.
+     */
+    public static String key(String text) {
+        return "coalesce(trim_scale(" + numberSql(text) + ")::text, "
+                + shortOnly(text, "nullif(" + stripped(text) + ", '')") + ", '')";
+    }
+
+    /** Название группы для сравнения (контракт отчёта 4.4): без пробелов по краям, строчными; пустое — null. */
+    public static String groupKey(String text) {
+        return "nullif(lower(" + stripped(text) + "), '')";
+    }
+
+    /** Название без пробелов по краям — написание для глаз; пустое — null. */
+    public static String trimmed(String text) {
+        return "nullif(" + stripped(text) + ", '')";
+    }
+
     private static String numberSql(String t) {
         // Экспонента ограничена 3 цифрами: иначе переполнение numeric роняет весь запрос вместо null
         return shortOnly(t, "(case when " + t + " ~ '^\\s*-?[0-9]+([.,][0-9]+)?([eE][-+]?[0-9]{1,3})?\\s*$'"
