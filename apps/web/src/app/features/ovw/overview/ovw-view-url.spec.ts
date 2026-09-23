@@ -253,6 +253,22 @@ describe('sanitizeOvwView', () => {
     expect(keep('region', 'T'.repeat(250)).view.group).toEqual({ value: 'T'.repeat(250) });
     expect(keep('amount', '-1234.5').dropped).toEqual([]);
   });
+
+  it('keeps a long number group value (41 digits, "1E-40" from the file) while a 31-digit bound is still dropped', () => {
+    const longNumber = `0.${'0'.repeat(39)}1`;
+    const result = sanitizeOvwView(
+      {
+        ...FULL_VIEW,
+        filters: [{ field: 'amount', kind: 'r', from: '1'.repeat(31), to: null }],
+        groupBy: 'amount',
+        group: { value: longNumber },
+      },
+      COLUMNS,
+    );
+    expect(result.view.group).toEqual({ value: longNumber });
+    expect(result.view.filters).toEqual([]);
+    expect(result.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
+  });
 });
 
 describe('toOvwRowsQuery / toOvwGroupsQuery', () => {

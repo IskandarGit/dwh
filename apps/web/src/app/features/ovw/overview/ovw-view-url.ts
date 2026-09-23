@@ -1,11 +1,9 @@
 import { OVW_PAGE_SIZE, OvwColumn, OvwColumnKind, OvwFilter, OvwGroupsQuery, OvwRowsQuery, ovwKind } from './ovw-api';
-import { OVW_DATE_PATTERN } from './ovw-format';
+import { OVW_DATE_PATTERN, OVW_EQ_NUMBER_PATTERN, OVW_FILTER_NUMBER_PATTERN } from './ovw-format';
 
 /** Limits of the server (contract, section 6): a link beyond them is cut on the screen, not sent. */
 const MAX_URL_FILTERS = 20;
 const MAX_CONTAINS_LENGTH = 200;
-const MAX_NUMBER_DIGITS = 30;
-const URL_NUMBER_PATTERN = new RegExp(`^-?\\d{1,${MAX_NUMBER_DIGITS}}(\\.\\d{1,${MAX_NUMBER_DIGITS}})?$`);
 
 export type OvwViewFilter =
   | { field: string; kind: 'c'; text: string }
@@ -192,20 +190,21 @@ function isFilterValid(filter: OvwViewFilter, kind: OvwColumnKind): boolean {
   if (kind === 'text' || (filter.from === null && filter.to === null)) {
     return false;
   }
-  if (![filter.from, filter.to].every((bound) => bound === null || isValueOfKind(bound, kind))) {
+  const isBoundValid = (bound: string | null) => bound === null || isValueOfKind(bound, kind, OVW_FILTER_NUMBER_PATTERN);
+  if (![filter.from, filter.to].every(isBoundValid)) {
     return false;
   }
   return filter.from === null || filter.to === null || !isAfter(filter.from, filter.to, kind);
 }
 
-/** The "(empty)" group (null) fits any column; a text column takes any value. */
+/** The "(empty)" group (null) fits any column; a text column takes any value; a number may be as long as `eq` takes. */
 function isGroupValueValid(value: string | null, kind: OvwColumnKind): boolean {
-  return value === null || isValueOfKind(value, kind);
+  return value === null || isValueOfKind(value, kind, OVW_EQ_NUMBER_PATTERN);
 }
 
-function isValueOfKind(value: string, kind: OvwColumnKind): boolean {
+function isValueOfKind(value: string, kind: OvwColumnKind, numberPattern: RegExp): boolean {
   if (kind === 'number') {
-    return URL_NUMBER_PATTERN.test(value);
+    return numberPattern.test(value);
   }
   if (kind === 'date') {
     return isCalendarDate(value);

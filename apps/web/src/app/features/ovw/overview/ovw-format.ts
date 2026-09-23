@@ -2,6 +2,18 @@ import { OvwColumnKind } from './ovw-api';
 
 /** Canonical number as the server sends it: dot as decimal separator, no grouping, no exponent. */
 export const OVW_NUMBER_PATTERN = /^-?\d+(\.\d+)?$/;
+/** Server limit of digits before and after the dot in a filter bound (contract, section 6). */
+export const OVW_MAX_NUMBER_DIGITS = 30;
+/** Server limit of digits before and after the dot in a group value (`eq` on a number column). */
+export const OVW_MAX_EQ_NUMBER_DIGITS = 1000;
+/** Number a filter bound may hold: the server rejects longer ones. */
+export const OVW_FILTER_NUMBER_PATTERN = new RegExp(
+  `^-?\\d{1,${OVW_MAX_NUMBER_DIGITS}}(\\.\\d{1,${OVW_MAX_NUMBER_DIGITS}})?$`,
+);
+/** Number a group value may hold: a long value from the file (e.g. "1E-40") still opens its group. */
+export const OVW_EQ_NUMBER_PATTERN = new RegExp(
+  `^-?\\d{1,${OVW_MAX_EQ_NUMBER_DIGITS}}(\\.\\d{1,${OVW_MAX_EQ_NUMBER_DIGITS}})?$`,
+);
 /** Canonical date as the server sends it. */
 export const OVW_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,7 +42,7 @@ export function formatOvwValue(kind: OvwColumnKind, value: string | null): OvwFo
 /** User input of a number bound → canonical number, or null when the input is not a number. */
 export function parseOvwNumberInput(input: string): string | null {
   const normalized = input.replace(/[  ]/g, '').replace(',', '.');
-  return OVW_NUMBER_PATTERN.test(normalized) ? normalized : null;
+  return OVW_FILTER_NUMBER_PATTERN.test(normalized) ? normalized : null;
 }
 
 /** User input `dd.mm.yyyy` of an existing date → `yyyy-mm-dd`, otherwise null. */

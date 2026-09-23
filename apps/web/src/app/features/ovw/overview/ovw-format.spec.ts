@@ -27,6 +27,11 @@ describe('formatOvwValue', () => {
   it('shows text as is and never marks it raw', () => {
     expect(formatOvwValue('text', 'TEST 2024-01-31')).toEqual({ text: 'TEST 2024-01-31', raw: false });
   });
+
+  it('shows a number of 41 digits as a number, not as raw', () => {
+    const longNumber = `0.${'0'.repeat(39)}1`;
+    expect(formatOvwValue('number', longNumber)).toEqual({ text: `0,${'0'.repeat(39)}1`, raw: false });
+  });
 });
 
 describe('parseOvwNumberInput', () => {
@@ -40,6 +45,14 @@ describe('parseOvwNumberInput', () => {
     expect(parseOvwNumberInput('12a')).toBeNull();
     expect(parseOvwNumberInput('')).toBeNull();
     expect(parseOvwNumberInput('1,2,3')).toBeNull();
+  });
+
+  it('rejects more than 30 digits in a part and accepts exactly 30, as the server does', () => {
+    const digits30 = '1'.repeat(30);
+    expect(parseOvwNumberInput('1'.repeat(31))).toBeNull();
+    expect(parseOvwNumberInput(`0,${'1'.repeat(31)}`)).toBeNull();
+    expect(parseOvwNumberInput(digits30)).toBe(digits30);
+    expect(parseOvwNumberInput(`-${digits30},${digits30}`)).toBe(`-${digits30}.${digits30}`);
   });
 });
 
