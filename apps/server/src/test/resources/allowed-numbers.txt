@@ -9,3 +9,4 @@ src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1024 # предел
 src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1000000 # предел загрузки, не норматив: число заполненных ячеек в файле
 src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:2958465 # дата отсчёта Excel, не норматив: последний допустимый номер дня (31.12.9999)
 src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:1899 # дата отсчёта Excel, не норматив: год нулевого дня 1899-12-30
+src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawReader.java:57014 # код SQLSTATE отмены запроса (query_canceled), не норматив
