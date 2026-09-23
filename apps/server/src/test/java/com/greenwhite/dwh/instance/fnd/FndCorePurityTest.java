@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FndCorePurityTest {
 
     private static final Path INSTANCE = Path.of("src/main/java/com/greenwhite/dwh/instance");
-    private static final List<String> OUR_MODULES = List.of("fnd", "upl", "ref", "reg", "vit", "ovw");
+    private static final List<String> OUR_MODULES = List.of("fnd", "upl", "ref", "reg", "vit", "ovw", "rpt");
     private static final Path OLTP_MIGRATIONS = Path.of("src/main/resources/db/migration");
     private static final Path DWH_MIGRATIONS = Path.of("src/main/resources/db/dwh");
     private static final Path TERMS = Path.of("src/test/resources/forbidden-terms.txt");

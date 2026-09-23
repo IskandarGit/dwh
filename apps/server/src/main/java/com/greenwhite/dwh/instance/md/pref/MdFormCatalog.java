@@ -121,6 +121,10 @@ public final class MdFormCatalog {
         forms.put("ovw.data", new FormMeta("ovw", "Обзор данных", ordered(
                 "view", "Просмотр")));
 
+        forms.put("rpt.reports", new FormMeta("rpt", "Отчёты", ordered(
+                "view", "Просмотр",
+                "edit", "Описание отчётов")));
+
         forms.put("tasks.projects", new FormMeta("ms.task", "Проекты", ordered(
                 "view", "Просмотр проектов",
                 "create", "Создание проекта",
