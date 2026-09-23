@@ -122,6 +122,35 @@ class UplXlsxParserTest {
     }
 
     @Test
+    @DisplayName("И6: строки данных отдаются с листом, № строки Excel и значениями как в файле")
+    void dataRowsAreStreamedAsInFile() {
+        List<List<Object>> rows = List.of(
+                row(1, "012345678", "TEST орг", "TEST abc", "31.12.2026"),
+                row(2, "900000002", "TEST орг 2", 10.5, "31.12.2026"),
+                row(null, null, null, null, null, "TEST вне анкеты"),
+                row(null, null, "  итого по листу", 100, null),
+                row(3, "900000003", null, 10.5, "31.12.2026"));
+        List<UplXlsxParser.DataRow> collected = new ArrayList<>();
+
+        UplParseResult result = parser.parse(new ByteArrayInputStream(file(HEADER, rows)), format(), collected::add);
+
+        assertThat(result.outcome()).isEqualTo(UplParseResult.Outcome.VERIFIED);
+        assertThat(result.rowsTotal()).isEqualTo(3);
+        assertThat(result.rowsRejected()).isEqualTo(1);
+        assertThat(collected).hasSize(result.rowsTotal());
+        assertThat(collected).extracting(UplXlsxParser.DataRow::sheet).containsOnly(SHEET);
+        assertThat(collected).extracting(UplXlsxParser.DataRow::sourceRowNo).containsExactly(3, 4, 7);
+        UplXlsxParser.DataRow first = collected.getFirst();
+        assertThat(first.fields().keySet()).containsExactly("row_no", "object_key", "org_name", "amount", "doc_date");
+        assertThat(first.fields())
+                .containsEntry("object_key", "012345678")
+                .containsEntry("org_name", "TEST орг")
+                .containsEntry("amount", "TEST abc")
+                .containsEntry("doc_date", "31.12.2026");
+        assertThat(collected.getLast().fields()).containsEntry("org_name", null);
+    }
+
+    @Test
     @DisplayName("Расхождения с анкетой: нет колонки и есть лишняя — файл отклонён, значения не проверяются")
     void structureMismatchRejectsFile() {
         List<String> header = List.of("№", "Ключ", "Название", "Лишняя", "Дата");
