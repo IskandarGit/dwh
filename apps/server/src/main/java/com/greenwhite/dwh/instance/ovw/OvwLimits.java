@@ -13,8 +13,6 @@ public final class OvwLimits {
     public static final int MAX_FILTER_VALUE_LENGTH = 200;
     /** Цифр до и после точки в числовой границе фильтра. */
     public static final int MAX_NUMBER_DIGITS = 30;
-    /** Цифр до и после точки у числа из группы (переход по группе): значение приходит из ответа сервера, экспоненты в нём нет. */
-    public static final int MAX_EQ_NUMBER_DIGITS = 1000;
     /** Лимит времени запроса ко второй базе, секунды. */
     public static final int QUERY_TIMEOUT_SECONDS = 10;
 

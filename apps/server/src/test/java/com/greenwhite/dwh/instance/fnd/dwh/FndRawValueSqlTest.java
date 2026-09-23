@@ -54,12 +54,30 @@ class FndRawValueSqlTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("контракт обзора 3.1: длинный, неразрывный пробел и вертикальная табуляция по краям не роняют запрос")
+    @DisplayName("контракт обзора 3.1: пробельные символы по краям — ASCII переводятся точно, длинный и неразрывный пробел не роняют запрос")
     void unicodeWhitespaceDoesNotFailQuery() {
-        assertThat(eval(Type.DATE, "\u000B2024-01-31")).isEqualTo("2024-01-31");
-        assertThat(eval(Type.DATE, "\u20032024-01-31")).isIn("2024-01-31", null);
-        assertThat(eval(Type.DATE, "\u00A031.01.2024")).isIn("2024-01-31", null);
-        assertThat(eval(Type.NUMBER, "\u2003" + "12,5")).isIn("12.5", null);
+        for (String ws : new String[] {"\u000B", "\u000C", "\t"}) {
+            assertThat(eval(Type.DATE, ws + "2024-01-31" + ws)).isEqualTo("2024-01-31");
+            assertThat(eval(Type.DATE, ws + "31.01.2024" + ws)).isEqualTo("2024-01-31");
+            assertThat(eval(Type.NUMBER, ws + "12,5" + ws)).isEqualTo("12.5");
+            assertThat(eval(Type.DATE, ws + "45322" + ws)).isEqualTo("2024-01-31");
+        }
+        for (String ws : new String[] {"\u00A0", "\u2003", "\u3000"}) {
+            assertThat(eval(Type.DATE, ws + "2024-01-31")).isIn("2024-01-31", null);
+            assertThat(eval(Type.DATE, ws + "31.01.2024")).isIn("2024-01-31", null);
+            assertThat(eval(Type.NUMBER, ws + "12,5")).isIn("12.5", null);
+            assertThat(eval(Type.DATE, ws + "45322")).isIn("2024-01-31", null);
+        }
+    }
+
+    @Test
+    @DisplayName("контракт обзора 3.1: цифры не 0–9 (надстрочные, арабско-индийские, полноширинные) — null, а не ошибка базы")
+    void nonAsciiDigitsAreNull() {
+        String[] values = {"10\u00B2", "45\u0660\u0660\u0660", "\uFF11\uFF12", "2\u0660\u0662\u0664-01-31"};
+        for (String value : values) {
+            assertThat(eval(Type.NUMBER, value)).isNull();
+            assertThat(eval(Type.DATE, value)).isNull();
+        }
     }
 
     @Test

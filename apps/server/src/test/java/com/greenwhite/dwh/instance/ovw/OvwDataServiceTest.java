@@ -212,9 +212,13 @@ class OvwDataServiceTest extends EmbeddedPostgresTest {
         applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
         String longNumber = "0." + "0".repeat(39) + "1";
 
+        String veryLongNumber = "1".repeat(1500);
+
         RowsPage page = rows(List.of(new FilterItem("amount", "eq", longNumber, null, null)), null);
+        RowsPage veryLongPage = rows(List.of(new FilterItem("amount", "eq", veryLongNumber, null, null)), null);
 
         assertThat(page.total()).isZero();
+        assertThat(veryLongPage.total()).isZero();
     }
 
     @Test

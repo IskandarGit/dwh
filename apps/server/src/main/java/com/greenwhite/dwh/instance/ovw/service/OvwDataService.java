@@ -66,9 +66,11 @@ public class OvwDataService {
     private static final String DIR_DESC = "desc";
     private static final Pattern PLAIN_NUMBER = Pattern.compile(
             "^-?\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "})?$");
-    /** Число из группы для {@code eq}: приходит из ответа сервера, может быть длиннее границы «от–до». */
-    private static final Pattern EQ_NUMBER = Pattern.compile(
-            "^-?\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "})?$");
+    /**
+     * Число из группы для {@code eq}: значение приходит из ответа сервера, экспоненты в нём нет;
+     * длину ограничивает размер тела запроса. {@code \d} в Java — только цифры 0–9.
+     */
+    private static final Pattern EQ_NUMBER = Pattern.compile("^-?\\d+(\\.\\d+)?$");
 
     private final UplSourceService sources;
     private final UplPackageRepository packages;
