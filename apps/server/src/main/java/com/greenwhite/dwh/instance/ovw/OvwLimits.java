@@ -11,6 +11,8 @@ public final class OvwLimits {
     public static final int MAX_FILTERS = 20;
     /** Длина текста фильтра в символах. */
     public static final int MAX_FILTER_VALUE_LENGTH = 200;
+    /** Цифр до и после точки в числовой границе фильтра. */
+    public static final int MAX_NUMBER_DIGITS = 30;
     /** Лимит времени запроса ко второй базе, секунды. */
     public static final int QUERY_TIMEOUT_SECONDS = 10;
 

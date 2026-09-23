@@ -190,6 +190,47 @@ class OvwDataServiceTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("AC-5: неверное значение фильтра — 422 OVW_FILTER_VALUE у поля")
+    void invalidFilterValueIsRejected() {
+        applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
+        String tooLong = "TEST".repeat(51).substring(0, OvwLimits.MAX_FILTER_VALUE_LENGTH + 1);
+
+        assertFilterValueRejected(new FilterItem("amount", "between", null, "abc", null));
+        assertFilterValueRejected(new FilterItem("amount", "between", null, "11", "10"));
+        assertFilterValueRejected(new FilterItem("doc_date", "between", null, "2026-01-31", "2026-01-01"));
+        assertFilterValueRejected(new FilterItem("doc_date", "between", null, "2024-02-30", null));
+        assertFilterValueRejected(new FilterItem("org_name", "contains", "", null, null));
+        assertFilterValueRejected(new FilterItem("org_name", "contains", tooLong, null, null));
+        assertFilterValueRejected(new FilterItem("amount", "between", null, "1e-20000", null));
+        assertFilterValueRejected(new FilterItem("amount", "between", null, null, "1E+200000"));
+        assertFilterValueRejected(new FilterItem("amount", "eq", "1e5", null, null));
+    }
+
+    @Test
+    @DisplayName("С-3: группа с текстом длиннее предела фильтра открывает свои строки")
+    void longTextGroupOpensItsRows() {
+        applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
+        String longText = "TEST".repeat(63).substring(0, 250);
+        long loadId = dwhJdbc.sql("select distinct load_id from raw.rows").query(Long.class).single();
+        dwhJdbc.sql("update raw.rows set fields = jsonb_set(fields, '{org_name}', to_jsonb(:v::text))"
+                        + " where load_id = :id and row_no = (select min(row_no) from raw.rows where load_id = :id)")
+                .param("v", longText)
+                .param("id", loadId)
+                .update();
+
+        GroupsResult groups = service.groups(sourceId, new GroupsQuery(null, List.of(), "org_name"));
+        String groupValue = groups.groups().stream()
+                .map(GroupItem::value)
+                .filter(longText::equals)
+                .findFirst()
+                .orElseThrow();
+
+        RowsPage page = rows(List.of(new FilterItem("org_name", "eq", groupValue, null, null)), null);
+
+        assertThat(page.total()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("AC-6: сумма групп сходится с итогом по числу строк и по сумме")
     void groupsAddUpToTotal() {
         applied(UplPackageTestData.workbook(7, 3), JAN_FROM, JAN_TO);
@@ -275,6 +316,10 @@ class OvwDataServiceTest extends EmbeddedPostgresTest {
             actors.apply(actors.system());
             modules.toggleModuleStatus("ovw", enable);
         });
+    }
+
+    private void assertFilterValueRejected(FilterItem filter) {
+        assertInvalid(() -> rows(List.of(filter), null), "filters[0]", OvwErrors.OVW_FILTER_VALUE);
     }
 
     private static void assertInvalid(ThrowingCallable call, String field, String code) {

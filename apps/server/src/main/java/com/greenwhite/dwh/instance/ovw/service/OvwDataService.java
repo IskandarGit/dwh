@@ -46,6 +46,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Обзор данных (контракт И14): источники с применёнными пакетами, раскладка листа по анкете,
@@ -63,6 +64,8 @@ public class OvwDataService {
     private static final String OP_EQ = "eq";
     private static final String DIR_ASC = "asc";
     private static final String DIR_DESC = "desc";
+    private static final Pattern PLAIN_NUMBER = Pattern.compile(
+            "^-?\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "})?$");
 
     private final UplSourceService sources;
     private final UplPackageRepository packages;
@@ -280,18 +283,21 @@ public class OvwDataService {
     private static Object convert(FndRawSpec.Type type, String value) {
         try {
             return switch (type) {
-                case TEXT -> {
-                    if (value.length() > OvwLimits.MAX_FILTER_VALUE_LENGTH) {
-                        throw new FilterRejected(OvwErrors.OVW_FILTER_VALUE);
-                    }
-                    yield value;
-                }
-                case NUMBER -> new BigDecimal(value.trim());
+                case TEXT -> value;
+                case NUMBER -> number(value);
                 case DATE -> LocalDate.parse(value.trim());
             };
         } catch (NumberFormatException | DateTimeParseException invalid) {
             throw new FilterRejected(OvwErrors.OVW_FILTER_VALUE);
         }
+    }
+
+    private static BigDecimal number(String value) {
+        String trimmed = value.trim();
+        if (!PLAIN_NUMBER.matcher(trimmed).matches()) {
+            throw new FilterRejected(OvwErrors.OVW_FILTER_VALUE);
+        }
+        return new BigDecimal(trimmed);
     }
 
     @SuppressWarnings("unchecked")
