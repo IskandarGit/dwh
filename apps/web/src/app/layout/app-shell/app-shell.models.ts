@@ -32,6 +32,7 @@ export interface BuildNavSectionsOptions {
   canViewNotes: () => boolean;
   canViewSources: () => boolean;
   canViewPackages: () => boolean;
+  canViewDataOverview: () => boolean;
   canViewFiles: () => boolean;
   canViewAnalytics: () => boolean;
   canViewNotifications: () => boolean;
@@ -75,6 +76,7 @@ export function buildNavSections(options: BuildNavSectionsOptions): NavSection[]
   workspaceItems.push(
     { id: 'upl-sources', route: '/upl/sources', labelKey: 'nav.upl_sources', icon: 'table_view', permission: options.canViewSources },
     { id: 'upl-packages', route: '/upl/packages', labelKey: 'nav.upl_packages', icon: 'upload_file', permission: options.canViewPackages },
+    { id: 'ovw-data', route: '/ovw/data', labelKey: 'nav.ovw_data', icon: 'table_chart', permission: options.canViewDataOverview },
     { id: 'files', route: '/files', labelKey: 'layout.app_shell.fayly', titleKey: 'files.faylovoe_hranilische', icon: 'folder_open', permission: options.canViewFiles },
     { id: 'analytics', route: '/analytics', labelKey: 'layout.app_shell.analitika', titleKey: 'analytics.analitika_i_dashbordy', icon: 'insights', permission: options.canViewAnalytics },
     { id: 'notifications', route: '/notifications', labelKey: 'nav.notifications', icon: 'notifications', permission: options.canViewNotifications, badge: options.unreadCount }

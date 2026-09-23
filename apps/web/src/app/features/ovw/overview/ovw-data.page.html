@@ -1,0 +1,284 @@
+<div class="ovw-page">
+  <h1 class="ovw-title">{{ 'ovw.title' | t }}</h1>
+
+  @if (sourcesState() === 'empty') {
+    <div class="ovw-empty" data-testid="ovw-empty-sources">
+      <span class="material-symbols-outlined ovw-empty-icon" aria-hidden="true">table_chart</span>
+      <p class="ovw-empty-text">{{ 'ovw.empty_sources' | t }}</p>
+      <a class="ovw-link" routerLink="/upl/packages">{{ 'ovw.go_packages' | t }}</a>
+    </div>
+  } @else {
+    @if (sourcesState() === 'ready') {
+      <div class="ovw-header">
+        <div class="form-group ovw-header-field">
+          <label class="form-label" for="ovw-source-field">{{ 'ovw.source' | t }}</label>
+          <select
+            class="form-select"
+            id="ovw-source-field"
+            data-testid="ovw-source"
+            [ngModel]="view()?.src ?? null"
+            (ngModelChange)="selectSource($event)"
+          >
+            @for (source of sources(); track source.id) {
+              <option [ngValue]="source.id">{{ source.name }} ({{ source.code }})</option>
+            }
+          </select>
+        </div>
+
+        @if ((layout()?.sheets?.length ?? 0) > 1) {
+          <div class="form-group ovw-header-field">
+            <label class="form-label" for="ovw-sheet-field">{{ 'ovw.sheet' | t }}</label>
+            <select
+              class="form-select"
+              id="ovw-sheet-field"
+              data-testid="ovw-sheet"
+              [ngModel]="layout()?.sheet ?? null"
+              (ngModelChange)="selectSheet($event)"
+            >
+              @for (sheet of layout()?.sheets ?? []; track sheet.ordinal) {
+                <option [ngValue]="sheet.ordinal">{{ sheet.name }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        <div class="form-group ovw-header-field">
+          <label class="form-label" for="ovw-group-by-field">{{ 'ovw.group_by' | t }}</label>
+          <select
+            class="form-select"
+            id="ovw-group-by-field"
+            data-testid="ovw-group-by"
+            [ngModel]="view()?.groupBy ?? null"
+            (ngModelChange)="selectGroupBy($event)"
+          >
+            <option [ngValue]="null">{{ 'ovw.no_grouping' | t }}</option>
+            @for (column of columns(); track column.field) {
+              <option [ngValue]="column.field">{{ column.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="ovw-header-actions">
+          <ui-button variant="secondary" data-testid="ovw-reset-view" (onClick)="resetView()">
+            {{ 'ovw.reset_view' | t }}
+          </ui-button>
+        </div>
+      </div>
+
+      @if (layout(); as current) {
+        <div class="ovw-packages" data-testid="ovw-packages">
+          <span class="ovw-packages-label">{{ 'ovw.packages' | t }}:</span>
+          @for (item of visiblePackages(); track $index; let last = $last) {
+            <span>{{ packageText(item) }}{{ last ? '' : ',' }}</span>
+          }
+          @if (hiddenPackages() > 0) {
+            <button type="button" class="ovw-link-button" data-testid="ovw-packages-more" (click)="expandPackages()">
+              {{ 'ovw.packages_more' | t: { n: hiddenPackages() } }}
+            </button>
+          }
+          <span class="ovw-packages-rows">· {{ 'ovw.rows_in_sheet' | t: { n: count(current.rowsTotal) } }}</span>
+        </div>
+      }
+    }
+
+    @if (dropped().length > 0) {
+      <div class="alert ovw-dropped" role="status" data-testid="ovw-dropped">
+        @for (item of dropped(); track $index) {
+          <span class="ovw-dropped-line">{{ droppedText(item) }}</span>
+        }
+      </div>
+    }
+
+    @if (loadError(); as error) {
+      <div class="alert alert-error ovw-alert" role="alert" data-testid="ovw-load-error">
+        <span>{{ error }}</span>
+        <ui-button variant="secondary" data-testid="ovw-retry" (onClick)="retry()">{{ 'ovw.retry' | t }}</ui-button>
+      </div>
+    }
+
+    @if (sourcesState() === 'ready' && layout() !== null && view() !== null) {
+      @if (mode() === 'groups') {
+        <div class="ovw-caption">
+          <span data-testid="ovw-groups-caption">{{ groupsCaption() }}</span>
+          @if (hasFilters()) {
+            <ui-button variant="secondary" size="sm" data-testid="ovw-reset-filters" (onClick)="resetFilters()">
+              {{ 'ovw.reset_filters' | t }}
+            </ui-button>
+          }
+        </div>
+
+        <div class="ovw-filter-bar">
+          @for (column of columns(); track column.field) {
+            <div class="ovw-filter-bar-item">
+              <span class="ovw-filter-bar-label">{{ column.label }}</span>
+              <ng-container *ngTemplateOutlet="filterEditor; context: { $implicit: column }"></ng-container>
+            </div>
+          }
+        </div>
+
+        <div class="table-card ovw-table-card" [class.ovw-busy]="loading()">
+          <div class="table-scroll ovw-scroll">
+            <table class="ovw-table" data-testid="ovw-groups-table">
+              <thead>
+                <tr>
+                  <th>{{ groupColumn()?.label }}</th>
+                  <th class="ovw-num">{{ 'ovw.col.count' | t }}</th>
+                  @for (column of summableColumns(); track column.field) {
+                    <th class="ovw-num">{{ sumHeader(column) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (group of groups()?.groups ?? []; track $index) {
+                  <tr
+                    class="ovw-group-row"
+                    data-testid="ovw-group-row"
+                    tabindex="0"
+                    (click)="openGroup(group.value)"
+                    (keydown.enter)="openGroup(group.value)"
+                  >
+                    <td [class.ovw-empty-value]="group.value === null">{{ groupValueText(group.value) }}</td>
+                    <td class="ovw-num">{{ count(group.count) }}</td>
+                    @for (column of summableColumns(); track column.field) {
+                      <td class="ovw-num">{{ sumText(group.sums, column.field) }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+              @if (groups(); as result) {
+                <tfoot>
+                  <tr class="ovw-total-row" data-testid="ovw-total-row">
+                    <td>{{ 'ovw.total' | t }}</td>
+                    <td class="ovw-num">{{ count(result.total.count) }}</td>
+                    @for (column of summableColumns(); track column.field) {
+                      <td class="ovw-num">{{ sumText(result.total.sums, column.field) }}</td>
+                    }
+                  </tr>
+                </tfoot>
+              }
+            </table>
+          </div>
+        </div>
+      } @else {
+        @if (mode() === 'group-rows') {
+          <div class="ovw-group-open">
+            <button type="button" class="ovw-link-button" data-testid="ovw-back-to-groups" (click)="backToGroups()">
+              ← {{ 'ovw.back_to_groups' | t }}
+            </button>
+            <span>· {{ openGroupText() }}</span>
+          </div>
+        }
+
+        <div class="ovw-caption">
+          <span data-testid="ovw-rows-caption">{{ rangeText() }}</span>
+          @if (hasFilters()) {
+            <ui-button variant="secondary" size="sm" data-testid="ovw-reset-filters" (onClick)="resetFilters()">
+              {{ 'ovw.reset_filters' | t }}
+            </ui-button>
+          }
+        </div>
+
+        <div class="table-card ovw-table-card" [class.ovw-busy]="loading()">
+          <div class="table-scroll ovw-scroll">
+            <table class="ovw-table" data-testid="ovw-rows-table">
+              <thead>
+                <tr>
+                  <th class="ovw-origin">{{ 'ovw.col.origin' | t }}</th>
+                  @for (column of columns(); track column.field) {
+                    <th [class.ovw-num]="column.kind === 'number'">
+                      <button
+                        type="button"
+                        class="ovw-sort"
+                        [attr.data-testid]="'ovw-sort-' + column.field"
+                        (click)="toggleSort(column.field)"
+                      >
+                        <span>{{ column.label }}</span>
+                        <span class="ovw-sort-mark" aria-hidden="true">{{ sortMark(column.field) }}</span>
+                      </button>
+                    </th>
+                  }
+                </tr>
+                <tr class="ovw-filter-row">
+                  <th class="ovw-origin"></th>
+                  @for (column of columns(); track column.field) {
+                    <th>
+                      <ng-container *ngTemplateOutlet="filterEditor; context: { $implicit: column }"></ng-container>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of rowViews(); track $index) {
+                  <tr>
+                    <td class="ovw-origin">{{ row.origin }}</td>
+                    @for (cell of row.cells; track $index; let i = $index) {
+                      <td [class.ovw-num]="columns()[i].kind === 'number' && !cell.raw" [class.ovw-raw]="cell.raw">{{ cell.text }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        @if (rows(); as page) {
+          @if (page.total === 0 && hasFilters()) {
+            <div class="ovw-empty" data-testid="ovw-no-rows">
+              <p class="ovw-empty-text">{{ 'ovw.no_rows' | t }}</p>
+              <ui-button variant="secondary" data-testid="ovw-no-rows-reset" (onClick)="resetFilters()">
+                {{ 'ovw.reset_filters' | t }}
+              </ui-button>
+            </div>
+          }
+          @if (page.total > 0) {
+            <div class="ovw-pager">
+              <ui-button variant="ghost" size="sm" data-testid="ovw-page-first" [disabled]="currentPage() <= 1" (onClick)="goToPage(1)">«</ui-button>
+              <ui-button variant="ghost" size="sm" data-testid="ovw-page-prev" [disabled]="currentPage() <= 1" (onClick)="goToPage(currentPage() - 1)">‹</ui-button>
+              <span data-testid="ovw-page-of">{{ pageText() }}</span>
+              <ui-button variant="ghost" size="sm" data-testid="ovw-page-next" [disabled]="currentPage() >= pageCount()" (onClick)="goToPage(currentPage() + 1)">›</ui-button>
+              <ui-button variant="ghost" size="sm" data-testid="ovw-page-last" [disabled]="currentPage() >= pageCount()" (onClick)="goToPage(pageCount())">»</ui-button>
+            </div>
+          }
+        }
+      }
+    }
+  }
+</div>
+
+<ng-template #filterEditor let-column>
+  <div class="ovw-filter" [class.ovw-filter-invalid]="fieldErrors()[column.field]" [attr.data-testid]="'ovw-filter-' + column.field">
+    @if (column.kind === 'text') {
+      <input
+        class="form-input ovw-filter-input"
+        type="text"
+        [placeholder]="'ovw.filter.contains' | t"
+        [value]="draft(column.field).text"
+        (input)="editDraft(column.field, 'text', $event)"
+        (keydown.enter)="applyFilter(column)"
+        (blur)="applyFilter(column)"
+      />
+    } @else {
+      <input
+        class="form-input ovw-filter-input ovw-filter-from"
+        type="text"
+        [placeholder]="(column.kind === 'date' ? 'ovw.filter.date_from' : 'ovw.filter.from') | t"
+        [value]="draft(column.field).from"
+        (input)="editDraft(column.field, 'from', $event)"
+        (keydown.enter)="applyFilter(column)"
+        (blur)="applyFilter(column)"
+      />
+      <input
+        class="form-input ovw-filter-input ovw-filter-to"
+        type="text"
+        [placeholder]="(column.kind === 'date' ? 'ovw.filter.date_to' : 'ovw.filter.to') | t"
+        [value]="draft(column.field).to"
+        (input)="editDraft(column.field, 'to', $event)"
+        (keydown.enter)="applyFilter(column)"
+        (blur)="applyFilter(column)"
+      />
+    }
+    @if (fieldErrors()[column.field]; as message) {
+      <span class="ovw-field-error" data-testid="ovw-filter-error">{{ message }}</span>
+    }
+  </div>
+</ng-template>

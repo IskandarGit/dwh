@@ -1,0 +1,267 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.ovw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.ovw-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 1.25rem;
+  color: var(--text-main);
+}
+
+.ovw-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.ovw-header-field {
+  flex: 0 1 16rem;
+  min-width: 12rem;
+  margin-bottom: 0;
+}
+
+.ovw-header-actions {
+  margin-left: auto;
+}
+
+.ovw-packages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.ovw-packages-label {
+  color: var(--text-main);
+}
+
+.ovw-link,
+.ovw-link-button {
+  color: var(--primary);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ovw-link-button {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.ovw-link:hover,
+.ovw-link-button:hover {
+  text-decoration: underline;
+}
+
+.ovw-dropped {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-bottom: 0;
+  background-color: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+.ovw-dropped-line {
+  display: block;
+}
+
+.ovw-alert {
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+
+.ovw-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.ovw-group-open {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+}
+
+.ovw-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.ovw-filter-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 10rem;
+}
+
+.ovw-filter-bar-label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.ovw-table-card {
+  width: 100%;
+}
+
+.ovw-busy {
+  opacity: 0.6;
+}
+
+.ovw-scroll {
+  max-width: 100%;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.ovw-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.ovw-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.ovw-table thead .ovw-filter-row th {
+  top: 2.5rem;
+}
+
+.ovw-table .ovw-origin {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.ovw-table thead .ovw-origin {
+  z-index: 3;
+}
+
+.ovw-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ovw-raw {
+  font-style: italic;
+}
+
+.ovw-empty-value {
+  color: var(--text-muted);
+}
+
+.ovw-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ovw-sort-mark {
+  font-size: 0.75rem;
+}
+
+.ovw-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.ovw-filter-input {
+  width: 7rem;
+  min-width: 5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.ovw-filter-invalid .ovw-filter-input {
+  border-color: var(--danger);
+}
+
+.ovw-field-error {
+  display: block;
+  width: 100%;
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: normal;
+}
+
+.ovw-group-row,
+.ovw-total-row {
+  cursor: pointer;
+}
+
+.ovw-group-row:hover {
+  background: var(--bg-hover);
+}
+
+.ovw-group-row:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--primary));
+  outline-offset: -2px;
+}
+
+.ovw-total-row {
+  cursor: default;
+  font-weight: 600;
+}
+
+.ovw-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.ovw-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.ovw-empty-icon {
+  font-size: 2.5rem;
+  color: var(--text-light);
+}
+
+.ovw-empty-text {
+  margin: 0;
+  color: var(--text-muted);
+}
