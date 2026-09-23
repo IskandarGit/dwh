@@ -275,6 +275,58 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
         assertThat(packageCount()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("AC-10, 12: администратор применяет проверенную загрузку; повтор и неразобранная — 409")
+    void adminAppliesVerifiedPackage() throws Exception {
+        Session admin = login(adminLogin);
+        var accepted = upload(admin, String.valueOf(sourceId), PERIOD_FROM, PERIOD_TO,
+                UplPackageTestData.workbook(7, 3));
+        assertThat(accepted.getStatus()).as(accepted.getContentAsString()).isEqualTo(202);
+        String id = read(accepted, "$.id");
+
+        var notParsed = send(admin, post(BASE + "/" + id + "/apply"));
+        assertThat(notParsed.getStatus()).as(notParsed.getContentAsString()).isEqualTo(409);
+        assertThat((String) read(notParsed, "$.detail")).isEqualTo("UPL_PKG_NOT_VERIFIED");
+
+        assertThat(jobs.runQueued()).isEqualTo(1);
+
+        var applied = send(admin, post(BASE + "/" + id + "/apply"));
+        assertThat(applied.getStatus()).as(applied.getContentAsString()).isEqualTo(200);
+        assertThat((String) read(applied, "$.status")).isEqualTo("applied");
+        assertThat((Integer) read(applied, "$.rawRows")).isEqualTo(10);
+        assertThat((Integer) read(applied, "$.rowsTotal")).isEqualTo(10);
+        Object loadId = read(applied, "$.loadId");
+        assertThat(loadId).isNotNull();
+        assertThat(String.valueOf(loadId)).isNotBlank();
+
+        var repeated = send(admin, post(BASE + "/" + id + "/apply"));
+        assertThat(repeated.getStatus()).as(repeated.getContentAsString()).isEqualTo(409);
+        assertThat((String) read(repeated, "$.detail")).isEqualTo("UPL_PKG_NOT_VERIFIED");
+
+        var unknown = send(admin, post(BASE + "/00000000-0000-0000-0000-000000000000/apply"));
+        assertThat(unknown.getStatus()).as(unknown.getContentAsString()).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("AC-12: аналитик и пользователь только с просмотром не применяют — 403")
+    void analystAndViewerCannotApply() throws Exception {
+        Session admin = login(adminLogin);
+        var accepted = upload(admin, String.valueOf(sourceId), PERIOD_FROM, PERIOD_TO,
+                UplPackageTestData.workbook(7, 3));
+        assertThat(accepted.getStatus()).as(accepted.getContentAsString()).isEqualTo(202);
+        String id = read(accepted, "$.id");
+        assertThat(jobs.runQueued()).isEqualTo(1);
+
+        var byAnalyst = send(login(analystLogin), post(BASE + "/" + id + "/apply"));
+        assertThat(byAnalyst.getStatus()).as(byAnalyst.getContentAsString()).isEqualTo(403);
+        var byViewer = send(login(viewerLogin), post(BASE + "/" + id + "/apply"));
+        assertThat(byViewer.getStatus()).as(byViewer.getContentAsString()).isEqualTo(403);
+
+        var list = sendGet(admin, BASE, 200);
+        assertThat((String) read(list, "$.items[0].id")).isEqualTo(id);
+        assertThat((String) read(list, "$.items[0].status")).isEqualTo(UplPackageModel.VERIFIED);
+    }
+
     // ---------- помощники ----------
 
     private MockHttpServletResponse upload(Session session, String source, String from, String to, byte[] content)
