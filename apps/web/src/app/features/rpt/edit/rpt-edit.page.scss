@@ -1,0 +1,153 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.rpt-edit-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 3rem;
+}
+
+.rpt-edit-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rpt-edit-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rpt-edit-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 1.25rem;
+  color: var(--text-main);
+}
+
+.rpt-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.rpt-edit-muted {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.rpt-edit-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rpt-edit-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rpt-edit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  background: var(--bg-surface);
+}
+
+.rpt-edit-block-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.rpt-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.rpt-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 0 1 18rem;
+  min-width: 12rem;
+  margin-bottom: 0;
+}
+
+.rpt-edit-field-wide {
+  flex-basis: 32rem;
+}
+
+.rpt-edit-field-narrow {
+  flex-basis: 8rem;
+  min-width: 6rem;
+}
+
+.rpt-edit-radio,
+.rpt-edit-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.rpt-edit-hint {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.rpt-edit-again {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.rpt-edit-error {
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+
+.rpt-edit-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rpt-edit-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.rpt-edit-equals {
+  line-height: 2.25rem;
+  color: var(--text-muted);
+}
+
+.rpt-edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

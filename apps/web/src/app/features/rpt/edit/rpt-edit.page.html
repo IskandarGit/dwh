@@ -1,0 +1,418 @@
+<div class="rpt-edit-page">
+  <div class="rpt-edit-header">
+    <button type="button" class="rpt-edit-back" data-testid="rpt-edit-back" (click)="cancel()">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      {{ (reportId() === null ? 'rpt.view.back' : 'rpt.edit.back') | t }}
+    </button>
+    <h1 class="rpt-edit-title" data-testid="rpt-edit-title">{{ title() }}</h1>
+    <div class="rpt-edit-actions">
+      <ui-button variant="secondary" data-testid="rpt-edit-cancel" (onClick)="cancel()">{{ 'rpt.edit.cancel' | t }}</ui-button>
+      <ui-button
+        variant="primary"
+        data-testid="rpt-edit-save"
+        [disabled]="!canSave()"
+        [loading]="saving()"
+        (onClick)="save()"
+      >{{ 'rpt.edit.save' | t }}</ui-button>
+    </div>
+  </div>
+
+  @if (state() === 'loading') {
+    <p class="rpt-edit-muted" data-testid="rpt-edit-loading">{{ 'rpt.edit.loading' | t }}</p>
+  }
+
+  @if (loadError(); as error) {
+    <div class="alert alert-error" role="alert" data-testid="rpt-edit-load-error">{{ error }}</div>
+  }
+
+  @if (conflict()) {
+    <div class="alert alert-error rpt-edit-conflict" role="alert" data-testid="rpt-edit-conflict">
+      <span>{{ 'rpt.edit.conflict' | t }}</span>
+      <ui-button variant="secondary" size="sm" data-testid="rpt-edit-reopen" (onClick)="reopen()">{{ 'rpt.edit.reopen' | t }}</ui-button>
+    </div>
+  }
+
+  @if (saveError(); as error) {
+    <div class="alert alert-error" role="alert" data-testid="rpt-edit-save-error">{{ error }}</div>
+  }
+
+  @if (state() === 'ready') {
+    @let current = form();
+    <div class="rpt-edit-blocks">
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-name">
+        <h2 class="rpt-edit-block-title">1. {{ 'rpt.edit.name' | t }}</h2>
+        <div class="form-group rpt-edit-field rpt-edit-field-wide">
+          <label class="form-label" for="rpt-edit-name">{{ 'rpt.edit.name' | t }}</label>
+          <input
+            class="form-input"
+            id="rpt-edit-name"
+            data-testid="rpt-edit-name"
+            maxlength="200"
+            [ngModel]="current.name"
+            (ngModelChange)="setName($event)"
+          />
+          @if (fieldError('name'); as error) {
+            <span class="rpt-edit-error" data-testid="rpt-edit-error-name">{{ error }}</span>
+          }
+        </div>
+      </section>
+
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-source">
+        <h2 class="rpt-edit-block-title">2. {{ 'rpt.edit.block_source' | t }}</h2>
+        <div class="rpt-edit-row">
+          <div class="form-group rpt-edit-field">
+            <label class="form-label" for="rpt-edit-source">{{ 'rpt.edit.source' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-source"
+              data-testid="rpt-edit-source"
+              [ngModel]="current.sourceId"
+              (ngModelChange)="setSource($event)"
+            >
+              <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+              @for (source of sources(); track source.id) {
+                <option [ngValue]="source.id">{{ sourceOption(source) }}</option>
+              }
+            </select>
+            @if (fieldError('sourceId'); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-sourceId">{{ error }}</span>
+            }
+          </div>
+          @if ((sourceLayout()?.sheets?.length ?? 0) > 1) {
+            <div class="form-group rpt-edit-field">
+              <label class="form-label" for="rpt-edit-source-sheet">{{ 'rpt.edit.sheet' | t }}</label>
+              <select
+                class="form-select"
+                id="rpt-edit-source-sheet"
+                data-testid="rpt-edit-source-sheet"
+                [ngModel]="current.sourceSheet"
+                (ngModelChange)="setSourceSheet($event)"
+              >
+                @for (sheet of sourceLayout()!.sheets; track sheet.ordinal) {
+                  <option [ngValue]="sheet.ordinal">{{ sheet.name }}</option>
+                }
+              </select>
+              @if (isChooseAgain(field.sourceSheet)) {
+                <span class="rpt-edit-again" data-testid="rpt-edit-again-sourceSheet">{{ 'rpt.edit.choose_again' | t }}</span>
+              }
+            </div>
+          }
+          @if (fieldError(field.sourceSheet); as error) {
+            <span class="rpt-edit-error" data-testid="rpt-edit-error-sourceSheet">{{ error }}</span>
+          }
+        </div>
+      </section>
+
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-date">
+        <h2 class="rpt-edit-block-title">3. {{ 'rpt.edit.block_date' | t }}</h2>
+        @if (noDateColumns()) {
+          <p class="rpt-edit-hint" data-testid="rpt-edit-no-date">{{ 'rpt.edit.no_date_columns' | t }}</p>
+        } @else {
+          <div class="form-group rpt-edit-field">
+            <label class="form-label" for="rpt-edit-date">{{ 'rpt.edit.date_field' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-date"
+              data-testid="rpt-edit-date"
+              [ngModel]="current.dateField"
+              (ngModelChange)="setDateField($event)"
+            >
+              <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+              @for (column of dateColumns(); track column.field) {
+                <option [ngValue]="column.field">{{ column.label }}</option>
+              }
+            </select>
+            @if (isChooseAgain(field.dateField)) {
+              <span class="rpt-edit-again" data-testid="rpt-edit-again-dateField">{{ 'rpt.edit.choose_again' | t }}</span>
+            }
+            @if (fieldError(field.dateField); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-dateField">{{ error }}</span>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-measure">
+        <h2 class="rpt-edit-block-title">4. {{ 'rpt.edit.block_measure' | t }}</h2>
+        <div class="rpt-edit-row">
+          <label class="rpt-edit-radio">
+            <input
+              type="radio"
+              name="rpt-edit-measure-kind"
+              data-testid="rpt-edit-measure-total"
+              [checked]="current.measureKind === 'total'"
+              (change)="setMeasureKind('total')"
+            />
+            {{ 'rpt.edit.measure_total' | t }}
+          </label>
+          <div class="form-group rpt-edit-field">
+            <select
+              class="form-select"
+              data-testid="rpt-edit-measure-field"
+              [attr.aria-label]="'rpt.edit.measure_total' | t"
+              [disabled]="current.measureKind !== 'total'"
+              [ngModel]="current.measureField"
+              (ngModelChange)="setMeasureField($event)"
+            >
+              <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+              @for (column of measureColumns(); track column.field) {
+                <option [ngValue]="column.field">{{ column.label }}</option>
+              }
+            </select>
+            @if (isChooseAgain(field.measureField)) {
+              <span class="rpt-edit-again" data-testid="rpt-edit-again-measureField">{{ 'rpt.edit.choose_again' | t }}</span>
+            }
+            @if (fieldError(field.measureField); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-measureField">{{ error }}</span>
+            }
+          </div>
+          <label class="rpt-edit-radio">
+            <input
+              type="radio"
+              name="rpt-edit-measure-kind"
+              data-testid="rpt-edit-measure-count"
+              [checked]="current.measureKind === 'count'"
+              (change)="setMeasureKind('count')"
+            />
+            {{ 'rpt.edit.measure_count' | t }}
+          </label>
+        </div>
+        <div class="rpt-edit-row">
+          <div class="form-group rpt-edit-field">
+            <label class="form-label" for="rpt-edit-divisor">{{ 'rpt.edit.show_in' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-divisor"
+              data-testid="rpt-edit-divisor"
+              [ngModel]="current.divisor"
+              (ngModelChange)="setDivisor($event)"
+            >
+              @for (divisor of divisors; track divisor) {
+                <option [ngValue]="divisor">{{ 'rpt.unit.' + divisor | t }}</option>
+              }
+            </select>
+            @if (fieldError('divisor'); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-divisor">{{ error }}</span>
+            }
+          </div>
+          <div class="form-group rpt-edit-field rpt-edit-field-narrow">
+            <label class="form-label" for="rpt-edit-decimals">{{ 'rpt.edit.decimals' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-decimals"
+              data-testid="rpt-edit-decimals"
+              [ngModel]="current.decimals"
+              (ngModelChange)="setDecimals($event)"
+            >
+              @for (decimals of decimalsList; track decimals) {
+                <option [ngValue]="decimals">{{ decimals }}</option>
+              }
+            </select>
+            @if (fieldError('decimals'); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-decimals">{{ error }}</span>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-ref">
+        <h2 class="rpt-edit-block-title">5. {{ 'rpt.edit.block_ref' | t }}</h2>
+        <label class="rpt-edit-check">
+          <input
+            type="checkbox"
+            data-testid="rpt-edit-use-ref"
+            [checked]="current.useRef"
+            (change)="setUseRef($any($event.target).checked)"
+          />
+          {{ 'rpt.edit.use_ref' | t }}
+        </label>
+        @if (current.useRef) {
+          <div class="rpt-edit-row" data-testid="rpt-edit-ref-block">
+            <div class="form-group rpt-edit-field">
+              <label class="form-label" for="rpt-edit-ref">{{ 'rpt.edit.ref' | t }}</label>
+              <select
+                class="form-select"
+                id="rpt-edit-ref"
+                data-testid="rpt-edit-ref"
+                [ngModel]="current.refSourceId"
+                (ngModelChange)="setRefSource($event)"
+              >
+                <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+                @for (source of refSources(); track source.id) {
+                  <option [ngValue]="source.id">{{ sourceOption(source) }}</option>
+                }
+              </select>
+              @if (isChooseAgain('ref.sourceId')) {
+                <span class="rpt-edit-again" data-testid="rpt-edit-again-ref-sourceId">{{ 'rpt.edit.choose_again' | t }}</span>
+              }
+              @if (fieldError('ref.sourceId'); as error) {
+                <span class="rpt-edit-error" data-testid="rpt-edit-error-ref-sourceId">{{ error }}</span>
+              }
+            </div>
+            @if ((refLayout()?.sheets?.length ?? 0) > 1) {
+              <div class="form-group rpt-edit-field">
+                <label class="form-label" for="rpt-edit-ref-sheet">{{ 'rpt.edit.sheet' | t }}</label>
+                <select
+                  class="form-select"
+                  id="rpt-edit-ref-sheet"
+                  data-testid="rpt-edit-ref-sheet"
+                  [ngModel]="current.refSheet"
+                  (ngModelChange)="setRefSheet($event)"
+                >
+                  @for (sheet of refLayout()!.sheets; track sheet.ordinal) {
+                    <option [ngValue]="sheet.ordinal">{{ sheet.name }}</option>
+                  }
+                </select>
+                @if (isChooseAgain(field.refSheet)) {
+                  <span class="rpt-edit-again" data-testid="rpt-edit-again-refSheet">{{ 'rpt.edit.choose_again' | t }}</span>
+                }
+              </div>
+            }
+            @if (fieldError(field.refSheet); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-refSheet">{{ error }}</span>
+            }
+          </div>
+
+          <div class="rpt-edit-pairs" data-testid="rpt-edit-pairs">
+            <span class="form-label">{{ 'rpt.edit.link' | t }}</span>
+            @for (key of current.keys; track $index; let index = $index) {
+              <div class="rpt-edit-pair" data-testid="rpt-edit-pair">
+                <div class="form-group rpt-edit-field">
+                  <select
+                    class="form-select"
+                    data-testid="rpt-edit-key-field"
+                    [attr.aria-label]="'rpt.edit.source' | t"
+                    [ngModel]="key.field"
+                    (ngModelChange)="setKeyField(index, $event)"
+                  >
+                    <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+                    @for (column of sourceKeyColumns(); track column.field) {
+                      <option [ngValue]="column.field">{{ column.label }}</option>
+                    }
+                  </select>
+                  @if (isChooseAgain(field.keyField(index))) {
+                    <span class="rpt-edit-again" data-testid="rpt-edit-again-key-field">{{ 'rpt.edit.choose_again' | t }}</span>
+                  }
+                  @if (fieldError(field.keyField(index)); as error) {
+                    <span class="rpt-edit-error" data-testid="rpt-edit-error-key-field">{{ error }}</span>
+                  }
+                </div>
+                <span class="rpt-edit-equals" aria-hidden="true">=</span>
+                <div class="form-group rpt-edit-field">
+                  <select
+                    class="form-select"
+                    data-testid="rpt-edit-key-ref-field"
+                    [attr.aria-label]="'rpt.edit.ref' | t"
+                    [ngModel]="key.refField"
+                    (ngModelChange)="setKeyRefField(index, $event)"
+                  >
+                    <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+                    @for (column of refKeyColumns(); track column.field) {
+                      <option [ngValue]="column.field">{{ column.label }}</option>
+                    }
+                  </select>
+                  @if (isChooseAgain(field.keyRefField(index))) {
+                    <span class="rpt-edit-again" data-testid="rpt-edit-again-key-ref-field">{{ 'rpt.edit.choose_again' | t }}</span>
+                  }
+                  @if (fieldError(field.keyRefField(index)); as error) {
+                    <span class="rpt-edit-error" data-testid="rpt-edit-error-key-ref-field">{{ error }}</span>
+                  }
+                </div>
+                @if (index > 0) {
+                  <ui-button variant="ghost" size="sm" icon="close" data-testid="rpt-edit-remove-pair" (onClick)="removePair(index)">
+                    {{ 'rpt.edit.remove_pair' | t }}
+                  </ui-button>
+                }
+              </div>
+            }
+            @if (current.keys.length < maxKeyPairs) {
+              <div>
+                <ui-button variant="ghost" size="sm" data-testid="rpt-edit-add-pair" (onClick)="addPair()">{{ 'rpt.edit.add_pair' | t }}</ui-button>
+              </div>
+            }
+            @if (fieldError('ref.keys'); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-keys">{{ error }}</span>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="rpt-edit-block" data-testid="rpt-edit-block-levels">
+        <h2 class="rpt-edit-block-title">6. {{ 'rpt.edit.block_levels' | t }}</h2>
+        <div class="rpt-edit-row">
+          <div class="form-group rpt-edit-field">
+            <label class="form-label" for="rpt-edit-level1">{{ 'rpt.edit.level1' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-level1"
+              data-testid="rpt-edit-level1"
+              [ngModel]="levelValue('level1')"
+              (ngModelChange)="setLevel('level1', $event)"
+            >
+              <option [ngValue]="null" disabled>{{ 'rpt.edit.choose' | t }}</option>
+              @if (levelSourceOptions().length > 0) {
+                <optgroup [label]="'rpt.edit.source' | t">
+                  @for (option of levelSourceOptions(); track option.field) {
+                    <option [ngValue]="option.origin + ':' + option.field">{{ levelOptionLabel(option) }}</option>
+                  }
+                </optgroup>
+              }
+              @if (levelRefOptions().length > 0) {
+                <optgroup [label]="'rpt.edit.ref' | t">
+                  @for (option of levelRefOptions(); track option.field) {
+                    <option [ngValue]="option.origin + ':' + option.field">{{ levelOptionLabel(option) }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+            @if (isChooseAgain(field.level1)) {
+              <span class="rpt-edit-again" data-testid="rpt-edit-again-level1">{{ 'rpt.edit.choose_again' | t }}</span>
+            }
+            @if (fieldError(field.level1); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-level1">{{ error }}</span>
+            }
+          </div>
+          <div class="form-group rpt-edit-field">
+            <label class="form-label" for="rpt-edit-level2">{{ 'rpt.edit.level2' | t }}</label>
+            <select
+              class="form-select"
+              id="rpt-edit-level2"
+              data-testid="rpt-edit-level2"
+              [ngModel]="levelValue('level2')"
+              (ngModelChange)="setLevel('level2', $event)"
+            >
+              <option [ngValue]="null">{{ 'rpt.edit.no_level2' | t }}</option>
+              @if (levelSourceOptions().length > 0) {
+                <optgroup [label]="'rpt.edit.source' | t">
+                  @for (option of levelSourceOptions(); track option.field) {
+                    <option [ngValue]="option.origin + ':' + option.field" [disabled]="isLevel2Blocked(option)">{{ levelOptionLabel(option) }}</option>
+                  }
+                </optgroup>
+              }
+              @if (levelRefOptions().length > 0) {
+                <optgroup [label]="'rpt.edit.ref' | t">
+                  @for (option of levelRefOptions(); track option.field) {
+                    <option [ngValue]="option.origin + ':' + option.field" [disabled]="isLevel2Blocked(option)">{{ levelOptionLabel(option) }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+            @if (isChooseAgain(field.level2)) {
+              <span class="rpt-edit-again" data-testid="rpt-edit-again-level2">{{ 'rpt.edit.choose_again' | t }}</span>
+            }
+            @if (fieldError(field.level2); as error) {
+              <span class="rpt-edit-error" data-testid="rpt-edit-error-level2">{{ error }}</span>
+            }
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  <ui-modal [isOpen]="isLeaveOpen()" [title]="'rpt.edit.leave_title' | t" size="sm" (close)="settleLeave(false)">
+    <div footer class="rpt-edit-modal-actions">
+      <ui-button variant="secondary" data-testid="rpt-edit-leave-no" (onClick)="settleLeave(false)">{{ 'rpt.edit.leave_no' | t }}</ui-button>
+      <ui-button variant="danger" data-testid="rpt-edit-leave-yes" (onClick)="settleLeave(true)">{{ 'rpt.edit.leave_yes' | t }}</ui-button>
+    </div>
+  </ui-modal>
+</div>
