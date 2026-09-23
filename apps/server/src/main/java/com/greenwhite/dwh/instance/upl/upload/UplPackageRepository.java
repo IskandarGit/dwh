@@ -221,6 +221,47 @@ public class UplPackageRepository {
                 .list();
     }
 
+    /** Источник с хотя бы одним применённым пакетом (обзор данных). */
+    public record AppliedSource(long id, String code, String name) { }
+
+    /** Показываемый пакет: из применённых пакетов одного периода — с наибольшим load_id. */
+    public record AppliedPackage(long loadId, String fileName, LocalDate periodFrom, LocalDate periodTo,
+                                 int formatVersion) { }
+
+    public List<AppliedSource> appliedSources() {
+        return jdbc.sql("""
+                        select s.id, s.code, s.name
+                          from upl_sources s
+                         where exists (select 1 from upl_packages p
+                                        where p.source_id = s.id and p.status = :applied)
+                         order by s.name, s.id
+                        """)
+                .param("applied", UplPackageModel.APPLIED)
+                .query((rs, rowNum) -> new AppliedSource(rs.getLong("id"), rs.getString("code"), rs.getString("name")))
+                .list();
+    }
+
+    public List<AppliedPackage> appliedPackages(long sourceId) {
+        return jdbc.sql("""
+                        select * from (
+                            select distinct on (period_from, period_to)
+                                   load_id, file_name, period_from, period_to, format_version
+                              from upl_packages
+                             where source_id = :sourceId and status = :applied
+                             order by period_from, period_to, load_id desc) p
+                         order by period_from, period_to
+                        """)
+                .param("sourceId", sourceId)
+                .param("applied", UplPackageModel.APPLIED)
+                .query((rs, rowNum) -> new AppliedPackage(
+                        rs.getLong("load_id"),
+                        rs.getString("file_name"),
+                        rs.getObject("period_from", LocalDate.class),
+                        rs.getObject("period_to", LocalDate.class),
+                        rs.getInt("format_version")))
+                .list();
+    }
+
     private PackageRow mapPackage(ResultSet rs, int rowNum) throws SQLException {
         return new PackageRow(
                 rs.getLong("id"),
