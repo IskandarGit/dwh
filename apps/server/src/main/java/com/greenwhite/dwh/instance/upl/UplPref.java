@@ -10,6 +10,7 @@ public final class UplPref {
     public static final String ACTION_EDIT = "edit";
     public static final String ACTION_PUBLISH = "publish";
     public static final String ACTION_UPLOAD = "upload";
+    public static final String ACTION_APPLY = "apply";
     public static final String TABLE_FORMAT_VERSIONS = "upl_format_versions";
 
     /** Код обработчика задания «разобрать файл пакета» в очереди основы. */
