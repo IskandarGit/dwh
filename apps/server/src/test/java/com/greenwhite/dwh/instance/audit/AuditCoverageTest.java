@@ -61,7 +61,8 @@ class AuditCoverageTest {
             "FndLoadService",
             "FndUnitService",
             "FndVersioning",
-            "UplSourceService"
+            "UplSourceService",
+            "UplPackageService"
     );
 
     @Test

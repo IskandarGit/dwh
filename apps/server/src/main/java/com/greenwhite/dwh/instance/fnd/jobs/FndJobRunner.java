@@ -173,6 +173,19 @@ public class FndJobRunner {
         }
     }
 
+    /**
+     * Ставит в очередь разовое задание с аргументами — вне расписания. Участвует в транзакции вызывающего:
+     * запись прикладного модуля и задание появляются вместе или не появляются вовсе.
+     */
+    @Transactional
+    public void enqueueOnce(String handlerCode, Map<String, Object> args) {
+        handler(handlerCode);
+        jdbc.sql("insert into fnd_job_queue (handler, args) values (:handler, cast(:args as jsonb))")
+                .param("handler", handlerCode)
+                .param("args", json.writeValueAsString(args))
+                .update();
+    }
+
     /** Текст ошибки для {@code fnd_job_runs.error}: исключение и цепочка причин, чтобы не терять текст SQLException. */
     static String describe(Throwable failure) {
         StringBuilder text = new StringBuilder(failure.toString());

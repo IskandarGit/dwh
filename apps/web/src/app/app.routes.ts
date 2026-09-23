@@ -94,6 +94,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/upl/sources/sources-list.component').then(m => m.SourcesListComponent)
       },
       {
+        path: 'upl/packages',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.packages', 'view')],
+        loadComponent: () => import('./features/upl/packages/packages.component').then(m => m.PackagesComponent)
+      },
+      {
         matcher: uplFormatMatcher,
         canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         canDeactivate: [recordNavigationGuard],
