@@ -79,13 +79,16 @@ public final class RptTestData {
 
     /** Источник с опубликованной анкетой: ключ объекта, дата, сумма, количество, код, группа. */
     public long publishedSource() {
-        return published("test.rpt.src.", "TEST источник", new Sheet(null, 0, SOURCE_SHEET, 1, null, List.of(
-                keyColumn(1),
-                column(2, "Дата TEST", DATE, DataType.DATE),
-                column(3, "Сумма TEST", AMOUNT, DataType.NUMBER),
-                column(4, "Количество TEST", QTY, DataType.INTEGER),
-                column(5, "Код TEST", CODE, DataType.TEXT),
-                column(6, "Группа TEST", GROUP, DataType.TEXT))));
+        SourceData data = new SourceData("test.rpt.src." + UUID.randomUUID().toString().substring(0, 8),
+                "TEST источник", "TEST org", null, Periodicity.MONTH, 5, null, null);
+        long sourceId = sources.createSource(data, userId).source().id();
+        publishVersion(sourceId, sourceSheet(true), VALID_FROM);
+        return sourceId;
+    }
+
+    /** Новая опубликованная версия анкеты источника без колонки группы, действует с {@code validFrom}; её номер. */
+    public int republishSourceWithoutGroup(long sourceId, LocalDate validFrom) {
+        return publishVersion(sourceId, sourceSheet(false), validFrom);
     }
 
     /** Справочник с опубликованной анкетой: ключ объекта, код, название. */
@@ -103,8 +106,21 @@ public final class RptTestData {
             SourceRow row = rows.get(i);
             cells.add(Arrays.asList(objectKey(i), row.date(), row.amount(), row.qty(), row.code(), row.group()));
         }
-        return apply(sourceId, UplXlsxFixtures.workbook(new SheetSpec(SOURCE_SHEET, 1, SOURCE_HEADER, cells)),
+        return apply(sourceId, 1, UplXlsxFixtures.workbook(new SheetSpec(SOURCE_SHEET, 1, SOURCE_HEADER, cells)),
                 from, to);
+    }
+
+    /** Применённый пакет источника по версии анкеты без колонки группы ({@link #republishSourceWithoutGroup}). */
+    public PackageRow applySourceWithoutGroup(long sourceId, int formatVersion, List<SourceRow> rows,
+                                              LocalDate from, LocalDate to) {
+        List<List<Object>> cells = new ArrayList<>();
+        for (int i = 0; i < rows.size(); i++) {
+            SourceRow row = rows.get(i);
+            cells.add(Arrays.asList(objectKey(i), row.date(), row.amount(), row.qty(), row.code()));
+        }
+        List<String> header = SOURCE_HEADER.subList(0, SOURCE_HEADER.size() - 1);
+        return apply(sourceId, formatVersion,
+                UplXlsxFixtures.workbook(new SheetSpec(SOURCE_SHEET, 1, header, cells)), from, to);
     }
 
     /** Применённый пакет справочника за период. */
@@ -114,13 +130,13 @@ public final class RptTestData {
             RefRow row = rows.get(i);
             cells.add(Arrays.asList(objectKey(i), row.code(), row.name()));
         }
-        return apply(refId, UplXlsxFixtures.workbook(new SheetSpec(REF_SHEET, 1, REF_HEADER, cells)), from, to);
+        return apply(refId, 1, UplXlsxFixtures.workbook(new SheetSpec(REF_SHEET, 1, REF_HEADER, cells)), from, to);
     }
 
-    private PackageRow apply(long sourceId, byte[] content, LocalDate from, LocalDate to) {
+    private PackageRow apply(long sourceId, int formatVersion, byte[] content, LocalDate from, LocalDate to) {
         FileRecord file = files.uploadFile("TEST.xlsx", UplPackageTestData.XLSX_MIME,
                 new ByteArrayInputStream(content), content.length, userId);
-        PackageRow row = packages.register(new NewPackage(sourceId, 1, from, to, file.id(),
+        PackageRow row = packages.register(new NewPackage(sourceId, formatVersion, from, to, file.id(),
                 file.originalName(), file.sha256(), file.sizeBytes(), userId));
         parseJob.run(Map.of("packageId", row.publicId().toString()));
         PackageRow parsed = packages.get(row.publicId().toString());
@@ -138,12 +154,30 @@ public final class RptTestData {
         SourceData data = new SourceData(codePrefix + UUID.randomUUID().toString().substring(0, 8), name,
                 "TEST org", null, Periodicity.MONTH, 5, null, null);
         long sourceId = sources.createSource(data, userId).source().id();
+        publishVersion(sourceId, sheet, VALID_FROM);
+        return sourceId;
+    }
+
+    private int publishVersion(long sourceId, Sheet sheet, LocalDate validFrom) {
         int version = sources.createDraft(sourceId, null, userId).version();
         int lockVersion = sources.getVersion(sourceId, version).lockVersion();
         sources.replaceDraft(sourceId, version, lockVersion,
                 new DraftData(null, null, null, null, List.of(sheet)), userId);
-        sources.publish(sourceId, version, VALID_FROM, userId);
-        return sourceId;
+        sources.publish(sourceId, version, validFrom, userId);
+        return version;
+    }
+
+    private static Sheet sourceSheet(boolean withGroup) {
+        List<Column> columns = new ArrayList<>(List.of(
+                keyColumn(1),
+                column(2, "Дата TEST", DATE, DataType.DATE),
+                column(3, "Сумма TEST", AMOUNT, DataType.NUMBER),
+                column(4, "Количество TEST", QTY, DataType.INTEGER),
+                column(5, "Код TEST", CODE, DataType.TEXT)));
+        if (withGroup) {
+            columns.add(column(6, "Группа TEST", GROUP, DataType.TEXT));
+        }
+        return new Sheet(null, 0, SOURCE_SHEET, 1, null, List.copyOf(columns));
     }
 
     private static String objectKey(int index) {
