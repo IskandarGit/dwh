@@ -68,9 +68,10 @@ public class OvwDataService {
             "^-?\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_NUMBER_DIGITS + "})?$");
     /**
      * Число из группы для {@code eq}: значение приходит из ответа сервера, экспоненты в нём нет;
-     * длину ограничивает размер тела запроса. {@code \d} в Java — только цифры 0–9.
+     * длина — до {@link OvwLimits#MAX_EQ_NUMBER_DIGITS} цифр до и после точки. {@code \d} в Java — только цифры 0–9.
      */
-    private static final Pattern EQ_NUMBER = Pattern.compile("^-?\\d+(\\.\\d+)?$");
+    private static final Pattern EQ_NUMBER = Pattern.compile(
+            "^-?\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "}(\\.\\d{1," + OvwLimits.MAX_EQ_NUMBER_DIGITS + "})?$");
 
     private final UplSourceService sources;
     private final UplPackageRepository packages;

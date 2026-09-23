@@ -103,6 +103,18 @@ class FndRawValueSqlTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт обзора 3.1: ячейка длиннее 1000 знаков — null, а не ошибка базы; самое длинное допустимое число переводится")
+    void longCellIsNull() {
+        String longFraction = "0." + "1".repeat(17000);
+        assertThat(eval(Type.NUMBER, longFraction)).isNull();
+        assertThat(eval(Type.DATE, longFraction)).isNull();
+        assertThat(eval(Type.NUMBER, "1".repeat(1001))).isNull();
+        assertThat(eval(Type.NUMBER, "1." + "5".repeat(998))).isNotNull();
+        assertThat(eval(Type.NUMBER, "1." + "5".repeat(999))).isNull();
+        assertThat(eval(Type.NUMBER, "1" + "0".repeat(990) + "e999")).isNotNull();
+    }
+
+    @Test
     @DisplayName("контракт обзора 3.1: единый вид — непереводимое остаётся текстом как в файле")
     void canonicalValue() {
         assertThat(evalCanonical(Type.NUMBER, "abc")).isEqualTo("abc");

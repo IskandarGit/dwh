@@ -204,6 +204,7 @@ class OvwDataServiceTest extends EmbeddedPostgresTest {
         assertFilterValueRejected(new FilterItem("amount", "between", null, "1e-20000", null));
         assertFilterValueRejected(new FilterItem("amount", "between", null, null, "1E+200000"));
         assertFilterValueRejected(new FilterItem("amount", "eq", "1e5", null, null));
+        assertFilterValueRejected(new FilterItem("amount", "eq", "0." + "1".repeat(2001), null, null));
     }
 
     @Test
