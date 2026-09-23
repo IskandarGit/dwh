@@ -106,6 +106,32 @@ export const routes: Routes = [
         loadComponent: () => import('./features/ovw/overview/ovw-data.page').then(m => m.OvwDataPage)
       },
       {
+        path: 'rpt/reports',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('rpt'), permissionGuard('rpt.reports', 'view')],
+        loadComponent: () => import('./features/rpt/list/rpt-list.page').then(m => m.RptListPage)
+      },
+      {
+        path: 'rpt/reports/new',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('rpt'), permissionGuard('rpt.reports', 'edit')],
+        canDeactivate: [recordNavigationGuard],
+        loadComponent: () => import('./features/rpt/edit/rpt-edit.page').then(m => m.RptEditPage)
+      },
+      {
+        path: 'rpt/reports/:id',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('rpt'), permissionGuard('rpt.reports', 'view')],
+        loadComponent: () => import('./features/rpt/view/rpt-view.page').then(m => m.RptViewPage)
+      },
+      {
+        path: 'rpt/reports/:id/edit',
+        pathMatch: 'full',
+        canActivate: [moduleActiveGuard('rpt'), permissionGuard('rpt.reports', 'edit')],
+        canDeactivate: [recordNavigationGuard],
+        loadComponent: () => import('./features/rpt/edit/rpt-edit.page').then(m => m.RptEditPage)
+      },
+      {
         matcher: uplFormatMatcher,
         canActivate: [moduleActiveGuard('upl'), permissionGuard('upl.sources', 'view')],
         canDeactivate: [recordNavigationGuard],
