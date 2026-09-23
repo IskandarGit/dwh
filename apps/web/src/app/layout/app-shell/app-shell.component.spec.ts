@@ -314,7 +314,7 @@ describe('AppShellComponent', () => {
     // Check items per section
     const workspaceSection = sections.find(s => s.id === 'workspace');
     expect(workspaceSection?.items.map(i => i.id)).toEqual([
-      'tasks', 'projects', 'notes', 'upl-sources', 'upl-packages', 'files', 'analytics', 'notifications'
+      'tasks', 'projects', 'notes', 'upl-sources', 'upl-packages', 'ovw-data', 'files', 'analytics', 'notifications'
     ]);
 
     const iamSection = sections.find(s => s.id === 'iam');
@@ -676,5 +676,33 @@ describe('AppShellComponent', () => {
     const sourcesItem = workspaceSection.items.find(i => i.route === '/upl/sources');
     expect(sourcesItem).toBeDefined();
     expect(sourcesItem!.permission()).toBe(false);
+  });
+
+  it('hides the data overview link without ovw.data view', () => {
+    permissionService.canView.mockImplementation(form => form !== 'ovw.data');
+    activeCodes.set(new Set(['notes', 'upl', 'ovw']));
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const overviewItem = workspaceSection.items.find(i => i.id === 'ovw-data');
+    expect(overviewItem).toBeDefined();
+    expect(overviewItem!.permission()).toBe(false);
+    permissionService.canView.mockImplementation(() => true);
+    expect(overviewItem!.permission()).toBe(true);
+  });
+
+  it('hides the data overview link when the ovw module is disabled', () => {
+    permissionService.canView.mockImplementation(() => true);
+    activeCodes.set(new Set(['notes', 'upl']));
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const overviewItem = workspaceSection.items.find(i => i.id === 'ovw-data');
+    expect(overviewItem).toBeDefined();
+    expect(overviewItem!.permission()).toBe(false);
+    activeCodes.set(new Set(['notes', 'upl', 'ovw']));
+    expect(overviewItem!.permission()).toBe(true);
   });
 });

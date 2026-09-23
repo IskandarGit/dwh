@@ -34,8 +34,8 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             "notify.preferences:view", "notify.preferences:update",
             "platform.announcements:view");
 
-    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages); V116 — upl.packages:apply только chief_admin и admin. */
-    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload");
+    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages); V116 — upl.packages:apply только chief_admin и admin; V117 — ovw.data:view. */
+    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload", "ovw.data:view");
 
     private static List<String> allAnalystPairs() {
         return java.util.stream.Stream.concat(ANALYST_PAIRS.stream(), LATER_MODULE_ANALYST_PAIRS.stream()).toList();
@@ -132,6 +132,28 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
                 order by r.pcode
                 """).query(String.class).list();
         assertThat(holders).contains("admin", "chief_admin").doesNotContain("analyst");
+    }
+
+    @Test
+    @DisplayName("И14: модуль ovw активен, право «Просмотр данных» есть у chief_admin, admin и analyst")
+    void dataOverviewModuleAndViewRight() {
+        List<Map<String, Object>> module = jdbc
+                .sql("select route, is_system, status from md_installed_modules where code = 'ovw'")
+                .query()
+                .listOfRows();
+        assertThat(module).hasSize(1);
+        assertThat(module.getFirst())
+                .containsEntry("route", "/ovw/data")
+                .containsEntry("is_system", false)
+                .containsEntry("status", "ACTIVE");
+
+        List<String> holders = jdbc.sql("""
+                select r.pcode from md_role_permissions p
+                join md_roles r on r.id = p.role_id
+                where p.form_code = 'ovw.data' and p.action = 'view'
+                order by r.pcode
+                """).query(String.class).list();
+        assertThat(holders).contains("admin", "analyst", "chief_admin");
     }
 
     @Test

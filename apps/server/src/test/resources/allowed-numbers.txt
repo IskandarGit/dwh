@@ -7,3 +7,9 @@ src/main/resources/db/migration/V111__upl_formats.sql:1251 # имя кодиро
 src/main/java/com/greenwhite/dwh/instance/upl/api/UplSourceDtos.java:1251 # имя кодировки windows-1251 в проверке DTO, не норматив
 src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1024 # предел загрузки, не норматив: байты → мегабайты
 src/main/java/com/greenwhite/dwh/instance/upl/UplLimits.java:1000000 # предел загрузки, не норматив: число заполненных ячеек в файле
+src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:2958465 # дата отсчёта Excel, не норматив: последний допустимый номер дня (31.12.9999)
+src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:1899 # дата отсчёта Excel, не норматив: год нулевого дня 1899-12-30
+src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawValueSql.java:1000 # предел обзора, не норматив: знаков в ячейке числа или даты
+src/main/java/com/greenwhite/dwh/instance/fnd/dwh/FndRawReader.java:57014 # код SQLSTATE отмены запроса (query_canceled), не норматив
+src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:1000 # предел обзора, не норматив: групп в ответе
+src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:2000 # предел обзора, не норматив: цифр до и после точки у числа группы
