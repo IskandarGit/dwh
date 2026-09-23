@@ -40,6 +40,12 @@ describe('OVW_EQ_NUMBER_PATTERN', () => {
     expect(OVW_EQ_NUMBER_PATTERN.test(`-${'9'.repeat(750)}.${'1'.repeat(750)}`)).toBe(true);
     expect(OVW_EQ_NUMBER_PATTERN.test('1E-40')).toBe(false);
   });
+
+  it('accepts 2000 digits before and after the dot and rejects 2001', () => {
+    expect(OVW_EQ_NUMBER_PATTERN.test(`${'9'.repeat(2000)}.${'1'.repeat(2000)}`)).toBe(true);
+    expect(OVW_EQ_NUMBER_PATTERN.test('9'.repeat(2001))).toBe(false);
+    expect(OVW_EQ_NUMBER_PATTERN.test(`0.${'1'.repeat(2001)}`)).toBe(false);
+  });
 });
 
 describe('parseOvwNumberInput', () => {

@@ -270,11 +270,19 @@ describe('sanitizeOvwView', () => {
     expect(result.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
   });
 
-  it('keeps a number group value of 1500 digits: the group value has no length limit', () => {
+  it('keeps a number group value of 1500 digits: it is within the 2000-digit group limit', () => {
     const hugeNumber = `-${'9'.repeat(750)}.${'1'.repeat(750)}`;
     const result = sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy: 'amount', group: { value: hugeNumber } }, COLUMNS);
     expect(result.view.group).toEqual({ value: hugeNumber });
     expect(result.dropped).toEqual([]);
+  });
+
+  it('drops a number group value whose fraction has 2001 digits, keeps the grouping', () => {
+    const tooLong = `0.${'1'.repeat(2001)}`;
+    const result = sanitizeOvwView({ ...FULL_VIEW, filters: [], groupBy: 'amount', group: { value: tooLong } }, COLUMNS);
+    expect(result.view.groupBy).toBe('amount');
+    expect(result.view.group).toBeNull();
+    expect(result.dropped).toEqual([{ reason: 'value', field: 'amount' }]);
   });
 });
 
