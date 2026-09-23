@@ -29,7 +29,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.LongSupplier;
@@ -123,12 +122,12 @@ class OvwLoadMeasureTest extends EmbeddedPostgresTest {
 
         assertThat(service.rows(sourceId, lastPage).total()).isEqualTo(ROWS_TOTAL);
 
-        long rowsFilterMs = medianMillis(() -> service.rows(sourceId, filtered).total());
-        long rowsLastPageMs = medianMillis(() -> service.rows(sourceId, lastPage).total());
-        long groupsMs = medianMillis(() -> service.groups(sourceId, groups).groups().size());
+        long rowsFilterMs = worstMillis(() -> service.rows(sourceId, filtered).total());
+        long rowsLastPageMs = worstMillis(() -> service.rows(sourceId, lastPage).total());
+        long groupsMs = worstMillis(() -> service.groups(sourceId, groups).groups().size());
 
         System.out.println("OVW-MEASURE rows_filter=" + rowsFilterMs + " rows_last_page=" + rowsLastPageMs
-                + " groups=" + groupsMs + " ms");
+                + " groups=" + groupsMs + " ms (max)");
         assertThat(rowsFilterMs).as("rows с фильтром и сортировкой, мс").isLessThanOrEqualTo(LIMIT_MS);
         assertThat(rowsLastPageMs).as("rows, последняя страница, мс").isLessThanOrEqualTo(LIMIT_MS);
         assertThat(groupsMs).as("groups по тексту, мс").isLessThanOrEqualTo(LIMIT_MS);
@@ -144,18 +143,17 @@ class OvwLoadMeasureTest extends EmbeddedPostgresTest {
         assertThat(count).isEqualTo(total);
     }
 
-    /** Медиана времени {@value #MEASURE_RUNS} вызовов в миллисекундах; результат вызова используется, чтобы его не выбросил JIT. */
-    private static long medianMillis(LongSupplier call) {
-        long[] millis = new long[MEASURE_RUNS];
+    /** Худшее время из {@value #MEASURE_RUNS} вызовов в миллисекундах; результат вызова используется, чтобы его не выбросил JIT. */
+    private static long worstMillis(LongSupplier call) {
+        long worst = 0;
         long sink = 0;
         for (int run = 0; run < MEASURE_RUNS; run++) {
             long started = System.nanoTime();
             sink += call.getAsLong();
-            millis[run] = (System.nanoTime() - started) / 1_000_000;
+            worst = Math.max(worst, (System.nanoTime() - started) / 1_000_000);
         }
         assertThat(sink).isNotNegative();
-        Arrays.sort(millis);
-        return millis[MEASURE_RUNS / 2];
+        return worst;
     }
 
     private void appliedPackage(byte[] content) {

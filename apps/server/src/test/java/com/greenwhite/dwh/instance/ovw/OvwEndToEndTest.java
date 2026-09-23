@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -79,6 +80,9 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
     private static final List<String> GROUPS = List.of("TEST A", "TEST B", "TEST C");
     private static final String DRILL_GROUP = "TEST B";
     private static final BigDecimal NUMBER_STEP = new BigDecimal("1.25");
+    private static final DateTimeFormatter FILE_DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    /** День, от которого Excel считает даты числом (с поправкой на несуществующее 29.02.1900). */
+    private static final LocalDate EXCEL_EPOCH = LocalDate.of(1899, 12, 30);
 
     @Autowired
     private WebApplicationContext wac;
@@ -108,9 +112,13 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
     private record Sample(byte[] content, Map<Integer, String> groupByRow) {
     }
 
-    /** Что тест прочитал из байтов xlsx: группа каждой строки, число строк и суммы числовых колонок по группам. */
+    /**
+     * Что тест прочитал из байтов xlsx: группа каждой строки, число строк, суммы числовых колонок по группам
+     * и значения всех колонок каждой строки (номер строки Excel → поле → текст, число или дата).
+     */
     private record XlsxFacts(Map<Integer, String> groupByRow, Map<String, Integer> counts,
-                             Map<String, Map<String, BigDecimal>> sums) {
+                             Map<String, Map<String, BigDecimal>> sums,
+                             Map<Integer, Map<String, Object>> valuesByRow) {
 
         BigDecimal sum(String group, String field) {
             return sums.getOrDefault(group, Map.of()).getOrDefault(field, BigDecimal.ZERO);
@@ -170,7 +178,7 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
         assertLayout(admin, sourceId, ordinal, sheet);
         assertRows(admin, sourceId, ordinal, sheet, groupColumn, facts);
         Map<String, Long> groupCounts = assertGroups(admin, sourceId, ordinal, groupColumn, summable, facts);
-        assertDrillDown(admin, sourceId, ordinal, groupColumn, facts, groupCounts.get(DRILL_GROUP));
+        assertDrillDown(admin, sourceId, ordinal, sheet, groupColumn, facts, groupCounts.get(DRILL_GROUP));
     }
 
     // ---------- проверки обзора ----------
@@ -212,6 +220,7 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
             assertThat(facts.groupByRow()).as("строка Excel %d есть в файле", excelRow).containsKey(excelRow);
             assertThat(values(item)).as("значение группировки в строке Excel %d", excelRow)
                     .containsEntry(groupColumn.field(), facts.groupByRow().get(excelRow));
+            assertRowMatchesFile(item, sheet, facts);
         });
         assertThat(items.stream().map(item -> ((Number) item.get("excelRow")).intValue()).collect(Collectors.toSet()))
                 .isEqualTo(facts.groupByRow().keySet());
@@ -260,8 +269,8 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
         return counts;
     }
 
-    private void assertDrillDown(Session session, long sourceId, int ordinal, FormatColumn groupColumn,
-                                 XlsxFacts facts, long groupCount) throws Exception {
+    private void assertDrillDown(Session session, long sourceId, int ordinal, FormatSheet sheet,
+                                 FormatColumn groupColumn, XlsxFacts facts, long groupCount) throws Exception {
         Map<String, Object> filter = Map.of("field", groupColumn.field(), "op", "eq", "value", DRILL_GROUP);
         var rows = ok(send(session, jsonPost(ovw(sourceId, "/rows"), rowsBody(ordinal, List.of(filter)))));
         assertThat(((Number) read(rows, "$.total")).longValue()).isEqualTo(groupCount);
@@ -271,8 +280,36 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
                 .collect(Collectors.toSet());
         List<Map<String, Object>> items = read(rows, "$.items");
         assertThat(items).hasSize((int) groupCount);
-        assertThat(items).allSatisfy(item ->
-                assertThat(expectedRows).contains(((Number) item.get("excelRow")).intValue()));
+        assertThat(items).allSatisfy(item -> {
+            assertThat(expectedRows).contains(((Number) item.get("excelRow")).intValue());
+            assertRowMatchesFile(item, sheet, facts);
+        });
+    }
+
+    /** Все колонки листа в строке ответа равны той же строке xlsx: текст — текстом, число — по величине, дата — датой. */
+    private static void assertRowMatchesFile(Map<String, Object> item, FormatSheet sheet, XlsxFacts facts) {
+        int excelRow = ((Number) item.get("excelRow")).intValue();
+        Map<String, Object> expectedValues = facts.valuesByRow().get(excelRow);
+        assertThat(expectedValues).as("строка Excel %d прочитана из файла", excelRow).isNotNull();
+        Map<String, Object> actualValues = values(item);
+        for (FormatColumn column : sheet.columns()) {
+            Object expected = expectedValues.get(column.field());
+            Object actual = actualValues.get(column.field());
+            String what = String.format("колонка %s (%s) строки Excel %d: ожидалось %s, пришло %s",
+                    column.field(), column.type(), excelRow, expected, actual);
+            if (expected == null) {
+                assertThat(actual).as(what).isNull();
+                continue;
+            }
+            assertThat(actual).as(what).isNotNull();
+            switch (column.type()) {
+                case "text", "object_key", "ref_code" -> assertThat(actual).as(what).isEqualTo(expected);
+                case "integer", "number" ->
+                        assertThat(new BigDecimal(actual.toString()).compareTo((BigDecimal) expected)).as(what).isZero();
+                case "date" -> assertThat(LocalDate.parse(actual.toString())).as(what).isEqualTo(expected);
+                default -> throw new IllegalStateException("Неизвестный тип колонки фикстуры: " + column.type());
+            }
+        }
     }
 
     // ---------- чтение xlsx по байтам ----------
@@ -289,6 +326,7 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
             Map<Integer, String> groupByRow = new LinkedHashMap<>();
             Map<String, Integer> counts = new HashMap<>();
             Map<String, Map<String, BigDecimal>> sums = new HashMap<>();
+            Map<Integer, Map<String, Object>> valuesByRow = new HashMap<>();
             for (Row row : rows) {
                 if (row.getRowNum() <= sheet.headerRow() || isBlank(row) || isTotalRow(row, sheet.totalRowMarker())) {
                     continue;
@@ -301,8 +339,9 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
                     value.ifPresent(v -> sums.computeIfAbsent(group, g -> new HashMap<>())
                             .merge(column.field(), v, BigDecimal::add));
                 }
+                valuesByRow.put(row.getRowNum(), rowValues(row, sheet, indexByName));
             }
-            return new XlsxFacts(groupByRow, counts, sums);
+            return new XlsxFacts(groupByRow, counts, sums, valuesByRow);
         } catch (IOException failure) {
             throw new UncheckedIOException("Не удалось прочитать собранный xlsx", failure);
         }
@@ -359,6 +398,32 @@ class OvwEndToEndTest extends EmbeddedPostgresTest {
                 .filter(cell -> cell.getType() == CellType.STRING)
                 .map(Cell::getText)
                 .orElseThrow(() -> new IllegalStateException("Нет текста группировки в строке " + row.getRowNum()));
+    }
+
+    /** Значения всех колонок листа в строке файла: поле → текст, число или дата; пустая ячейка — {@code null}. */
+    private static Map<String, Object> rowValues(Row row, FormatSheet sheet, Map<String, Integer> indexByName) {
+        Map<String, Object> values = new HashMap<>();
+        for (FormatColumn column : sheet.columns()) {
+            values.put(column.field(), fileValue(row, columnIndex(indexByName, column), column.type()));
+        }
+        return values;
+    }
+
+    private static Object fileValue(Row row, int index, String type) {
+        Optional<Cell> found = row.getOptionalCell(index);
+        if (found.isEmpty() || found.get().getType() == CellType.EMPTY || found.get().getText().isBlank()) {
+            return null;
+        }
+        Cell cell = found.get();
+        return switch (type) {
+            case "text", "object_key", "ref_code" -> cell.getText();
+            case "integer", "number" -> cell.getType() == CellType.NUMBER
+                    ? cell.asNumber() : new BigDecimal(cell.getText().trim());
+            case "date" -> cell.getType() == CellType.NUMBER
+                    ? EXCEL_EPOCH.plusDays(cell.asNumber().longValueExact())
+                    : LocalDate.parse(cell.getText().trim(), FILE_DATE);
+            default -> throw new IllegalStateException("Неизвестный тип колонки фикстуры: " + type);
+        };
     }
 
     private static Optional<BigDecimal> number(Row row, int index) {
