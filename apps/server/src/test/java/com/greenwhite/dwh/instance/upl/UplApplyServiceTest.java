@@ -133,16 +133,36 @@ class UplApplyServiceTest extends EmbeddedPostgresTest {
         PackageRow row = verifiedPackage(UplPackageTestData.workbook(7, 3));
         PackageRow applied = applies.apply(row.publicId().toString(), userId);
 
-        assertConflict(() -> applies.apply(row.publicId().toString(), userId));
+        assertConflict(() -> applies.apply(row.publicId().toString(), userId), UplApplyService.UPL_PKG_NOT_VERIFIED);
         assertThat(rawCount(applied.loadId())).isEqualTo(10);
         assertThat(dwhJdbc.sql("select count(*) from raw.rows").query(Long.class).single()).isEqualTo(10);
 
         PackageRow broken = parsedPackage(UplPackageTestData.brokenStructure());
         assertThat(broken.status()).isEqualTo(UplPackageModel.REJECTED);
-        assertConflict(() -> applies.apply(broken.publicId().toString(), userId));
+        assertConflict(() -> applies.apply(broken.publicId().toString(), userId), UplApplyService.UPL_PKG_NOT_VERIFIED);
 
         assertNotFound(() -> applies.apply(UUID.randomUUID().toString(), userId));
         assertNotFound(() -> applies.apply("abc", userId));
+    }
+
+    @Test
+    @DisplayName("AC-12: в загрузке нет принятых строк — применить нельзя, прежняя загрузка периода не заменяется")
+    void packageWithoutAcceptedRowsCannotBeApplied() {
+        PackageRow good = verifiedPackage(UplPackageTestData.workbook(7, 3));
+        PackageRow applied = applies.apply(good.publicId().toString(), userId);
+
+        for (byte[] content : List.of(UplPackageTestData.workbook(0, 3), UplPackageTestData.workbook(0, 0))) {
+            String id = verifiedPackage(content).publicId().toString();
+
+            assertConflict(() -> applies.apply(id, userId), UplApplyService.UPL_PKG_NOTHING_TO_APPLY);
+            assertThat(packages.get(id).status()).isEqualTo(UplPackageModel.VERIFIED);
+            assertThat(packages.get(id).loadId()).isNull();
+        }
+
+        assertThat(dwhJdbc.sql("select count(*) from raw.rows").query(Long.class).single()).isEqualTo(10);
+        assertThat(loads.find(applied.loadId())).hasValueSatisfying(
+                load -> assertThat(load.status()).isEqualTo(FndLoad.APPLIED));
+        assertThat(loads.appliedLoadIds(good.sourceCode())).containsExactly(applied.loadId());
     }
 
     @Test
@@ -222,11 +242,11 @@ class UplApplyServiceTest extends EmbeddedPostgresTest {
                 .param("id", loadId).query(Long.class).single();
     }
 
-    private static void assertConflict(ThrowingCallable call) {
+    private static void assertConflict(ThrowingCallable call, String code) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class, e -> {
             assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONFLICT);
             assertThat(e.getErrorCode().getDefaultStatus()).isEqualTo(409);
-            assertThat(e.getMessage()).isEqualTo(UplApplyService.UPL_PKG_NOT_VERIFIED);
+            assertThat(e.getMessage()).isEqualTo(code);
         });
     }
 

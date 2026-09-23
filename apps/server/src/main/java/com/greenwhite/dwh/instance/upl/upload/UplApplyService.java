@@ -34,6 +34,8 @@ public class UplApplyService {
 
     /** Применить можно только пакет «проверен», ещё не получивший номер загрузки. */
     public static final String UPL_PKG_NOT_VERIFIED = "UPL_PKG_NOT_VERIFIED";
+    /** В пакете «проверен» нет ни одной принятой строки — применять нечего. */
+    public static final String UPL_PKG_NOTHING_TO_APPLY = "UPL_PKG_NOTHING_TO_APPLY";
     /** Строк в raw не столько, сколько в пакете, или счётчики пакета не сходятся. */
     public static final String UPL_PKG_RECONCILIATION = "UPL_PKG_RECONCILIATION";
     /** Строки пакета не записаны в raw. */
@@ -67,7 +69,7 @@ public class UplApplyService {
 
     /**
      * Применяет пакет: открывает загрузку основы, пишет строки файла в raw и по сверке закрывает пакет
-     * «применён» или «отклонён системой». Не «проверен» — 409, нет пакета — 404.
+     * «применён» или «отклонён системой». Не «проверен» — 409, нет принятых строк — 409, нет пакета — 404.
      */
     public PackageRow apply(String publicId, long userId) {
         UUID id = packages.get(publicId).publicId();
@@ -87,6 +89,9 @@ public class UplApplyService {
                 .orElseThrow(() -> ApiException.notFound(ErrorCode.NOT_FOUND, UplPackageService.UPL_PKG_NOT_FOUND));
         if (!UplPackageModel.VERIFIED.equals(row.status()) || row.loadId() != null) {
             throw ApiException.conflict(ErrorCode.CONFLICT, UPL_PKG_NOT_VERIFIED);
+        }
+        if (row.rowsAccepted() == null || row.rowsAccepted() == 0) {
+            throw ApiException.conflict(ErrorCode.CONFLICT, UPL_PKG_NOTHING_TO_APPLY);
         }
         long loadId = loads.begin(row.sourceCode(), row.publicId(), row.periodFrom(), row.periodTo(),
                 String.valueOf(row.formatVersion()), actor);
