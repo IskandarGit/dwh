@@ -112,6 +112,23 @@ class UplApplyServiceTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("И15б: отклонённая анкетой строка лежит в raw с признаком rejected, принятые — без него")
+    void rejectedRowIsStoredWithFlag() {
+        PackageRow row = verifiedPackage(UplPackageTestData.workbook(9, 1));
+
+        PackageRow applied = applies.apply(row.publicId().toString(), userId);
+
+        long loadId = applied.loadId();
+        assertThat(applied.rowsTotal()).isEqualTo(10);
+        assertThat(applied.rawRows()).isEqualTo(10);
+        assertThat(rawCount(loadId)).isEqualTo(10);
+        assertThat(dwhJdbc.sql("select count(*) from raw.rows where load_id = :id and rejected")
+                .param("id", loadId).query(Long.class).single()).isEqualTo(1);
+        assertThat(dwhJdbc.sql("select count(*) from raw.rows where load_id = :id and not rejected")
+                .param("id", loadId).query(Long.class).single()).isEqualTo(9);
+    }
+
+    @Test
     @DisplayName("AC-10: второй пакет того же файла и периода получает свою загрузку, первый остаётся «применён»")
     void secondPackageSamePeriodGetsOwnLoad() {
         byte[] content = UplPackageTestData.workbook(7, 3);

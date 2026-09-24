@@ -151,6 +151,25 @@ class UplXlsxParserTest {
     }
 
     @Test
+    @DisplayName("И15б: строка с ошибкой отдаётся с признаком отклонения, верная — без него, число строк прежнее")
+    void rejectedRowsAreStreamedWithFlag() {
+        List<List<Object>> rows = List.of(
+                row(1, "900000001", "TEST орг", 10.5, "31.12.2026"),
+                row(2, "12345678X", "TEST орг", 10.5, "31.12.2026"),
+                row(3, "900000003", "TEST орг", "TEST abc", "31.12.2026"),
+                row(4, "900000004", "TEST орг", 10.5, "31.12.2026"));
+        List<UplXlsxParser.DataRow> collected = new ArrayList<>();
+
+        UplParseResult result = parser.parse(new ByteArrayInputStream(file(HEADER, rows)), format(), collected::add);
+
+        assertThat(result.rowsTotal()).isEqualTo(4);
+        assertThat(result.rowsRejected()).isEqualTo(2);
+        assertThat(collected).hasSize(result.rowsTotal());
+        assertThat(collected).extracting(UplXlsxParser.DataRow::sourceRowNo, UplXlsxParser.DataRow::rejected)
+                .containsExactly(tuple(3, false), tuple(4, true), tuple(5, true), tuple(6, false));
+    }
+
+    @Test
     @DisplayName("Расхождения с анкетой: нет колонки и есть лишняя — файл отклонён, значения не проверяются")
     void structureMismatchRejectsFile() {
         List<String> header = List.of("№", "Ключ", "Название", "Лишняя", "Дата");

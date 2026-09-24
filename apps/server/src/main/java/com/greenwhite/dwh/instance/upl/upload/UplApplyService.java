@@ -117,7 +117,8 @@ public class UplApplyService {
             FormatVersion format = sources.getVersion(row.sourceId(), row.formatVersion());
             List<FndRawRow> rows = new ArrayList<>();
             UplParseResult result = parser.parse(file.inputStream(), format,
-                    data -> rows.add(new FndRawRow(rows.size() + 1, data.sheet(), data.sourceRowNo(), data.fields())));
+                    data -> rows.add(new FndRawRow(rows.size() + 1, data.sheet(), data.sourceRowNo(), data.fields(),
+                            data.rejected())));
             if (result.outcome() != UplParseResult.Outcome.VERIFIED) {
                 throw new IllegalStateException("Повторный разбор файла пакета " + row.publicId()
                         + " не дал «проверен»");
