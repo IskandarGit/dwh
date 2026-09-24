@@ -57,7 +57,6 @@ const SCREEN_KEYS = [
   'rpt.view.expand_all',
   'rpt.view.collapse_all',
   'rpt.view.grand',
-  'rpt.view.total',
   'rpt.view.no_name',
   'rpt.view.undated',
   'rpt.view.show_rows',

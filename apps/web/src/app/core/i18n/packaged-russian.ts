@@ -1783,7 +1783,6 @@ export const PACKAGED_RUSSIAN: Readonly<Record<string, string>> = Object.freeze(
   "rpt.view.expand_all": "Развернуть все",
   "rpt.view.collapse_all": "Свернуть все",
   "rpt.view.grand": "ВСЕГО",
-  "rpt.view.total": "Итого",
   "rpt.view.no_name": "Без названия",
   "rpt.view.undated": "Без даты: строк {n} на сумму {value} — в таблицу не вошли.",
   "rpt.view.show_rows": "Показать строки",
