@@ -454,35 +454,35 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
     @Test
     @DisplayName("10.3: заданы и колонка-дата, и колонки-месяцы — dateField RPT_PERIOD_INVALID")
     void bothPeriods() {
-        assertInvalid(valid().measure(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
+        assertInvalid(valid().measureName("TEST мера").measure(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
                 "dateField", RptErrors.RPT_PERIOD_INVALID);
     }
 
     @Test
     @DisplayName("10.3: мера задана при колонках-месяцах — dateField RPT_PERIOD_INVALID")
     void measureWithMonths() {
-        assertInvalid(valid().dateField(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
+        assertInvalid(valid().measureName("TEST мера").dateField(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
                 "dateField", RptErrors.RPT_PERIOD_INVALID);
     }
 
     @Test
     @DisplayName("10.3: колонок-месяцев не 12 — monthFields RPT_PERIOD_INVALID")
     void monthsNotTwelve() {
-        assertInvalid(valid().dateField(null).measure(null).monthFields(List.of(RptTestData.AMOUNT)),
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null).monthFields(List.of(RptTestData.AMOUNT)),
                 "monthFields", RptErrors.RPT_PERIOD_INVALID);
     }
 
     @Test
     @DisplayName("10.3: все 12 месяцев «нет» — monthFields RPT_MONTHS_EMPTY")
     void monthsEmpty() {
-        assertInvalid(valid().dateField(null).measure(null).monthFields(RptTestData.months()),
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null).monthFields(RptTestData.months()),
                 "monthFields", RptErrors.RPT_MONTHS_EMPTY);
     }
 
     @Test
     @DisplayName("10.3: колонка месяца текстовая — monthFields[1] RPT_COLUMN_TYPE, неизвестная — monthFields[2] RPT_COLUMN_UNKNOWN")
     void monthColumnTypeAndUnknown() {
-        assertInvalid(valid().dateField(null).measure(null)
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null)
                         .monthFields(RptTestData.months(RptTestData.AMOUNT, RptTestData.CODE, "TEST_none")),
                 tuple("monthFields[1]", RptErrors.RPT_COLUMN_TYPE),
                 tuple("monthFields[2]", RptErrors.RPT_COLUMN_UNKNOWN));
@@ -493,6 +493,21 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
     void measureNameLength() {
         assertInvalid(valid().measureName("   "), "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
         assertInvalid(valid().measureName("T".repeat(101)), "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: мера 1 по колонкам-месяцам без названия — measureName RPT_MEASURE_NAME_INVALID; с названием — создаётся")
+    void monthMeasureNameRequired() {
+        List<String> months = RptTestData.months(RptTestData.AMOUNT);
+        assertInvalid(valid().dateField(null).measure(null).monthFields(months),
+                "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+        assertInvalid(valid().measureName("  ").dateField(null).measure(null).monthFields(months),
+                "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+
+        Definition created = service.create(valid().name("TEST named months").measureName("TEST мера")
+                .dateField(null).measure(null).monthFields(months).build(), userId);
+
+        assertThat(service.get(created.id()).measureName()).isEqualTo("TEST мера");
     }
 
     @Test

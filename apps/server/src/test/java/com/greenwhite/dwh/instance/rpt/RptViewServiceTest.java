@@ -455,6 +455,7 @@ class RptViewServiceTest extends EmbeddedPostgresTest {
         assertThat(view.lines()).isNotEmpty();
         assertThat(view.ytdMonth()).isEqualTo(2);
         assertThat(view.measures()).extracting(RptModel.MeasureInfo::byMonthColumns).containsExactly(true, true);
+        assertThat(view.labels().measure()).isEqualTo("TEST план");
         assertThat(view.undated()).isNull();
         assertThat(view.undated2()).isNull();
         assertThat(view.grand().cells().subList(0, 2)).containsExactly("7350.75", "11");

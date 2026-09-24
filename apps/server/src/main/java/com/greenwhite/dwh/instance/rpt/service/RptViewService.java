@@ -290,8 +290,8 @@ public class RptViewService {
     }
 
     private static Labels labels(Row row, MeasureSources sources) {
-        String measure = RptModel.MEASURE_TOTAL.equals(row.measureKind())
-                ? sources.source().label(row.measureField()) : null;
+        String measure = byMonths(row.first()) ? row.measureName()
+                : RptModel.MEASURE_TOTAL.equals(row.measureKind()) ? sources.source().label(row.measureField()) : null;
         return new Labels(levelLabel(row.level1Origin(), row.level1Field(), sources),
                 levelLabel(row.level2Origin(), row.level2Field(), sources), measure);
     }

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -42,7 +43,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Замер «Сводного отчёта» на 20 тыс. TEST-строк источника и 1 000 строк справочника: расчёт и строки ячейки не дольше 2 с (AC-9).
  * 100 тыс. — долг: view 5,4 с (замер 24.09).
+ * Замер: только {@code -Dperf=true}, предел — требование стенда.
  */
+@EnabledIfSystemProperty(named = "perf", matches = "true")
 class RptLoadMeasureTest extends EmbeddedPostgresTest {
 
     private static final long SOURCE_TOTAL = 20_000;

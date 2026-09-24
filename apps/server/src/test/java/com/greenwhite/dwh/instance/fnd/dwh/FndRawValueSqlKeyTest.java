@@ -113,6 +113,16 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт отчёта 4.2, 4.4: неразрывный пробел по краям снимается и на базе с языком C")
+    void nonBreakingSpaceStripped() {
+        assertThat(evalKey(" TEST ")).isEqualTo("test");
+        assertThat(evalSql(FndRawValueSql.key("(' TEST '::text collate \"C\")"))).isEqualTo("test");
+        assertThat(evalGroupKey(" Ипак йўли ")).isEqualTo(evalGroupKey("Ипак йўли"));
+        String groupC = evalSql(FndRawValueSql.groupKey("(' Ипак йўли '::text collate \"C\")"));
+        assertThat(groupC).isEqualTo("ипак йўли");
+    }
+
+    @Test
     @DisplayName("контракт отчёта 4.1: уровень из числовой колонки — по значению (12 = 12.0 = 12,00), непереводимое — как в файле")
     void numericLevelByValue() {
         assertThat(evalLevel("12")).isEqualTo("12");

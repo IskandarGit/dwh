@@ -40,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -63,7 +64,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Замер отчёта из двух мер на 10 тыс. TEST-строк у каждой меры (мера 1 — по дате, мера 2 — колонки-месяцы) и 1 000 строк
  * справочника: расчёт и строки ячейки меры 2 не дольше 2 с (AC-9).
  * 20 тыс. за 2 с — долг: view 2,8–3,0 с (замер 24.09), решение Искандара.
+ * Замер: только {@code -Dperf=true}, предел — требование стенда.
  */
+@EnabledIfSystemProperty(named = "perf", matches = "true")
 class RptTwoMeasuresLoadTest extends EmbeddedPostgresTest {
 
     private static final long SOURCE_TOTAL = 10_000;

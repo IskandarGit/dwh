@@ -152,7 +152,7 @@ public class RptDefinitionService {
             errors.add(error("lockVersion", RptErrors.RPT_DEFINITION_INVALID));
         }
         checkName(in.name(), ownId, errors);
-        if (in.measureName() != null) {
+        if (in.measureName() != null || in.first().monthFields() != null) {
             checkMeasureName(in.measureName(), "measureName", errors);
         }
         checkMeasurePart(FIRST, in.first(), errors);

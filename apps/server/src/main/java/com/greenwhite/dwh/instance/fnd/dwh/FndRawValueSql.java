@@ -108,7 +108,8 @@ public final class FndRawValueSql {
      * считает пробелом, а обрезка нет, роняет запрос.
      */
     private static String stripped(String t) {
-        return "regexp_replace(" + t + ", '^\\s+|\\s+$', '', 'g')";
+        // неразрывный пробел: на базе с языком C `\s` его не берёт
+        return "regexp_replace(" + t + ", '^[\\s\\u00a0]+|[\\s\\u00a0]+$', '', 'g')";
     }
 
     /**
