@@ -78,7 +78,7 @@ public final class FndRawValueSql {
 
     private static String numberSql(String t) {
         // Экспонента ограничена 3 цифрами: иначе переполнение numeric роняет весь запрос вместо null
-        return shortOnly(t, "(case when " + t + " ~ '^\\s*-?[0-9]+([.,][0-9]+)?([eE][-+]?[0-9]{1,3})?\\s*$'"
+        return shortOnly(t, "(case when " + stripped(t) + " ~ '^-?[0-9]+([.,][0-9]+)?([eE][-+]?[0-9]{1,3})?$'"
                 + " then replace(" + stripped(t) + ", ',', '.')::numeric end)");
     }
 

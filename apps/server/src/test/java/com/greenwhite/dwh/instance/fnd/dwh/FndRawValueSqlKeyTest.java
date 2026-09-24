@@ -71,6 +71,14 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт отчёта 4.2: число с неразрывным пробелом по краям — по значению (1183.0 + U+00A0 = 1183)")
+    void numericKeyWithNonBreakingSpace() {
+        assertThat(evalKey("1183.0\u00a0")).isEqualTo(evalKey("1183"));
+        assertThat(evalKey("\u00a01183.0")).isEqualTo(evalKey("1183"));
+        assertThat(evalKey("1183.0\u00a0")).isEqualTo("1183");
+    }
+
+    @Test
     @DisplayName("контракт отчёта 4.2: пусто, null и пробелы — пустая строка (пусто = пусто)")
     void emptyKeyIsEmptyString() {
         assertThat(evalKey(null)).isEqualTo("");
