@@ -139,20 +139,35 @@ public class FndRawReader {
         }
         PivotSql sql = new PivotSql(spec, false);
         if (sql.months) {
-            return read(j -> new FndPivotSpec.Pivot(List.of(), pivotCells(j, sql, null), 0, BigDecimal.ZERO,
-                    refDuplicateKeys(j, sql), monthsWithRows(j, sql, null)));
+            return read(j -> {
+                List<FndPivotSpec.Cell> cells = pivotCells(j, sql, null);
+                return new FndPivotSpec.Pivot(List.of(), cells, 0, BigDecimal.ZERO, refDuplicateKeys(j, sql),
+                        grandMonths(cells));
+            });
         }
         return read(j -> {
-            List<Integer> years = j.sql(sql.withData()
-                            + " select distinct extract(year from dt)::int as y from d where dt is not null order by 1")
-                    .params(sql.params).query(Integer.class).list();
-            Integer year = years.isEmpty() ? null : spec.year() != null ? spec.year() : years.getLast();
+            List<Integer> years = years(j, sql);
+            Integer year = chosenYear(years, spec.year());
             List<FndPivotSpec.Cell> cells = year == null ? List.of() : pivotCells(j, sql, year);
-            List<Integer> monthsWithRows = year == null ? List.of() : monthsWithRows(j, sql, year);
             CellTotal undated = j.sql(sql.withData() + " select count(*) as cnt, " + sql.value + " as val from d where dt is null")
                     .params(sql.params).query((rs, rowNum) -> cellTotal(rs)).single();
             return new FndPivotSpec.Pivot(years, cells, undated.count(), undated.value(), refDuplicateKeys(j, sql),
-                    monthsWithRows);
+                    grandMonths(cells));
+        });
+    }
+
+    /** Месяцы, где у меры есть строки за год спецификации (год null — последний); колонки-месяцы — без года. */
+    public List<Integer> monthsWithRows(FndPivotSpec spec) {
+        if (spec.data().loadIds().isEmpty()) {
+            return List.of();
+        }
+        PivotSql sql = new PivotSql(spec, false);
+        return read(j -> {
+            if (sql.months) {
+                return monthsWithRows(j, sql, null);
+            }
+            Integer year = chosenYear(years(j, sql), spec.year());
+            return year == null ? List.<Integer>of() : monthsWithRows(j, sql, year);
         });
     }
 
@@ -184,6 +199,25 @@ public class FndRawReader {
 
     private static List<Integer> monthsWithRows(JdbcClient j, PivotSql sql, Integer year) {
         return j.sql(sql.monthsQuery()).params(sql.paramsWithYear(year)).query(Integer.class).list();
+    }
+
+    private static List<Integer> years(JdbcClient j, PivotSql sql) {
+        return j.sql(sql.withData() + " select distinct extract(year from dt)::int as y from d where dt is not null order by 1")
+                .params(sql.params).query(Integer.class).list();
+    }
+
+    /** Год сводной: заданный, иначе последний из лет; лет нет — null. */
+    private static Integer chosenYear(List<Integer> years, Integer year) {
+        return years.isEmpty() ? null : year != null ? year : years.getLast();
+    }
+
+    /** Месяцы ячеек общего итога, где есть строки, по возрастанию. */
+    private static List<Integer> grandMonths(List<FndPivotSpec.Cell> cells) {
+        return cells.stream()
+                .filter(cell -> cell.depth() == 0 && cell.month() != null && cell.count() > 0)
+                .map(FndPivotSpec.Cell::month)
+                .sorted()
+                .toList();
     }
 
     private static int refDuplicateKeys(JdbcClient j, PivotSql sql) {
@@ -362,15 +396,16 @@ public class FndRawReader {
 
     /**
      * Части запроса сводной и их связанные параметры: {@code d} — принятые строки источника (при колонках-месяцах —
-     * пары «месяц, значение»), {@code rk} — принятые строки справочника с ключом, {@code r} — одна строка справочника
-     * на ключ (последняя загрузка, в ней первая строка), {@code j} — строка источника с её строкой справочника,
-     * группами, названиями уровней и месяцем {@code mon}.
+     * значения месяцев {@code m<i>} в одной строке), {@code rk} — принятые строки справочника с ключом, {@code r} — одна
+     * строка справочника на ключ (последняя загрузка, в ней первая строка), {@code j} — строка источника с её строкой
+     * справочника, группами, названиями уровней и месяцем {@code mon} (при колонках-месяцах — пара «месяц, значение»).
      * Поля источника — параметры {@code df*}, справочника — {@code rf*}, значения ячейки — {@code p*}.
      */
     private static final class PivotSql {
 
         private final FndPivotSpec spec;
         private final boolean months;
+        private final boolean withText;
         private final boolean counting;
         private final Map<String, Object> params = new HashMap<>();
         private final String value;
@@ -382,6 +417,7 @@ public class FndRawReader {
         PivotSql(FndPivotSpec spec, boolean withText) {
             this.spec = spec;
             this.months = spec.period() instanceof FndPivotSpec.MonthsPeriod;
+            this.withText = withText;
             this.counting = !months && spec.measureField() == null;
             this.value = aggregate(null);
             this.data = months ? monthsDataCte(withText) : dataCte(withText);
@@ -419,25 +455,60 @@ public class FndRawReader {
         String cellsQuery() {
             boolean two = spec.level2() != null;
             String sets = two ? "(g1, g2, mon), (g1, g2), (g1, mon), (g1), (mon), ()" : "(g1, mon), (g1), (mon), ()";
-            String count = "count(*)";
-            String val = value;
+            String count = "sum(c)";
+            String val = summedValue("");
             if (spec.untilMonth() != null) {
-                String until = "mon <= " + bind(spec.untilMonth());
-                count = "case when grouping(mon) = 1 then count(*) filter (where " + until + ") else count(*) end";
-                val = "case when grouping(mon) = 1 then " + aggregate(until) + " else " + value + " end";
+                String until = " filter (where mon <= " + bind(spec.untilMonth()) + ")";
+                count = "case when grouping(mon) = 1 then coalesce(sum(c)" + until + ", 0) else sum(c) end";
+                val = "case when grouping(mon) = 1 then " + summedValue(until) + " else " + val + " end";
             }
-            return withAll() + " select grouping(g1) as x1, " + (two ? "grouping(g2)" : "1") + " as x2, grouping(mon) as xm,"
-                    + " g1, " + (two ? "g2" : "null::text") + " as g2, mon, " + count + " as cnt, " + val + " as val,"
-                    + " (array_agg(n1 order by " + nameOrder(spec.level1()) + "))[1] as name1, "
-                    + (two ? "(array_agg(n2 order by " + nameOrder(spec.level2()) + "))[1]" : "null::text") + " as name2"
-                    + " from j" + (months ? "" : " where extract(year from dt) = :year") + " group by grouping sets (" + sets + ")"
+            return withAll() + ", pa as (" + cellGroups(two) + ")"
+                    + " select grouping(g1) as x1, " + (two ? "grouping(g2)" : "1") + " as x2, grouping(mon) as xm,"
+                    + " g1, " + (two ? "g2" : "null::text") + " as g2, mon, (" + count + ")::bigint as cnt, " + val + " as val,"
+                    + " " + summedName(spec.level1(), 1) + " as name1, "
+                    + (two ? summedName(spec.level2(), 2) : "null::text") + " as name2"
+                    + " from pa group by grouping sets (" + sets + ")"
                     + " order by x1 desc, g1 asc nulls last, x2 desc, g2 asc nulls last, xm desc, mon";
         }
 
+        /** Строки (пары) сложены в (g1, g2, mon): число, сумма, первое по порядку строк название уровня и ключ его строки. */
+        private String cellGroups(boolean two) {
+            return "select g1, g2, mon, count(*) as c" + (counting ? "" : ", sum(m) as s")
+                    + ", " + firstName(spec.level1(), 1) + (two ? ", " + firstName(spec.level2(), 2) : "")
+                    + " from j" + (months ? "" : " where extract(year from dt) = :year") + " group by g1, g2, mon";
+        }
+
+        /** Мера ячейки свода по сложенным группам {@code pa}; {@code filter} — условие агрегата или пустая строка. */
+        private String summedValue(String filter) {
+            return counting ? "coalesce(sum(c)" + filter + ", 0)::numeric" : "coalesce(sum(s)" + filter + ", 0)";
+        }
+
+        private static String firstName(FndPivotSpec.Level level, int index) {
+            String order = nameOrder(level);
+            boolean data = level.origin() == FndPivotSpec.Origin.DATA;
+            return "(array_agg(n" + index + " order by " + order + "))[1] as n" + index
+                    + ", (array_agg(" + (data ? "load_id" : "rl") + " order by " + order + "))[1] as o" + index + "a"
+                    + ", (array_agg(" + (data ? "row_no" : "rr") + " order by " + order + "))[1] as o" + index + "b";
+        }
+
+        /** Первое название уровня среди групп {@code pa} — по ключу первой строки, в том же порядке, что {@link #nameOrder}. */
+        private static String summedName(FndPivotSpec.Level level, int index) {
+            String first = "o" + index + "a" + (level.origin() == FndPivotSpec.Origin.DATA ? "" : " desc");
+            return "(array_agg(n" + index + " order by " + first + ", o" + index + "b))[1]";
+        }
+
         String monthsQuery() {
-            return months
-                    ? withData() + " select distinct mon from d order by 1"
-                    : withData() + " select distinct extract(month from dt)::int as mon from d where extract(year from dt) = :year order by 1";
+            if (!months) {
+                return withData() + " select distinct extract(month from dt)::int as mon from d where extract(year from dt) = :year order by 1";
+            }
+            StringBuilder numbers = new StringBuilder();
+            StringBuilder filled = new StringBuilder();
+            for (int mon : monthNumbers()) {
+                numbers.append(numbers.isEmpty() ? "" : ", ").append(mon);
+                filled.append(filled.isEmpty() ? "" : ", ").append("bool_or(m").append(mon).append(" is not null)");
+            }
+            return withData() + " select u.mon from (select array[" + filled + "] as filled from d) t,"
+                    + " unnest(array[" + numbers + "], t.filled) u(mon, has) where u.has order by 1";
         }
 
         String cellCondition(FndPivotSpec.CellQuery cell) {
@@ -492,34 +563,40 @@ public class FndRawReader {
             return cte.append(" from raw.rows where load_id in (:dataLoadIds) and sheet = :dataSheet and not rejected)").toString();
         }
 
-        /** Колонки-месяцы (контракт 10.5 п.3): строка источника — пары «месяц, значение», месяц без колонки или пустой — не пара. */
+        /** Колонки-месяцы (контракт 10.5 п.3): строка источника с ключами, уровнями и значением каждого месяца {@code m<i>}. */
         private String monthsDataCte(boolean withText) {
             params.put("dataLoadIds", spec.data().loadIds());
             params.put("dataSheet", spec.data().sheet());
             List<String> fields = ((FndPivotSpec.MonthsPeriod) spec.period()).fields();
-            StringBuilder pairs = new StringBuilder();
-            for (int i = 0; i < fields.size(); i++) {
-                String field = fields.get(i);
-                if (field == null) {
-                    continue;
-                }
-                pairs.append(pairs.isEmpty() ? "(" : ", (").append(i + 1).append(", ")
-                        .append(FndRawValueSql.converted(FndRawSpec.Type.NUMBER, dataField(field)));
-                if (withText) {
-                    pairs.append(", ").append(FndRawValueSql.canonical(FndRawSpec.Type.NUMBER, dataField(field)))
-                            .append(", cast(").append(bind(field)).append(" as text)");
-                }
-                pairs.append(")");
-            }
-            StringBuilder cte = new StringBuilder("d as (select load_id, row_no, sheet, source_row_no, mm.mon, mm.m");
+            StringBuilder cte = new StringBuilder("d as (select load_id, row_no, sheet, source_row_no");
             appendKeysAndLevels(cte);
             if (withText) {
-                cte.append(", null::text as dt_text, mm.m_text, mm.col");
+                cte.append(", null::text as dt_text");
             }
-            return cte.append(" from raw.rows cross join lateral (values ").append(pairs).append(") mm(mon, m")
-                    .append(withText ? ", m_text, col" : "").append(")")
-                    .append(" where load_id in (:dataLoadIds) and sheet = :dataSheet and not rejected and mm.m is not null)")
+            for (int mon : monthNumbers()) {
+                String field = fields.get(mon - 1);
+                cte.append(", ").append(FndRawValueSql.converted(FndRawSpec.Type.NUMBER, dataField(field)))
+                        .append(" as m").append(mon);
+                if (withText) {
+                    cte.append(", ").append(FndRawValueSql.canonical(FndRawSpec.Type.NUMBER, dataField(field)))
+                            .append(" as m").append(mon).append("_text, cast(").append(bind(field)).append(" as text) as c")
+                            .append(mon);
+                }
+            }
+            return cte.append(" from raw.rows where load_id in (:dataLoadIds) and sheet = :dataSheet and not rejected)")
                     .toString();
+        }
+
+        /** Номера месяцев 1–12, у которых есть колонка. */
+        private List<Integer> monthNumbers() {
+            List<String> fields = ((FndPivotSpec.MonthsPeriod) spec.period()).fields();
+            List<Integer> numbers = new ArrayList<>();
+            for (int i = 0; i < fields.size(); i++) {
+                if (fields.get(i) != null) {
+                    numbers.add(i + 1);
+                }
+            }
+            return numbers;
         }
 
         private void appendKeysAndLevels(StringBuilder cte) {
@@ -569,7 +646,27 @@ public class FndRawReader {
             if (refKeys != null) {
                 cte.append(" left join r on r.k1 = d.k1 and r.k2 = d.k2");
             }
-            return cte.append(")").toString();
+            if (!months) {
+                return cte.append(")").toString();
+            }
+            // offset 0 не даёт базе встроить подзапрос: ключи, группы и значения месяцев считаются по строке, а не по паре
+            return monthPairs(cte.append(" offset 0)").toString());
+        }
+
+        /** Колонки-месяцы: строка, уже соединённая со справочником, — пары «месяц, значение»; месяц без значения — не пара. */
+        private String monthPairs(String rows) {
+            StringBuilder values = new StringBuilder();
+            for (int mon : monthNumbers()) {
+                values.append(values.isEmpty() ? "(" : ", (").append(mon).append(", x.m").append(mon);
+                if (withText) {
+                    values.append(", x.m").append(mon).append("_text, x.c").append(mon);
+                }
+                values.append(")");
+            }
+            String columns = "x.load_id, x.row_no, x.sheet, x.source_row_no, x.g1, x.n1, x.g2, x.n2"
+                    + (refKeys != null ? ", x.rl, x.rr" : "") + (withText ? ", x.dt_text, mm.m_text, mm.col" : "");
+            return "(select " + columns + ", mm.mon, mm.m from " + rows + " x cross join lateral (values " + values
+                    + ") mm(mon, m" + (withText ? ", m_text, col" : "") + ") where mm.m is not null)";
         }
 
         private void appendLevel(StringBuilder cte, FndPivotSpec.Level level, int index, FndPivotSpec.Origin origin) {

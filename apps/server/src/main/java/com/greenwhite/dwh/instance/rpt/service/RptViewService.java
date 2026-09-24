@@ -99,7 +99,7 @@ public class RptViewService {
         MeasureRow first = row.first();
         MeasureRow second = row.second();
         Pivot pivot1 = timed(() -> raw.pivot(spec(first, sources.first(), year, null)));
-        int ytdMonth = ytdMonth(pivot1);
+        int ytdMonth = ytdMonth(pivot1.monthsWithRows());
         Integer secondYear = byMonths(first) ? year : shownYear(pivot1.years(), year);
         Pivot pivot2 = second == null ? null
                 : timed(() -> raw.pivot(spec(second, sources.second(), secondYear, ytdMonth)));
@@ -140,7 +140,7 @@ public class RptViewService {
         int offset = query.offset() == null ? 0 : query.offset();
         Integer year = cell.kind() == PeriodKind.UNDATED || byMonths(measure) ? null : query.year();
         Integer untilMonth = second && cell.kind() == PeriodKind.YEAR
-                ? ytdMonth(timed(() -> raw.pivot(spec(row.first(), sources.first(), query.year(), null)))) : null;
+                ? ytdMonth(timed(() -> raw.monthsWithRows(spec(row.first(), sources.first(), query.year(), null)))) : null;
         FndPivotSpec.CellRows rows = timed(() -> raw.pivotRows(spec(measure, measureSources, year, untilMonth), cell,
                 offset, RptLimits.PAGE_SIZE));
         if (rows.total() > 0 && offset >= rows.total()) {
@@ -269,8 +269,8 @@ public class RptViewService {
     }
 
     /** N — последний месяц, где у меры 1 есть строки; строк нет — 12. */
-    private static int ytdMonth(Pivot first) {
-        return first.monthsWithRows().isEmpty() ? MONTHS : first.monthsWithRows().getLast();
+    private static int ytdMonth(List<Integer> monthsWithRows) {
+        return monthsWithRows.isEmpty() ? MONTHS : monthsWithRows.getLast();
     }
 
     /** Годы отчёта: меры 1 по дате, иначе меры 2 по дате; обе по колонкам-месяцам — пусто. */
