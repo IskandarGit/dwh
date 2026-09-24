@@ -160,8 +160,8 @@ public class FndRawReader {
         String where = sql.cellCondition(cell);
         sql.params.put("limit", limit);
         sql.params.put("offset", offset);
-        String totalQuery = sql.withAll() + " select count(*) as cnt, " + sql.value + " as val from j where " + where;
-        String pageQuery = sql.withAll() + " select load_id, sheet, source_row_no, dt_text, m_text, n1, n2 from j where "
+        String totalQuery = sql.withAllMaterialized() + " select count(*) as cnt, " + sql.value + " as val from j where " + where;
+        String pageQuery = sql.withAllMaterialized() + " select load_id, sheet, source_row_no, dt_text, m_text, n1, n2 from j where "
                 + where + " order by load_id, row_no limit :limit offset :offset";
         return read(j -> {
             CellTotal total = j.sql(totalQuery).params(sql.params).query((rs, rowNum) -> cellTotal(rs)).single();
@@ -379,9 +379,18 @@ public class FndRawReader {
         }
 
         String withAll() {
+            return withRef() + ", j as " + joined;
+        }
+
+        // Фильтр ячейки не должен встраиваться в соединение со справочником: иначе вложенный цикл.
+        String withAllMaterialized() {
+            return withRef() + ", j as materialized " + joined;
+        }
+
+        private String withRef() {
             String ref = refKeys == null ? ""
                     : ", " + refKeys + ", r as (select distinct on (k1, k2) * from rk order by k1, k2, rl desc, rr)";
-            return "with " + data + ref + ", " + joined;
+            return "with " + data + ref;
         }
 
         String cellsQuery() {
@@ -454,7 +463,7 @@ public class FndRawReader {
         }
 
         private String joinedCte() {
-            StringBuilder cte = new StringBuilder("j as (select d.*, ");
+            StringBuilder cte = new StringBuilder("(select d.*, ");
             appendGroup(cte, spec.level1(), 1);
             cte.append(", ");
             if (spec.level2() == null) {
