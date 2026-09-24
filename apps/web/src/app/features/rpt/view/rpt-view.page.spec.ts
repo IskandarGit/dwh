@@ -16,7 +16,7 @@ function cells(first: string | null, second: string | null = null): (string | nu
 }
 
 function line(first: string | null, second: string | null, total: string | null): RptLine {
-  return { cells: cells(first, second), total, count: 3 };
+  return { cells: cells(first, second), total, count: 3, m2: null, ratio: null };
 }
 
 function reportView(patch: Partial<RptReportView> = {}): RptReportView {
@@ -43,6 +43,9 @@ function reportView(patch: Partial<RptReportView> = {}): RptReportView {
     ],
     undated: null,
     refDuplicateKeys: 0,
+    ytdMonth: 12,
+    measures: [{ name: null, divisor: 1000000, decimals: 2, byMonthColumns: false }],
+    undated2: null,
     ...patch
   };
 }
@@ -271,7 +274,7 @@ describe('RptViewPage', () => {
   });
 
   it('says there is no data instead of the table when the source has no dated rows', async () => {
-    const empty = reportView({ year: null, years: [], lines: [], grand: { cells: cells(null), total: null, count: 0 } });
+    const empty = reportView({ year: null, years: [], lines: [], grand: { cells: cells(null), total: null, count: 0, m2: null, ratio: null } });
     const { fixture } = await createFixture({ view: of(empty) });
 
     expect(byTestId(fixture, 'rpt-view-no-data')[0].textContent).toContain(ru('rpt.view.no_data'));

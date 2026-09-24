@@ -17,7 +17,8 @@ function item(index: number): RptCellItem {
     date: '2026-02-01',
     measure: '500000',
     level1: 'TEST-A',
-    level2: null
+    level2: null,
+    column: null
   };
 }
 
