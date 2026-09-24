@@ -182,7 +182,7 @@ public class FndRawReader {
             return 0;
         }
         String query = "with " + sql.refKeys
-                + " select count(*) from (select 1 from rk group by k1, k2 having count(*) > 1) x";
+                + " select count(*) from (select 1 from rk where k1 is not null and k2 is not null group by k1, k2 having count(*) > 1) x";
         return Math.toIntExact(j.sql(query).params(sql.params).query(Long.class).single());
     }
 

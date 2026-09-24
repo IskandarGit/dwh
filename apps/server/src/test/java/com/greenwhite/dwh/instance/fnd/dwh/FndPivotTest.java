@@ -107,6 +107,24 @@ class FndPivotTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт отчёта 4.3: две строки справочника с ключом длиннее 1000 знаков — не повтор, refDuplicateKeys = 0")
+    void longRefKeysAreNotDuplicates() {
+        String longKeyA = "TEST" + "A".repeat(997);
+        String longKeyB = "TEST" + "B".repeat(997);
+        insert(DATA_LOAD, DATA_SHEET, 1, Map.of("dt", "2026-02-01", "amount", "10", "code", longKeyA));
+        insert(REF_LOAD, REF_SHEET, 1, Map.of("rcode", longKeyA, "rname", "TEST-A"));
+        insert(REF_LOAD, REF_SHEET, 2, Map.of("rcode", longKeyB, "rname", "TEST-B"));
+
+        FndPivotSpec.Pivot pivot = reader.pivot(oneRefLevel(YEAR));
+
+        assertThat(pivot.refDuplicateKeys()).isZero();
+        FndPivotSpec.Cell unnamed = find(pivot, 1, null, null, null);
+        assertThat(unnamed.name1()).isNull();
+        assertThat(unnamed.count()).isEqualTo(1);
+        assertThat(unnamed.value()).isEqualByComparingTo("10");
+    }
+
+    @Test
     @DisplayName("AC-4: два ключа с одним названием в разном регистре и с пробелом — одна группа, написание первой строки справочника")
     void sameNameOneGroup() {
         insert(DATA_LOAD, DATA_SHEET, 1, Map.of("dt", "2026-03-01", "amount", "1", "code", "2"));
