@@ -53,13 +53,13 @@ public final class FndRawValueSql {
     }
 
     /**
-     * Ключ связи со справочником (контракт отчёта 4.2): число — по значению ({@code 1183} = {@code 1183.0}),
-     * иначе текст без пробелов по краям с регистром; пусто и null — пустая строка (пусто = пусто);
-     * длинная ячейка — null: ни с чем не совпадает.
+     * Ключ связи со справочником (контракт отчёта 4.2, 10.5 [С10]): число — по значению ({@code 1183} = {@code 1183.0}),
+     * иначе текст без пробелов по краям и без учёта регистра — как название группы {@link #groupKey};
+     * пусто и null — пустая строка (пусто = пусто); длинная ячейка — null: ни с чем не совпадает.
      */
     public static String key(String text) {
         return "(case when length(" + text + ") > " + MAX_CELL_LENGTH + " then null else coalesce(trim_scale("
-                + numberSql(text) + ")::text, nullif(" + stripped(text) + ", ''), '') end)";
+                + numberSql(text) + ")::text, " + groupKey(text) + ", '') end)";
     }
 
     /**

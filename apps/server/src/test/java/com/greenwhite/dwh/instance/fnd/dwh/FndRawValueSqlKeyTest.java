@@ -79,11 +79,12 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("контракт отчёта 4.2: текстовый ключ — без пробелов по краям, с учётом регистра")
-    void textKeyTrimmedCaseSensitive() {
-        assertThat(evalKey("A1")).isEqualTo("A1");
-        assertThat(evalKey("a1")).isEqualTo("a1");
-        assertThat(evalKey("A1")).isNotEqualTo(evalKey("a1"));
+    @DisplayName("контракт отчёта 10.5 [С10]: текстовый ключ — без пробелов по краям, без учёта регистра, кириллица тоже")
+    void textKeyTrimmedCaseInsensitive() {
+        assertThat(evalKey("A1")).isEqualTo("a1");
+        assertThat(evalKey("A1")).isEqualTo(evalKey("a1"));
+        assertThat(evalKey(" Ипак ")).isEqualTo(evalKey("ипак"));
+        assertThat(evalKey(" Ипак ")).isEqualTo("ипак");
         assertThat(evalKey(" x y ")).isEqualTo("x y");
     }
 

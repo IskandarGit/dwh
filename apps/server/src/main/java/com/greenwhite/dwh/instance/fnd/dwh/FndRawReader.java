@@ -129,24 +129,30 @@ public class FndRawReader {
     }
 
     /**
-     * Сводная за год (контракт отчёта 4.5): ячейки уровней по месяцам, подытоги и общий итог считает база
-     * одним запросом {@code grouping sets}; год {@code null} — последний из {@code years}.
+     * Сводная за год (контракт отчёта 4.5, 10.5): ячейки уровней по месяцам, подытоги и общий итог считает база
+     * одним запросом {@code grouping sets}; только принятые строки. Колонка-дата: год {@code null} — последний
+     * из {@code years}. Колонки-месяцы: года нет, «без даты» нет.
      */
     public FndPivotSpec.Pivot pivot(FndPivotSpec spec) {
         if (spec.data().loadIds().isEmpty()) {
-            return new FndPivotSpec.Pivot(List.of(), List.of(), 0, BigDecimal.ZERO, 0);
+            return new FndPivotSpec.Pivot(List.of(), List.of(), 0, BigDecimal.ZERO, 0, List.of());
         }
         PivotSql sql = new PivotSql(spec, false);
+        if (sql.months) {
+            return read(j -> new FndPivotSpec.Pivot(List.of(), pivotCells(j, sql, null), 0, BigDecimal.ZERO,
+                    refDuplicateKeys(j, sql), monthsWithRows(j, sql, null)));
+        }
         return read(j -> {
             List<Integer> years = j.sql(sql.withData()
                             + " select distinct extract(year from dt)::int as y from d where dt is not null order by 1")
                     .params(sql.params).query(Integer.class).list();
-            List<FndPivotSpec.Cell> cells = years.isEmpty()
-                    ? List.of()
-                    : pivotCells(j, sql, spec.year() != null ? spec.year() : years.getLast());
+            Integer year = years.isEmpty() ? null : spec.year() != null ? spec.year() : years.getLast();
+            List<FndPivotSpec.Cell> cells = year == null ? List.of() : pivotCells(j, sql, year);
+            List<Integer> monthsWithRows = year == null ? List.of() : monthsWithRows(j, sql, year);
             CellTotal undated = j.sql(sql.withData() + " select count(*) as cnt, " + sql.value + " as val from d where dt is null")
                     .params(sql.params).query((rs, rowNum) -> cellTotal(rs)).single();
-            return new FndPivotSpec.Pivot(years, cells, undated.count(), undated.value(), refDuplicateKeys(j, sql));
+            return new FndPivotSpec.Pivot(years, cells, undated.count(), undated.value(), refDuplicateKeys(j, sql),
+                    monthsWithRows);
         });
     }
 
@@ -161,8 +167,8 @@ public class FndRawReader {
         sql.params.put("limit", limit);
         sql.params.put("offset", offset);
         String totalQuery = sql.withAllMaterialized() + " select count(*) as cnt, " + sql.value + " as val from j where " + where;
-        String pageQuery = sql.withAllMaterialized() + " select load_id, sheet, source_row_no, dt_text, m_text, n1, n2 from j where "
-                + where + " order by load_id, row_no limit :limit offset :offset";
+        String pageQuery = sql.withAllMaterialized() + " select load_id, sheet, source_row_no, dt_text, m_text, n1, n2, col from j where "
+                + where + " order by load_id, row_no, mon limit :limit offset :offset";
         return read(j -> {
             CellTotal total = j.sql(totalQuery).params(sql.params).query((rs, rowNum) -> cellTotal(rs)).single();
             List<FndPivotSpec.CellRow> rows = j.sql(pageQuery).params(sql.params)
@@ -171,10 +177,13 @@ public class FndRawReader {
         });
     }
 
-    private static List<FndPivotSpec.Cell> pivotCells(JdbcClient j, PivotSql sql, int year) {
-        Map<String, Object> params = new HashMap<>(sql.params);
-        params.put("year", year);
-        return j.sql(sql.cellsQuery()).params(params).query((rs, rowNum) -> cell(rs)).list();
+    private static List<FndPivotSpec.Cell> pivotCells(JdbcClient j, PivotSql sql, Integer year) {
+        String query = sql.cellsQuery();
+        return j.sql(query).params(sql.paramsWithYear(year)).query((rs, rowNum) -> cell(rs)).list();
+    }
+
+    private static List<Integer> monthsWithRows(JdbcClient j, PivotSql sql, Integer year) {
+        return j.sql(sql.monthsQuery()).params(sql.paramsWithYear(year)).query(Integer.class).list();
     }
 
     private static int refDuplicateKeys(JdbcClient j, PivotSql sql) {
@@ -190,7 +199,8 @@ public class FndRawReader {
         if (cell.kind() == null) {
             throw new IllegalArgumentException("Не задан период ячейки");
         }
-        if (cell.kind() != FndPivotSpec.PeriodKind.UNDATED && spec.year() == null) {
+        if (cell.kind() != FndPivotSpec.PeriodKind.UNDATED && spec.year() == null
+                && spec.period() instanceof FndPivotSpec.DatePeriod) {
             throw new IllegalArgumentException("Для месяца или года ячейки нужен год");
         }
         if (cell.kind() == FndPivotSpec.PeriodKind.MONTH && cell.month() == null) {
@@ -219,7 +229,7 @@ public class FndRawReader {
     private static FndPivotSpec.CellRow cellRow(ResultSet rs) throws SQLException {
         return new FndPivotSpec.CellRow(rs.getLong("load_id"), rs.getString("sheet"),
                 rs.getObject("source_row_no", Integer.class), rs.getString("dt_text"), rs.getString("m_text"),
-                rs.getString("n1"), rs.getString("n2"));
+                rs.getString("n1"), rs.getString("n2"), rs.getString("col"));
     }
 
     <T> T read(Function<JdbcClient, T> query) {
@@ -351,14 +361,17 @@ public class FndRawReader {
     }
 
     /**
-     * Части запроса сводной и их связанные параметры: {@code d} — строки источника, {@code rk} — строки справочника
-     * с ключом, {@code r} — одна строка справочника на ключ (последняя загрузка, в ней первая строка),
-     * {@code j} — строка источника с её строкой справочника, группами и названиями уровней.
+     * Части запроса сводной и их связанные параметры: {@code d} — принятые строки источника (при колонках-месяцах —
+     * пары «месяц, значение»), {@code rk} — принятые строки справочника с ключом, {@code r} — одна строка справочника
+     * на ключ (последняя загрузка, в ней первая строка), {@code j} — строка источника с её строкой справочника,
+     * группами, названиями уровней и месяцем {@code mon}.
      * Поля источника — параметры {@code df*}, справочника — {@code rf*}, значения ячейки — {@code p*}.
      */
     private static final class PivotSql {
 
         private final FndPivotSpec spec;
+        private final boolean months;
+        private final boolean counting;
         private final Map<String, Object> params = new HashMap<>();
         private final String value;
         private final String data;
@@ -368,8 +381,10 @@ public class FndRawReader {
 
         PivotSql(FndPivotSpec spec, boolean withText) {
             this.spec = spec;
-            this.value = spec.measureField() == null ? "count(*)::numeric" : "coalesce(sum(m), 0)";
-            this.data = dataCte(withText);
+            this.months = spec.period() instanceof FndPivotSpec.MonthsPeriod;
+            this.counting = !months && spec.measureField() == null;
+            this.value = aggregate(null);
+            this.data = months ? monthsDataCte(withText) : dataCte(withText);
             this.refKeys = spec.ref() == null ? null : refKeysCte();
             this.joined = joinedCte();
         }
@@ -393,31 +408,69 @@ public class FndRawReader {
             return "with " + data + ref;
         }
 
+        Map<String, Object> paramsWithYear(Integer year) {
+            Map<String, Object> withYear = new HashMap<>(params);
+            if (year != null) {
+                withYear.put("year", year);
+            }
+            return withYear;
+        }
+
         String cellsQuery() {
             boolean two = spec.level2() != null;
             String sets = two ? "(g1, g2, mon), (g1, g2), (g1, mon), (g1), (mon), ()" : "(g1, mon), (g1), (mon), ()";
+            String count = "count(*)";
+            String val = value;
+            if (spec.untilMonth() != null) {
+                String until = "mon <= " + bind(spec.untilMonth());
+                count = "case when grouping(mon) = 1 then count(*) filter (where " + until + ") else count(*) end";
+                val = "case when grouping(mon) = 1 then " + aggregate(until) + " else " + value + " end";
+            }
             return withAll() + " select grouping(g1) as x1, " + (two ? "grouping(g2)" : "1") + " as x2, grouping(mon) as xm,"
-                    + " g1, " + (two ? "g2" : "null::text") + " as g2, mon, count(*) as cnt, " + value + " as val,"
+                    + " g1, " + (two ? "g2" : "null::text") + " as g2, mon, " + count + " as cnt, " + val + " as val,"
                     + " (array_agg(n1 order by " + nameOrder(spec.level1()) + "))[1] as name1, "
                     + (two ? "(array_agg(n2 order by " + nameOrder(spec.level2()) + "))[1]" : "null::text") + " as name2"
-                    + " from j where extract(year from dt) = :year group by grouping sets (" + sets + ")"
+                    + " from j" + (months ? "" : " where extract(year from dt) = :year") + " group by grouping sets (" + sets + ")"
                     + " order by x1 desc, g1 asc nulls last, x2 desc, g2 asc nulls last, xm desc, mon";
+        }
+
+        String monthsQuery() {
+            return months
+                    ? withData() + " select distinct mon from d order by 1"
+                    : withData() + " select distinct extract(month from dt)::int as mon from d where extract(year from dt) = :year order by 1";
         }
 
         String cellCondition(FndPivotSpec.CellQuery cell) {
             List<String> conditions = new ArrayList<>();
             switch (cell.kind()) {
                 case MONTH -> {
-                    conditions.add("extract(year from dt) = " + bind(spec.year()));
-                    conditions.add("extract(month from dt) = " + bind(cell.month()));
+                    addYear(conditions);
+                    conditions.add("mon = " + bind(cell.month()));
                 }
-                case YEAR -> conditions.add("extract(year from dt) = " + bind(spec.year()));
-                case UNDATED -> conditions.add("dt is null");
+                case YEAR -> {
+                    addYear(conditions);
+                    if (spec.untilMonth() != null) {
+                        conditions.add("mon <= " + bind(spec.untilMonth()));
+                    }
+                }
+                case UNDATED -> conditions.add(months ? "false" : "dt is null");
             }
             for (int i = 0; i < cell.path().size(); i++) {
                 conditions.add("g" + (i + 1) + " is not distinct from cast(" + bind(cell.path().get(i)) + " as text)");
             }
-            return String.join(" and ", conditions);
+            return conditions.isEmpty() ? "true" : String.join(" and ", conditions);
+        }
+
+        private void addYear(List<String> conditions) {
+            if (!months) {
+                conditions.add("extract(year from dt) = " + bind(spec.year()));
+            }
+        }
+
+        /** Мера по строкам (парам) ячейки: число строк или сумма; {@code filter} — условие агрегата или null. */
+        private String aggregate(String filter) {
+            String filtered = filter == null ? "" : " filter (where " + filter + ")";
+            return counting ? "(count(*)" + filtered + ")::numeric" : "coalesce(sum(m)" + filtered + ", 0)";
         }
 
         private String dataCte(boolean withText) {
@@ -428,19 +481,54 @@ public class FndRawReader {
                     .append(FndRawValueSql.converted(FndRawSpec.Type.DATE, dataField(spec.dateField()))).append(" as dt, ")
                     .append(measure == null ? "null::numeric"
                             : FndRawValueSql.converted(FndRawSpec.Type.NUMBER, dataField(measure))).append(" as m");
+            appendKeysAndLevels(cte);
+            if (withText) {
+                cte.append(", ").append(FndRawValueSql.canonical(FndRawSpec.Type.DATE, dataField(spec.dateField())))
+                        .append(" as dt_text, ")
+                        .append(measure == null ? "null::text"
+                                : FndRawValueSql.canonical(FndRawSpec.Type.NUMBER, dataField(measure))).append(" as m_text")
+                        .append(", null::text as col");
+            }
+            return cte.append(" from raw.rows where load_id in (:dataLoadIds) and sheet = :dataSheet and not rejected)").toString();
+        }
+
+        /** Колонки-месяцы (контракт 10.5 п.3): строка источника — пары «месяц, значение», месяц без колонки или пустой — не пара. */
+        private String monthsDataCte(boolean withText) {
+            params.put("dataLoadIds", spec.data().loadIds());
+            params.put("dataSheet", spec.data().sheet());
+            List<String> fields = ((FndPivotSpec.MonthsPeriod) spec.period()).fields();
+            StringBuilder pairs = new StringBuilder();
+            for (int i = 0; i < fields.size(); i++) {
+                String field = fields.get(i);
+                if (field == null) {
+                    continue;
+                }
+                pairs.append(pairs.isEmpty() ? "(" : ", (").append(i + 1).append(", ")
+                        .append(FndRawValueSql.converted(FndRawSpec.Type.NUMBER, dataField(field)));
+                if (withText) {
+                    pairs.append(", ").append(FndRawValueSql.canonical(FndRawSpec.Type.NUMBER, dataField(field)))
+                            .append(", cast(").append(bind(field)).append(" as text)");
+                }
+                pairs.append(")");
+            }
+            StringBuilder cte = new StringBuilder("d as (select load_id, row_no, sheet, source_row_no, mm.mon, mm.m");
+            appendKeysAndLevels(cte);
+            if (withText) {
+                cte.append(", null::text as dt_text, mm.m_text, mm.col");
+            }
+            return cte.append(" from raw.rows cross join lateral (values ").append(pairs).append(") mm(mon, m")
+                    .append(withText ? ", m_text, col" : "").append(")")
+                    .append(" where load_id in (:dataLoadIds) and sheet = :dataSheet and not rejected and mm.m is not null)")
+                    .toString();
+        }
+
+        private void appendKeysAndLevels(StringBuilder cte) {
             for (int i = 0; i < 2; i++) {
                 String key = i < spec.keys().size() ? FndRawValueSql.key(dataField(spec.keys().get(i).field())) : "''";
                 cte.append(", ").append(key).append(" as k").append(i + 1);
             }
             appendLevel(cte, spec.level1(), 1, FndPivotSpec.Origin.DATA);
             appendLevel(cte, spec.level2(), 2, FndPivotSpec.Origin.DATA);
-            if (withText) {
-                cte.append(", ").append(FndRawValueSql.canonical(FndRawSpec.Type.DATE, dataField(spec.dateField())))
-                        .append(" as dt_text, ")
-                        .append(measure == null ? "null::text"
-                                : FndRawValueSql.canonical(FndRawSpec.Type.NUMBER, dataField(measure))).append(" as m_text");
-            }
-            return cte.append(" from raw.rows where load_id in (:dataLoadIds) and sheet = :dataSheet)").toString();
         }
 
         private String refKeysCte() {
@@ -457,7 +545,7 @@ public class FndRawReader {
             } else {
                 params.put("refLoadIds", spec.ref().loadIds());
                 params.put("refSheet", spec.ref().sheet());
-                cte.append("load_id in (:refLoadIds) and sheet = :refSheet");
+                cte.append("load_id in (:refLoadIds) and sheet = :refSheet and not rejected");
             }
             return cte.append(")").toString();
         }
@@ -474,7 +562,10 @@ public class FndRawReader {
             if (refKeys != null) {
                 cte.append(", r.rl, r.rr");
             }
-            cte.append(", extract(month from d.dt)::int as mon from d");
+            if (!months) {
+                cte.append(", extract(month from d.dt)::int as mon");
+            }
+            cte.append(" from d");
             if (refKeys != null) {
                 cte.append(" left join r on r.k1 = d.k1 and r.k2 = d.k2");
             }

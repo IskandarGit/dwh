@@ -251,22 +251,23 @@ class RptThreeSpheresEndToEndTest extends EmbeddedPostgresTest {
     void everyCellMatchesFile(Sphere sphere) throws Exception {
         byte[] sourceFile = workbook(SOURCE_SHEET, sphere.sourceCols(), sphere.sourceRows());
         long sourceId = publish("test.rpt.e2e.src.", SOURCE_SHEET, sphere.sourceCols());
-        apply(sourceId, sourceFile);
+        Set<Integer> sourceRejected = apply(sourceId, sourceFile, SOURCE_SHEET);
         int sourceOrdinal = sheetOrdinal(sourceId, SOURCE_SHEET);
 
         byte[] refFile = null;
         Long refId = null;
         Integer refOrdinal = null;
+        Set<Integer> refRejected = Set.of();
         if (sphere.refCols() != null) {
             refFile = workbook(REF_SHEET, sphere.refCols(), sphere.refRows());
             refId = publish("test.rpt.e2e.ref.", REF_SHEET, sphere.refCols());
-            apply(refId, refFile);
+            refRejected = apply(refId, refFile, REF_SHEET);
             refOrdinal = sheetOrdinal(refId, REF_SHEET);
         }
 
         for (ReportSpec report : sphere.reports()) {
             long reportId = createReport(report, sourceId, sourceOrdinal, refId, refOrdinal);
-            Expected expected = expected(sphere, report, sourceFile, refFile);
+            Expected expected = expected(sphere, report, sourceFile, refFile, sourceRejected, refRejected);
             checkView(sphere.name() + " · " + report.name(), report, reportId, expected);
         }
     }
@@ -412,10 +413,18 @@ class RptThreeSpheresEndToEndTest extends EmbeddedPostgresTest {
 
     // ---------- ожидаемое по байтам xlsx ----------
 
-    private static Expected expected(Sphere sphere, ReportSpec report, byte[] sourceFile, byte[] refFile) {
+    /**
+     * Ожидаемое по файлу; строки, которые загрузка отклонила ({@code sourceRejected}, {@code refRejected} — номера строк Excel),
+     * не входят ни в какие цифры, а строка справочника с ошибкой не даёт названия (контракт 10.5 п.1).
+     */
+    private static Expected expected(Sphere sphere, ReportSpec report, byte[] sourceFile, byte[] refFile,
+                                     Set<Integer> sourceRejected, Set<Integer> refRejected) {
         Map<List<String>, FileRow> refByKey = new HashMap<>();
         if (refFile != null) {
             for (FileRow refRow : readSheet(refFile, REF_SHEET, sphere.refCols())) {
+                if (refRejected.contains(refRow.excelRow())) {
+                    continue;
+                }
                 List<String> key = report.keys().stream().map(k -> keyOf(refRow.values().get(k.refField()))).toList();
                 refByKey.putIfAbsent(key, refRow);
             }
@@ -424,6 +433,9 @@ class RptThreeSpheresEndToEndTest extends EmbeddedPostgresTest {
         Agg undated = new Agg();
         String dateField = dateField(sphere.sourceCols());
         for (FileRow row : readSheet(sourceFile, SOURCE_SHEET, sphere.sourceCols())) {
+            if (sourceRejected.contains(row.excelRow())) {
+                continue;
+            }
             BigDecimal measure = MEASURE_COUNT.equals(report.measureKind())
                     ? BigDecimal.ONE : measureOf(row.values().get(report.measureField()));
             LocalDate date = dateOf(row.values().get(dateField));
@@ -596,7 +608,8 @@ class RptThreeSpheresEndToEndTest extends EmbeddedPostgresTest {
         return sourceId;
     }
 
-    private void apply(long sourceId, byte[] content) {
+    /** Загружает и применяет файл; возвращает номера строк Excel листа, которые загрузка отклонила. */
+    private Set<Integer> apply(long sourceId, byte[] content, String sheetName) {
         FileRecord file = files.uploadFile("TEST.xlsx", UplPackageTestData.XLSX_MIME,
                 new ByteArrayInputStream(content), content.length, userId);
         PackageRow row = packages.register(new NewPackage(sourceId, 1, PACKAGE_FROM, PACKAGE_TO, file.id(),
@@ -606,6 +619,17 @@ class RptThreeSpheresEndToEndTest extends EmbeddedPostgresTest {
         assertThat(parsed.status()).as("проверка тестового файла").isEqualTo(UplPackageModel.VERIFIED);
         PackageRow applied = applies.apply(parsed.publicId().toString(), userId);
         assertThat(applied.status()).as("применение тестового файла").isEqualTo(UplPackageModel.APPLIED);
+        Set<Integer> rejected = new HashSet<>(tx.execute(status -> {
+            actors.apply(actors.system());
+            return jdbc.sql("select distinct row_no from upl_package_errors"
+                            + " where package_id = :packageId and sheet = :sheet and row_no is not null")
+                    .param("packageId", applied.id())
+                    .param("sheet", sheetName)
+                    .query(Integer.class).list();
+        }));
+        assertThat(rejected.size()).as("отклонённые строки по ошибкам = счётчику пакета")
+                .isEqualTo(applied.rowsRejected() == null ? 0 : applied.rowsRejected());
+        return rejected;
     }
 
     private static byte[] workbook(String sheetName, List<Col> cols, List<List<Object>> rows) {
