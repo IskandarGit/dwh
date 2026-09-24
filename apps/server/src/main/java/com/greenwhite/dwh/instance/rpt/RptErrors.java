@@ -18,6 +18,14 @@ public final class RptErrors {
     public static final String RPT_CELL_INVALID = "RPT_CELL_INVALID";
     public static final String RPT_MODULE_DISABLED = "RPT_MODULE_DISABLED";
     public static final String RPT_QUERY_TIMEOUT = "RPT_QUERY_TIMEOUT";
+    /** У меры нет периода или заданы оба; мера задана при колонках-месяцах (контракт И15б, 10.9). */
+    public static final String RPT_PERIOD_INVALID = "RPT_PERIOD_INVALID";
+    /** Все 12 колонок-месяцев не заданы. */
+    public static final String RPT_MONTHS_EMPTY = "RPT_MONTHS_EMPTY";
+    /** У меры 2 другое число уровней строк, чем у меры 1. */
+    public static final String RPT_LEVELS_MISMATCH = "RPT_LEVELS_MISMATCH";
+    /** Название меры пусто или длиннее предела. */
+    public static final String RPT_MEASURE_NAME_INVALID = "RPT_MEASURE_NAME_INVALID";
 
     private RptErrors() {
     }

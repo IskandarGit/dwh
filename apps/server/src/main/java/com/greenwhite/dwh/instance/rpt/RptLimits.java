@@ -11,6 +11,10 @@ public final class RptLimits {
     public static final int PAGE_SIZE = 200;
     /** Длина названия отчёта в символах. */
     public static final int MAX_NAME_LENGTH = 200;
+    /** Длина названия меры в символах (контракт И15б, 10.3). */
+    public static final int MAX_MEASURE_NAME_LENGTH = 100;
+    /** Колонок-месяцев у меры: по одной на месяц. */
+    public static final int MONTHS = 12;
     /** Пар колонок связи со справочником. */
     public static final int MAX_KEYS = 2;
     /** Допустимые делители отображения: единицы, тысячи, миллионы. */

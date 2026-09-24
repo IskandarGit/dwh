@@ -15,6 +15,8 @@ public final class RptModel {
     public static final String MEASURE_TOTAL = "total";
     /** Мера — число строк. */
     public static final String MEASURE_COUNT = "count";
+    /** Мера — сумма колонок-месяцев; только в базе ({@code measure_kind}), в API {@code measure = null}. */
+    public static final String MEASURE_MONTHS = "months";
     /** Ячейка месяца. */
     public static final String PERIOD_MONTH = "month";
     /** Ячейка «Итого» за год. */
@@ -35,13 +37,38 @@ public final class RptModel {
 
     public record LevelPart(String origin, String field) { }
 
+    /**
+     * Мера отчёта (контракт И15б, 10.3): ровно одно из {@code dateField} и {@code monthFields} (12 элементов, null — месяца нет);
+     * {@code measure} — null при колонках-месяцах. У меры 1 {@code name} — её название или null (прежняя подпись).
+     */
+    public record MeasureInput(String name, Long sourceId, Integer sourceSheet, String dateField, List<String> monthFields,
+                               Measure measure, Integer divisor, Integer decimals, RefPart ref, LevelPart level1,
+                               LevelPart level2) { }
+
+    /** Описание отчёта; {@code measureName}, {@code monthFields}, {@code second} — дополнение И15б, отсутствуют — null. */
     public record DefinitionInput(String name, Long sourceId, Integer sourceSheet, String dateField, Measure measure,
                                   Integer divisor, Integer decimals, RefPart ref, LevelPart level1, LevelPart level2,
-                                  Integer lockVersion) { }
+                                  Integer lockVersion, String measureName, List<String> monthFields, MeasureInput second) {
+
+        /** Прежнее описание И15а: одна мера по колонке-дате, без названия меры. */
+        public DefinitionInput(String name, Long sourceId, Integer sourceSheet, String dateField, Measure measure,
+                               Integer divisor, Integer decimals, RefPart ref, LevelPart level1, LevelPart level2,
+                               Integer lockVersion) {
+            this(name, sourceId, sourceSheet, dateField, measure, divisor, decimals, ref, level1, level2, lockVersion,
+                    null, null, null);
+        }
+
+        /** Мера 1 в том же виде, что мера 2; её название — {@code measureName}. */
+        public MeasureInput first() {
+            return new MeasureInput(measureName, sourceId, sourceSheet, dateField, monthFields, measure, divisor, decimals,
+                    ref, level1, level2);
+        }
+    }
 
     public record Definition(long id, String name, long sourceId, int sourceSheet, String dateField, Measure measure,
                              int divisor, int decimals, RefPart ref, LevelPart level1, LevelPart level2,
-                             int lockVersion, OffsetDateTime modifiedAt, String modifiedBy, Map<String, String> labels) { }
+                             int lockVersion, OffsetDateTime modifiedAt, String modifiedBy, Map<String, String> labels,
+                             String measureName, List<String> monthFields, MeasureInput second) { }
 
     public record SourceItem(long id, String code, String name) { }
 
