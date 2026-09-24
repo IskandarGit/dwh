@@ -1,0 +1,158 @@
+<div class="rpt-view-page">
+  <div class="rpt-view-top">
+    <a class="rpt-view-back" routerLink="/rpt/reports" data-testid="rpt-view-back">← {{ 'rpt.view.back' | t }}</a>
+    <h1 class="rpt-view-title" data-testid="rpt-view-title">{{ view()?.name ?? '' }}</h1>
+    @if (canEdit() && reportId() !== null) {
+      <a class="btn btn-secondary btn-md rpt-view-edit" [routerLink]="editLink()" data-testid="rpt-view-edit">{{ 'rpt.view.edit' | t }}</a>
+    }
+  </div>
+
+  @if (view(); as current) {
+    <div class="rpt-view-bar">
+      @if (current.years.length > 0) {
+        <div class="form-group rpt-view-year">
+          <label class="form-label" for="rpt-year-field">{{ 'rpt.view.year' | t }}</label>
+          <select
+            class="form-select"
+            id="rpt-year-field"
+            data-testid="rpt-view-year"
+            [ngModel]="current.year"
+            (ngModelChange)="selectYear($event)"
+          >
+            @for (year of current.years; track year) {
+              <option [ngValue]="year">{{ year }}</option>
+            }
+          </select>
+        </div>
+      }
+      <span class="rpt-view-muted" data-testid="rpt-view-digits">{{ digitsText() }}</span>
+      <span class="rpt-view-muted" data-testid="rpt-view-measure">{{ measureText() }}</span>
+      @if (hasLevel2() && current.years.length > 0) {
+        <div class="rpt-view-actions">
+          <ui-button variant="secondary" size="sm" data-testid="rpt-view-expand-all" (onClick)="expandAll()">
+            {{ 'rpt.view.expand_all' | t }}
+          </ui-button>
+          <ui-button variant="secondary" size="sm" data-testid="rpt-view-collapse-all" (onClick)="collapseAll()">
+            {{ 'rpt.view.collapse_all' | t }}
+          </ui-button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="rpt-view-muted" data-testid="rpt-view-loading">{{ 'rpt.view.loading' | t }}</p>
+  }
+
+  @if (loadError(); as error) {
+    <div class="alert alert-error rpt-view-alert" role="alert" data-testid="rpt-view-error">{{ error }}</div>
+  }
+
+  @if (staleFields(); as fields) {
+    <div class="alert rpt-view-warning" role="alert" data-testid="rpt-view-stale">
+      <span>{{ 'rpt.err.RPT_DEFINITION_STALE' | t }}</span>
+      @for (field of fields; track $index) {
+        <span class="rpt-view-stale-field" data-testid="rpt-view-stale-field">{{ 'rpt.view.stale_field' | t: { field: field } }}</span>
+      }
+      @if (canEdit()) {
+        <a class="btn btn-secondary btn-sm" [routerLink]="editLink()" data-testid="rpt-view-stale-edit">{{ 'rpt.view.edit' | t }}</a>
+      } @else {
+        <span data-testid="rpt-view-stale-ask">{{ 'rpt.view.stale_ask_admin' | t }}</span>
+      }
+    </div>
+  }
+
+  @if (view(); as current) {
+    @if (current.years.length === 0) {
+      <p class="rpt-view-empty" data-testid="rpt-view-no-data">{{ 'rpt.view.no_data' | t }}</p>
+    } @else {
+      <div class="table-card rpt-view-card" [class.rpt-view-busy]="loading()">
+        <div class="rpt-view-scroll">
+          <table class="rpt-view-table" data-testid="rpt-view-table">
+            <thead>
+              <tr>
+                <th class="rpt-view-name"></th>
+                @for (month of months; track month) {
+                  <th class="rpt-view-num">{{ monthName(month) }}</th>
+                }
+                <th class="rpt-view-num">{{ 'rpt.view.total' | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.id) {
+                <tr
+                  [class.rpt-view-grand]="row.kind === 'grand'"
+                  [class.rpt-view-l1]="row.kind === 'l1'"
+                  [class.rpt-view-l2]="row.kind === 'l2'"
+                  [attr.data-testid]="'rpt-row-' + row.kind"
+                >
+                  <td class="rpt-view-name" [class.rpt-view-no-name]="row.kind !== 'grand' && row.name === null">
+                    @if (row.hasChildren) {
+                      <button
+                        type="button"
+                        class="rpt-view-toggle"
+                        data-testid="rpt-view-toggle"
+                        [attr.aria-expanded]="!row.collapsed"
+                        (click)="toggle(row)"
+                      >
+                        <span class="rpt-view-arrow" aria-hidden="true">{{ row.collapsed ? '▸' : '▾' }}</span>
+                        <span data-testid="rpt-row-name">{{ rowName(row) }}</span>
+                      </button>
+                    } @else {
+                      <span data-testid="rpt-row-name">{{ rowName(row) }}</span>
+                    }
+                  </td>
+                  @for (month of months; track month) {
+                    <td class="rpt-view-num">
+                      @if (row.cells[month - 1] !== null) {
+                        <button type="button" class="rpt-view-cell" data-testid="rpt-cell" (click)="openMonth(row, month)">
+                          {{ number(row.cells[month - 1]) }}
+                        </button>
+                      }
+                    </td>
+                  }
+                  <td class="rpt-view-num rpt-view-row-total">
+                    @if (row.total !== null) {
+                      <button type="button" class="rpt-view-cell" data-testid="rpt-cell-total" (click)="openYear(row)">
+                        {{ number(row.total) }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    @if (current.undated !== null) {
+      <div class="alert rpt-view-warning rpt-view-undated" data-testid="rpt-view-undated">
+        <span>⚠ {{ undatedText() }}</span>
+        <ui-button variant="secondary" size="sm" data-testid="rpt-view-show-undated" (onClick)="openUndated()">
+          {{ 'rpt.view.show_rows' | t }}
+        </ui-button>
+      </div>
+    }
+
+    @if (current.refDuplicateKeys > 0) {
+      <p class="rpt-view-muted" data-testid="rpt-view-duplicates">ⓘ {{ duplicatesText() }}</p>
+    }
+
+    @if (panel(); as state) {
+      @if (panelLabels(); as labels) {
+        <app-rpt-cell-panel
+          [reportId]="current.reportId"
+          [year]="current.year"
+          [target]="state.target"
+          [heading]="state.heading"
+          [tableValue]="state.tableValue"
+          [divisor]="current.divisor"
+          [decimals]="current.decimals"
+          [labels]="labels"
+          (closed)="closePanel()"
+        />
+      }
+    }
+  }
+</div>

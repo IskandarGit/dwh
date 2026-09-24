@@ -1,0 +1,67 @@
+<aside class="rpt-panel" role="dialog" aria-modal="false" data-testid="rpt-panel">
+  <div class="rpt-panel-head">
+    <h2 class="rpt-panel-title">{{ 'rpt.panel.title' | t }}</h2>
+    <button
+      type="button"
+      class="rpt-panel-close"
+      data-testid="rpt-panel-close"
+      [attr.aria-label]="'rpt.panel.close' | t"
+      [title]="'rpt.panel.close' | t"
+      (click)="close()"
+    >✕</button>
+  </div>
+  <p class="rpt-panel-heading" data-testid="rpt-panel-heading">{{ heading }}</p>
+
+  @if (loadError(); as error) {
+    <div class="alert alert-error rpt-panel-alert" role="alert" data-testid="rpt-panel-error">{{ error }}</div>
+  }
+
+  @if (rows(); as current) {
+    <p class="rpt-panel-summary" data-testid="rpt-panel-summary">{{ summary() }}</p>
+    <div class="rpt-panel-scroll" [class.rpt-panel-busy]="loading()">
+      <table class="rpt-panel-table" data-testid="rpt-panel-table">
+        <thead>
+          <tr>
+            <th>{{ 'rpt.panel.from' | t }}</th>
+            <th>{{ 'rpt.panel.date' | t }}</th>
+            @if (labels.measure !== null) {
+              <th class="rpt-panel-num" data-testid="rpt-panel-col-measure">{{ labels.measure }}</th>
+            }
+            @if (showLevel1()) {
+              <th data-testid="rpt-panel-col-level1">{{ labels.level1 }}</th>
+            }
+            @if (showLevel2()) {
+              <th data-testid="rpt-panel-col-level2">{{ labels.level2 }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track $index) {
+            <tr data-testid="rpt-panel-row">
+              <td class="rpt-panel-origin">{{ item.origin }}</td>
+              <td class="rpt-panel-date">{{ item.date }}</td>
+              @if (labels.measure !== null) {
+                <td class="rpt-panel-num">{{ item.measure }}</td>
+              }
+              @if (showLevel1()) {
+                <td>{{ item.level1 }}</td>
+              }
+              @if (showLevel2()) {
+                <td>{{ item.level2 }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="rpt-panel-pager">
+      <ui-button variant="ghost" size="sm" data-testid="rpt-panel-first" [disabled]="page() <= 1" (onClick)="goToPage(1)">«</ui-button>
+      <ui-button variant="ghost" size="sm" data-testid="rpt-panel-prev" [disabled]="page() <= 1" (onClick)="goToPage(page() - 1)">‹</ui-button>
+      <span data-testid="rpt-panel-page">{{ pageText() }}</span>
+      <ui-button variant="ghost" size="sm" data-testid="rpt-panel-next" [disabled]="page() >= pageCount()" (onClick)="goToPage(page() + 1)">›</ui-button>
+      <ui-button variant="ghost" size="sm" data-testid="rpt-panel-last" [disabled]="page() >= pageCount()" (onClick)="goToPage(pageCount())">»</ui-button>
+    </div>
+  } @else if (loading()) {
+    <p class="rpt-panel-muted" data-testid="rpt-panel-loading">{{ 'rpt.view.loading' | t }}</p>
+  }
+</aside>

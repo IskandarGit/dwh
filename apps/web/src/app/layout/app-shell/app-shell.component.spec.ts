@@ -314,7 +314,7 @@ describe('AppShellComponent', () => {
     // Check items per section
     const workspaceSection = sections.find(s => s.id === 'workspace');
     expect(workspaceSection?.items.map(i => i.id)).toEqual([
-      'tasks', 'projects', 'notes', 'upl-sources', 'upl-packages', 'ovw-data', 'files', 'analytics', 'notifications'
+      'tasks', 'projects', 'notes', 'upl-sources', 'upl-packages', 'ovw-data', 'rpt-reports', 'files', 'analytics', 'notifications'
     ]);
 
     const iamSection = sections.find(s => s.id === 'iam');
@@ -704,5 +704,34 @@ describe('AppShellComponent', () => {
     expect(overviewItem!.permission()).toBe(false);
     activeCodes.set(new Set(['notes', 'upl', 'ovw']));
     expect(overviewItem!.permission()).toBe(true);
+  });
+
+  it('hides the reports link without rpt.reports view', () => {
+    permissionService.canView.mockImplementation(form => form !== 'rpt.reports');
+    activeCodes.set(new Set(['notes', 'upl', 'ovw', 'rpt']));
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const reportsItem = workspaceSection.items.find(i => i.id === 'rpt-reports');
+    expect(reportsItem).toBeDefined();
+    expect(reportsItem!.route).toBe('/rpt/reports');
+    expect(reportsItem!.permission()).toBe(false);
+    permissionService.canView.mockImplementation(() => true);
+    expect(reportsItem!.permission()).toBe(true);
+  });
+
+  it('hides the reports link when the rpt module is disabled', () => {
+    permissionService.canView.mockImplementation(() => true);
+    activeCodes.set(new Set(['notes', 'upl', 'ovw']));
+    const fixture = TestBed.createComponent(AppShellComponent);
+    fixture.detectChanges();
+
+    const workspaceSection = fixture.componentInstance.navSections().find(s => s.id === 'workspace')!;
+    const reportsItem = workspaceSection.items.find(i => i.id === 'rpt-reports');
+    expect(reportsItem).toBeDefined();
+    expect(reportsItem!.permission()).toBe(false);
+    activeCodes.set(new Set(['notes', 'upl', 'ovw', 'rpt']));
+    expect(reportsItem!.permission()).toBe(true);
   });
 });

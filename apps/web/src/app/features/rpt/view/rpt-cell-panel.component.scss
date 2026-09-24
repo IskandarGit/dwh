@@ -1,0 +1,108 @@
+:host {
+  display: contents;
+}
+
+.rpt-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 560px;
+  max-width: 100%;
+  padding: 1rem;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 640px) {
+  .rpt-panel {
+    width: 100%;
+  }
+}
+
+.rpt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rpt-panel-title {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 1.125rem;
+  color: var(--text-main);
+}
+
+.rpt-panel-close {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.rpt-panel-close:hover {
+  color: var(--text-main);
+}
+
+.rpt-panel-heading {
+  margin: 0;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.rpt-panel-summary,
+.rpt-panel-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.rpt-panel-alert {
+  margin-bottom: 0;
+}
+
+.rpt-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.rpt-panel-busy {
+  opacity: 0.6;
+}
+
+.rpt-panel-table {
+  width: 100%;
+}
+
+.rpt-panel-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.rpt-panel-origin,
+.rpt-panel-date {
+  white-space: nowrap;
+}
+
+.rpt-panel-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rpt-panel-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
