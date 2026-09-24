@@ -148,17 +148,21 @@ export class RptViewPage implements OnInit {
     return this.measureInfo(measure)?.byMonthColumns ?? false;
   }
 
-  /** Name of the measure from the description; the first measure without a name keeps the former caption. */
+  /**
+   * Name of the measure from the description; the first measure without a name keeps the former caption.
+   * A measure by month columns always sums values, so it is never called "number of rows".
+   */
   measureName(measure: RptMeasureNo): string {
     const current = this.view();
     const name = current?.measures[measure - 1]?.name ?? null;
     if (name !== null) {
       return name;
     }
-    if (measure === 1) {
-      return current?.labels.measure ?? this.i18n.translate('rpt.view.count_measure');
+    if (measure === 2) {
+      return this.i18n.translate('rpt.edit.block_measure2');
     }
-    return this.i18n.translate('rpt.edit.block_measure2');
+    const fallbackKey = this.byMonthColumns(1) ? 'rpt.edit.block_measure1' : 'rpt.view.count_measure';
+    return current?.labels.measure ?? this.i18n.translate(fallbackKey);
   }
 
   /** Caption of the last block: "January – <month N>", just "January" when N = 1. */
@@ -316,7 +320,7 @@ export class RptViewPage implements OnInit {
     const info = this.measureInfo(measure);
     this.panel.set({
       target: two ? { period, path, measure } : { period, path },
-      heading: this.heading(path, period, two ? measure : null),
+      heading: this.heading(path, period, measure, two),
       tableValue: value,
       divisor: info?.divisor ?? current.divisor,
       decimals: info?.decimals ?? current.decimals,
@@ -331,10 +335,10 @@ export class RptViewPage implements OnInit {
   }
 
   /** "<measure> · <line names> · <period>"; the measure name only when the report has two measures. */
-  private heading(path: (string | null)[], period: RptPeriod, measure: RptMeasureNo | null): string {
-    const periodText = this.periodText(period);
+  private heading(path: (string | null)[], period: RptPeriod, measure: RptMeasureNo, named: boolean): string {
+    const periodText = this.periodText(period, measure);
     const parts = period.kind === 'undated' ? [periodText] : [...this.pathNames(path), periodText];
-    return (measure === null ? parts : [this.measureName(measure), ...parts]).join(' · ');
+    return (named ? [this.measureName(measure), ...parts] : parts).join(' · ');
   }
 
   private pathNames(path: (string | null)[]): string[] {
@@ -351,14 +355,22 @@ export class RptViewPage implements OnInit {
     return names;
   }
 
-  private periodText(period: RptPeriod): string {
-    const year = this.view()?.year ?? '';
-    if (period.kind === 'month') {
-      return this.i18n.translate('rpt.month_year', { month: this.monthName(period.month), year });
-    }
+  /**
+   * Period of the panel heading: the total cell carries the same caption as the head of the table;
+   * a month of a measure by month columns, or of a report without a year, is written without a year.
+   */
+  private periodText(period: RptPeriod, measure: RptMeasureNo): string {
     if (period.kind === 'year') {
-      return this.i18n.translate('rpt.panel.year_total', { year });
+      return this.ytdText();
     }
-    return this.i18n.translate('rpt.panel.undated');
+    if (period.kind === 'undated') {
+      return this.i18n.translate('rpt.panel.undated');
+    }
+    const month = this.monthName(period.month);
+    const year = this.view()?.year ?? null;
+    if (year === null || this.byMonthColumns(measure)) {
+      return month;
+    }
+    return this.i18n.translate('rpt.month_year', { month, year });
   }
 }

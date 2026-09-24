@@ -605,6 +605,28 @@ describe('RptEditPage — measure name, month columns, second measure', () => {
     expect(byTestId(fixture, 'rpt-edit-m2-error-month-3')).toHaveLength(0);
   });
 
+  it('shows the server error about a missing name of the first measure under its name field', async () => {
+    const problem: ProblemDetail = {
+      title: 'TEST',
+      status: 422,
+      code: 'TEST',
+      detail: 'RPT_DEFINITION_INVALID',
+      errors: [{ field: 'measureName', code: 'RPT_MEASURE_NAME_INVALID', message: 'RPT_MEASURE_NAME_INVALID' }]
+    };
+    const { fixture } = await createFixture({
+      id: 7,
+      report: () => of(twoMeasureReport()),
+      save: () => throwError(() => problem)
+    });
+
+    await click(fixture, 'rpt-edit-save');
+
+    const error = byTestId(fixture, 'rpt-edit-error-measureName');
+    expect(error).toHaveLength(1);
+    expect(error[0].textContent?.trim()).toBe(PACKAGED_RUSSIAN['rpt.err.RPT_MEASURE_NAME_INVALID']);
+    expect(byTestId(fixture, 'rpt-edit-m2-error-measureName')).toHaveLength(0);
+  });
+
   it('opens a saved report with two measures; a gone column of the second measure asks to choose again in its block', async () => {
     const report = twoMeasureReport();
     delete report.labels['second.source:name'];

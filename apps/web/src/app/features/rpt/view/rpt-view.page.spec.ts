@@ -86,6 +86,19 @@ function twoMeasureView(patch: Partial<RptReportView> = {}): RptReportView {
   });
 }
 
+/** Both measures take the months from columns: the server answers without a year and names measure 1 in `labels.measure`. */
+function columnsOnlyView(): RptReportView {
+  return twoMeasureView({
+    year: null,
+    years: [],
+    labels: { level1: 'Gruppa TEST', level2: 'Podgruppa TEST', measure: 'Fakt TEST' },
+    measures: [
+      { name: 'Fakt TEST', divisor: 1000000, decimals: 1, byMonthColumns: true },
+      { name: 'Plan TEST', divisor: 1000000, decimals: 1, byMonthColumns: true }
+    ]
+  });
+}
+
 function ytd(month: number): string {
   return ru('rpt.view.ytd', { month: ru(`rpt.month.${month}`).toLowerCase() });
 }
@@ -421,13 +434,12 @@ describe('RptViewPage', () => {
     (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell-m2"]') as HTMLElement).click();
     fixture.detectChanges();
     expect(api.cells).toHaveBeenCalledWith(7, { year: 2026, period: { kind: 'month', month: 1 }, path: [], offset: 0, measure: 2 });
-    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent).toContain(
-      `Plan TEST · ${ru('rpt.view.grand')} · ${ru('rpt.month_year', { month: ru('rpt.month.1'), year: 2026 })}`
-    );
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent?.trim()).toBe(`Plan TEST · ${ru('rpt.view.grand')} · ${ru('rpt.month.1')}`);
 
     (bodyRows(fixture)[1].querySelector('[data-testid="rpt-cell-total-m2"]') as HTMLElement).click();
     fixture.detectChanges();
     expect(api.cells).toHaveBeenLastCalledWith(7, { year: 2026, period: { kind: 'year' }, path: ['test-a'], offset: 0, measure: 2 });
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent?.trim()).toBe(`Plan TEST · TEST-A · ${ytd(6)}`);
 
     (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell"]') as HTMLElement).click();
     fixture.detectChanges();
@@ -449,20 +461,38 @@ describe('RptViewPage', () => {
   });
 
   it('shows the table without a year when both measures take the months from columns', async () => {
-    const columnsOnly = twoMeasureView({
-      year: null,
-      years: [],
-      measures: [
-        { name: 'Fakt TEST', divisor: 1000000, decimals: 1, byMonthColumns: true },
-        { name: 'Plan TEST', divisor: 1000000, decimals: 1, byMonthColumns: true }
-      ]
-    });
-    const { fixture } = await createFixture({ view: of(columnsOnly) });
+    const { fixture } = await createFixture({ view: of(columnsOnlyView()) });
 
     expect(byTestId(fixture, 'rpt-view-year')).toHaveLength(0);
     expect(byTestId(fixture, 'rpt-view-no-data')).toHaveLength(0);
     expect(byTestId(fixture, 'rpt-view-table')).toHaveLength(1);
     expect(byTestId(fixture, 'rpt-view-months-no-year')).toHaveLength(2);
+  });
+
+  it('heads the panel of a total with the caption of the table head and a month of a measure by month columns without a year', async () => {
+    const { fixture } = await createFixture({ view: of(columnsOnlyView()) });
+
+    (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell-total"]') as HTMLElement).click();
+    fixture.detectChanges();
+    const lastHead = headRows(fixture)[0][13];
+    expect(lastHead).toBe(ytd(6));
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent?.trim()).toBe(`Fakt TEST · ${ru('rpt.view.grand')} · ${lastHead}`);
+
+    (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent?.trim()).toBe(`Fakt TEST · ${ru('rpt.view.grand')} · ${ru('rpt.month.1')}`);
+  });
+
+  it('shows the value column in the panel of the first measure by month columns', async () => {
+    const { fixture } = await createFixture({ view: of(columnsOnlyView()) });
+
+    (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell"]') as HTMLElement).click();
+    fixture.detectChanges();
+
+    const column = byTestId(fixture, 'rpt-panel-col-measure');
+    expect(column).toHaveLength(1);
+    expect(column[0].textContent?.trim()).toBe('Fakt TEST');
+    expect(byTestId(fixture, 'rpt-view-measure')[0].textContent).not.toContain(ru('rpt.view.count_measure'));
   });
 
   it('shows an undated strip for each measure by date and opens the rows of its measure', async () => {
