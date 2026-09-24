@@ -34,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -158,6 +159,24 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
         service.create(valid().name("TEST report A").build(), userId);
 
         assertInvalid(valid().name("  test REPORT a "), "name", RptErrors.RPT_NAME_TAKEN);
+    }
+
+    @Test
+    @DisplayName("2.2: название кириллицей в другом регистре занято — name RPT_NAME_TAKEN")
+    void cyrillicNameTaken() {
+        service.create(valid().name("TEST Свод").build(), userId);
+
+        assertInvalid(valid().name("test СВОД"), "name", RptErrors.RPT_NAME_TAKEN);
+    }
+
+    @Test
+    @DisplayName("Индекс rpt_reports_uk_name: две строки, отличающиеся регистром кириллицы, не вставляются")
+    void uniqueIndexIgnoresCyrillicCase() {
+        insertReportRow("TEST Свод");
+
+        assertThatThrownBy(() -> insertReportRow("test СВОД"))
+                .isInstanceOf(DuplicateKeyException.class)
+                .hasMessageContaining("rpt_reports_uk_name");
     }
 
     @Test
@@ -360,6 +379,23 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
             }
         }
         return "";
+    }
+
+    private void insertReportRow(String name) {
+        tx.executeWithoutResult(status -> {
+            actors.apply(actors.system());
+            jdbc.sql("""
+                            insert into rpt_reports (name, source_id, source_sheet, date_field, measure_field,
+                                                     level1_origin, level1_field, created_by, modified_by)
+                            values (:name, :sourceId, 1, :dateField, :measureField, 'source', :levelField, 'TEST', 'TEST')
+                            """)
+                    .param("name", name)
+                    .param("sourceId", sourceId)
+                    .param("dateField", RptTestData.DATE)
+                    .param("measureField", RptTestData.AMOUNT)
+                    .param("levelField", RptTestData.GROUP)
+                    .update();
+        });
     }
 
     private void setModule(boolean enable) {

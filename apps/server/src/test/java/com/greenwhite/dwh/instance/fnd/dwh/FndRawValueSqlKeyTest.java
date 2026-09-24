@@ -52,6 +52,15 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("основа: во второй базе есть сравнение ICU und-x-icu")
+    void icuCollationAvailable() {
+        Long count = jdbc.sql("select count(*) from pg_collation where collname = 'und-x-icu'")
+                .query(Long.class)
+                .single();
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
     @DisplayName("контракт отчёта 4.2: число в ключе — по значению (1183 = 1183.0 = 1183,00, экспонента)")
     void numericKeyByValue() {
         assertThat(evalKey("1183")).isEqualTo("1183");
@@ -79,9 +88,10 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("контракт отчёта 4.2: ячейка длиннее 1000 знаков — пустой ключ, а не ошибка базы")
-    void longCellKeyIsEmpty() {
-        assertThat(evalKey("7".repeat(1001))).isEqualTo("");
+    @DisplayName("контракт отчёта 4.2: ячейка длиннее 1000 знаков — ключ null, ни с чем не совпадает")
+    void longCellKeyIsNull() {
+        assertThat(evalKey("7".repeat(1001))).isNull();
+        assertThat(evalKey("x".repeat(1001))).isNull();
     }
 
     @Test
@@ -90,6 +100,39 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
         assertThat(evalGroupKey(" Ипак ЙЎЛИ ")).isEqualTo("ипак йўли");
         assertThat(evalGroupKey("ипак йўли")).isEqualTo("ипак йўли");
         assertThat(evalGroupKey(" ")).isNull();
+    }
+
+    @Test
+    @DisplayName("контракт отчёта 4.4: регистр кириллицы не зависит от языка базы (collate C)")
+    void groupKeyIgnoresDatabaseLocale() {
+        String mixed = evalSql(FndRawValueSql.groupKey("('  Ипак Йўли ҚҒҲ '::text collate \"C\")"));
+        String upper = evalSql(FndRawValueSql.groupKey("('ИПАК ЙЎЛИ ҚҒҲ'::text collate \"C\")"));
+        assertThat(mixed).isEqualTo("ипак йўли қғҳ");
+        assertThat(upper).isEqualTo(mixed);
+    }
+
+    @Test
+    @DisplayName("контракт отчёта 4.1: уровень из числовой колонки — по значению (12 = 12.0 = 12,00), непереводимое — как в файле")
+    void numericLevelByValue() {
+        assertThat(evalLevel("12")).isEqualTo("12");
+        assertThat(evalLevel("12.0")).isEqualTo("12");
+        assertThat(evalLevel(" 12,00 ")).isEqualTo("12");
+        assertThat(evalLevel("12a")).isEqualTo("12a");
+    }
+
+    private String evalSql(String expression) {
+        return jdbc.sql("select " + expression)
+                .query(String.class)
+                .optional()
+                .orElse(null);
+    }
+
+    private String evalLevel(String value) {
+        return jdbc.sql("select " + FndRawValueSql.level(Type.NUMBER, "cast(:v as text)"))
+                .param("v", value)
+                .query(String.class)
+                .optional()
+                .orElse(null);
     }
 
     @Test

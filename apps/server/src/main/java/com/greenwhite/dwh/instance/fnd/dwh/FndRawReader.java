@@ -487,7 +487,7 @@ public class FndRawReader {
             }
             String text = origin == FndPivotSpec.Origin.DATA ? dataField(level.field()) : refField(level.field());
             FndRawSpec part = origin == FndPivotSpec.Origin.DATA ? spec.data() : spec.ref();
-            cte.append(", ").append(FndRawValueSql.canonical(part.type(level.field()), text)).append(" as v").append(index);
+            cte.append(", ").append(FndRawValueSql.level(part.type(level.field()), text)).append(" as v").append(index);
         }
 
         private static void appendGroup(StringBuilder cte, FndPivotSpec.Level level, int index) {

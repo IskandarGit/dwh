@@ -41,7 +41,7 @@ public class RptReportRepository {
                         select r.id, r.name, s.name as source_name, r.modified_at
                           from rpt_reports r
                           join upl_sources s on s.id = r.source_id
-                         order by lower(r.name), r.id
+                         order by lower(r.name collate "und-x-icu"), r.id
                         """)
                 .query((rs, rowNum) -> new ReportItem(rs.getLong("id"), rs.getString("name"),
                         rs.getString("source_name"), rs.getObject("modified_at", OffsetDateTime.class)))
@@ -59,7 +59,7 @@ public class RptReportRepository {
     public boolean nameTaken(String name, Long exceptId) {
         return jdbc.sql("""
                         select exists (select 1 from rpt_reports
-                                        where lower(btrim(name)) = lower(btrim(:name))
+                                        where lower(btrim(name) collate "und-x-icu") = lower(btrim(:name) collate "und-x-icu")
                                           and (:exceptId::bigint is null or id <> :exceptId))
                         """)
                 .param("name", name)

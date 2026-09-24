@@ -194,6 +194,23 @@ class FndPivotTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("Уровень из числовой колонки: «12» и «12.0» — одна строка, её сумма = сумме обеих")
+    void numericLevelByValue() {
+        insert(DATA_LOAD, DATA_SHEET, 1, Map.of("dt", "2026-05-01", "amount", "12"));
+        insert(DATA_LOAD, DATA_SHEET, 2, Map.of("dt", "2026-05-02", "amount", "12.0"));
+        FndPivotSpec.Level amountLevel = new FndPivotSpec.Level(FndPivotSpec.Origin.DATA, "amount");
+
+        FndPivotSpec.Pivot pivot = reader.pivot(
+                new FndPivotSpec(data(), "dt", "amount", null, List.of(), amountLevel, null, YEAR));
+
+        assertThat(pivot.cells()).filteredOn(cell -> cell.depth() == 1 && cell.month() == null).hasSize(1);
+        FndPivotSpec.Cell line = find(pivot, 1, "12", null, null);
+        assertThat(line.count()).isEqualTo(2);
+        assertThat(line.value()).isEqualByComparingTo("24");
+        assertConverges(pivot, 1);
+    }
+
+    @Test
     @DisplayName("AC-7: строки ячейки — число и мера как в ячейке, Σ меры всех страниц = значению ячейки")
     void cellRowsMatchCells() {
         insertTwoLevelData();

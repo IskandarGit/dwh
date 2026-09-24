@@ -38,6 +38,6 @@ create table rpt_reports (
                                        or (level2_origin in ('source', 'ref') and level2_field is not null
                                            and (level2_origin = 'source' or ref_source_id is not null)))
 );
-create unique index rpt_reports_uk_name on rpt_reports (lower(btrim(name)));
+create unique index rpt_reports_uk_name on rpt_reports (lower(btrim(name) collate "und-x-icu"));
 
 select fnd_audit_enable('rpt_reports', 'id');
