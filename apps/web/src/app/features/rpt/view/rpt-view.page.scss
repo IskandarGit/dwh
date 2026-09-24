@@ -141,6 +141,33 @@
   z-index: 3;
 }
 
+.rpt-view-two thead .rpt-view-name {
+  height: calc(2 * var(--rpt-head-height));
+}
+
+.rpt-view-two .rpt-view-head-measures th {
+  top: var(--rpt-head-height);
+}
+
+.rpt-view-two .rpt-view-grand td {
+  top: calc(2 * var(--rpt-head-height));
+}
+
+.rpt-view-block {
+  text-align: center;
+  border-left: 1px solid var(--border-color);
+}
+
+.rpt-view-ratio {
+  color: var(--text-muted);
+}
+
+.rpt-view-measure-info {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
 .rpt-view-l1 td {
   font-weight: 600;
 }

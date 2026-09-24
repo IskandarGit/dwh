@@ -13,7 +13,7 @@ const KEY_LITERAL = /'(rpt\.[A-Za-z0-9_.]*[A-Za-z0-9_]|nav\.rpt_[a-z0-9_]+)'/g;
 const CODE_LITERAL = /'(RPT_[A-Z0-9_]+)'/g;
 /** Литералы того же вида, которые ключами словаря не являются: код формы в каталоге прав. */
 const NOT_KEYS = new Set(['rpt.reports']);
-/** Коды ошибок из контракта «Отчётов», раздел 7. */
+/** Коды ошибок из контракта «Отчётов», разделы 7 и 10.9. */
 const CONTRACT_CODES = [
   'RPT_REPORT_NOT_FOUND',
   'RPT_DEFINITION_INVALID',
@@ -29,7 +29,11 @@ const CONTRACT_CODES = [
   'RPT_TOO_MANY_LINES',
   'RPT_CELL_INVALID',
   'RPT_MODULE_DISABLED',
-  'RPT_QUERY_TIMEOUT'
+  'RPT_QUERY_TIMEOUT',
+  'RPT_PERIOD_INVALID',
+  'RPT_MONTHS_EMPTY',
+  'RPT_LEVELS_MISMATCH',
+  'RPT_MEASURE_NAME_INVALID'
 ];
 const DIVISORS = ['1', '1000', '1000000'];
 const MONTHS = Array.from({ length: 12 }, (_, index) => String(index + 1));
@@ -53,7 +57,6 @@ const SCREEN_KEYS = [
   'rpt.view.expand_all',
   'rpt.view.collapse_all',
   'rpt.view.grand',
-  'rpt.view.total',
   'rpt.view.no_name',
   'rpt.view.undated',
   'rpt.view.show_rows',
@@ -62,6 +65,10 @@ const SCREEN_KEYS = [
   'rpt.view.no_data',
   'rpt.view.stale_ask_admin',
   'rpt.view.stale_field',
+  'rpt.view.ratio',
+  'rpt.view.ytd',
+  'rpt.view.undated_measure',
+  'rpt.view.months_no_year',
   ...DIVISORS.map(divisor => `rpt.unit_short.${divisor}`),
   ...DIVISORS.map(divisor => `rpt.unit.${divisor}`),
   ...MONTHS.map(month => `rpt.month.${month}`),
@@ -76,6 +83,7 @@ const SCREEN_KEYS = [
   'rpt.panel.year_total',
   'rpt.panel.undated',
   'rpt.panel.page',
+  'rpt.panel.column',
   'rpt.edit.new_title',
   'rpt.edit.back',
   'rpt.edit.cancel',
@@ -111,7 +119,20 @@ const SCREEN_KEYS = [
   'rpt.edit.leave_title',
   'rpt.edit.leave_yes',
   'rpt.edit.leave_no',
-  'rpt.edit.source_option'
+  'rpt.edit.source_option',
+  'rpt.edit.block_measure1',
+  'rpt.edit.block_measure2',
+  'rpt.edit.measure_name',
+  'rpt.edit.measure_name_hint',
+  'rpt.edit.add_second',
+  'rpt.edit.months_by',
+  'rpt.edit.months_by_date',
+  'rpt.edit.months_by_columns',
+  'rpt.edit.month_none',
+  'rpt.edit.fill_in_order',
+  'rpt.edit.hint_levels',
+  'rpt.edit.hint_ratio',
+  'rpt.edit.level_matches'
 ];
 
 function sourceFiles(): string[] {
@@ -152,8 +173,8 @@ describe('rpt dictionary keys', () => {
     expect(emptyOrMissing(SCREEN_KEYS, PACKAGED_RUSSIAN)).toEqual([]);
   });
 
-  it('has a non-empty Russian text for all 15 error codes of the contract', () => {
-    expect(CONTRACT_CODES).toHaveLength(15);
+  it('has a non-empty Russian text for all 19 error codes of the contract', () => {
+    expect(CONTRACT_CODES).toHaveLength(19);
     expect(emptyOrMissing(CONTRACT_CODES.map(code => `rpt.err.${code}`), PACKAGED_RUSSIAN)).toEqual([]);
   });
 

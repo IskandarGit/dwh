@@ -7,7 +7,7 @@ function cells(value: string | null): (string | null)[] {
 }
 
 function line(total: string, count: number): RptLine {
-  return { cells: cells(total), total, count };
+  return { cells: cells(total), total, count, m2: null, ratio: null };
 }
 
 function child(key: string | null, name: string | null, total: string): RptLine2 {
@@ -31,6 +31,9 @@ function view(lines: RptLine1[]): RptReportView {
     lines,
     undated: null,
     refDuplicateKeys: 0,
+    ytdMonth: 12,
+    measures: [{ name: null, divisor: 1, decimals: 0, byMonthColumns: false }],
+    undated2: null,
   };
 }
 
@@ -98,6 +101,26 @@ describe('rptVisibleRows', () => {
   it('gives every row a distinct id', () => {
     const rows = rptVisibleRows(twoLevels, new Set());
     expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
+  });
+
+  it('carries the second measure and the ratio of every line as the server sent them', () => {
+    const m2 = { cells: cells('5'), total: '60', count: 3 };
+    const ratio = { cells: cells('0.500000'), total: '0.600000' };
+    const withSecond = view([{ ...group('north', 'North', '100', [{ ...child('a', 'A', '100'), m2, ratio }]), m2, ratio }]);
+    const rows = rptVisibleRows({ ...withSecond, grand: { ...line('100', 10), m2, ratio } }, new Set());
+    expect(rows.map((row) => [row.m2, row.ratio])).toEqual([
+      [m2, ratio],
+      [m2, ratio],
+      [m2, ratio],
+    ]);
+  });
+
+  it('leaves the second measure and the ratio empty in a report with one measure', () => {
+    const [grand, first] = rptVisibleRows(twoLevels, new Set());
+    expect(grand.m2).toBeNull();
+    expect(grand.ratio).toBeNull();
+    expect(first.m2).toBeNull();
+    expect(first.ratio).toBeNull();
   });
 
   it('shows one level without children and never marks such a line collapsed', () => {

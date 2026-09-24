@@ -65,6 +65,9 @@ function savedReport(labels: Record<string, string> = allLabels): RptDefinition 
     sourceSheet: 1,
     dateField: 'date_out',
     measure: { kind: 'total', field: 'amount' },
+    measureName: null,
+    monthFields: null,
+    second: null,
     divisor: 1000000,
     decimals: 2,
     ref: { sourceId: 2, sheet: 1, keys: [{ field: 'branch', refField: 'code' }] },
@@ -278,6 +281,9 @@ describe('RptEditPage', () => {
       sourceSheet: 1,
       dateField: 'date_out',
       measure: { kind: 'count', field: null },
+      measureName: null,
+      monthFields: null,
+      second: null,
       divisor: 1,
       decimals: 0,
       ref: null,
@@ -394,5 +400,250 @@ describe('RptEditPage', () => {
     const opened = await createFixture({ id: 7 });
     await click(opened.fixture, 'rpt-edit-cancel');
     expect(opened.router.navigate).toHaveBeenCalledWith(['/rpt/reports', 7]);
+  });
+});
+
+const NO_MONTHS: (string | null)[] = Array.from({ length: 12 }, () => null);
+
+function months(...fields: (string | null)[]): (string | null)[] {
+  return NO_MONTHS.map((empty, index) => fields[index] ?? empty);
+}
+
+function twoMeasureReport(): RptDefinition {
+  return {
+    ...savedReport(),
+    dateField: null,
+    measure: null,
+    measureName: 'Fakt TEST',
+    monthFields: months('amount', 'qty', 'amount', 'qty'),
+    ref: null,
+    level1: { origin: 'source', field: 'branch' },
+    level2: { origin: 'source', field: 'region' },
+    second: {
+      name: 'Plan TEST',
+      sourceId: 3,
+      sourceSheet: 1,
+      dateField: null,
+      monthFields: months('value'),
+      measure: null,
+      divisor: 1000,
+      decimals: 1,
+      ref: null,
+      level1: { origin: 'source', field: 'name' },
+      level2: null
+    },
+    labels: {
+      ...allLabels,
+      'source:qty': 'Kolichestvo',
+      'second.source:value': 'Znachenie',
+      'second.source:name': 'Imya'
+    }
+  };
+}
+
+async function typeInto(fixture: ComponentFixture<RptEditPage>, id: string, value: string): Promise<void> {
+  const input = byTestId(fixture, id)[0] as HTMLInputElement;
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+  fixture.detectChanges();
+  await fixture.whenStable();
+  fixture.detectChanges();
+}
+
+function isChecked(fixture: ComponentFixture<RptEditPage>, id: string): boolean {
+  return (byTestId(fixture, id)[0] as HTMLInputElement).checked;
+}
+
+describe('RptEditPage — measure name, month columns, second measure', () => {
+  it('switching to month columns hides "what we add up", keeps the divisor and offers number columns for every month', async () => {
+    const { fixture } = await createFixture();
+    await choose(fixture, 'rpt-edit-source', 'Vydachi TEST (vyd)');
+    expect(byTestId(fixture, 'rpt-edit-measure-kind')).toHaveLength(1);
+
+    await click(fixture, 'rpt-edit-period-months');
+
+    expect(byTestId(fixture, 'rpt-edit-measure-kind')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-edit-measure-field')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-edit-date')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-edit-block-measure')[0].textContent).not.toContain(PACKAGED_RUSSIAN['rpt.edit.block_measure']);
+    expect(byTestId(fixture, 'rpt-edit-divisor')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-decimals')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-month')).toHaveLength(12);
+    expect(byTestId(fixture, 'rpt-edit-months')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.month.12']);
+    expect(optionTexts(fixture, 'rpt-edit-month', 11)).toEqual([PACKAGED_RUSSIAN['rpt.edit.month_none'], 'Summa', 'Kolichestvo']);
+
+    await click(fixture, 'rpt-edit-period-date');
+    expect(byTestId(fixture, 'rpt-edit-measure-kind')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-months')).toHaveLength(0);
+  });
+
+  it('fills the months in order from January and sends a measure by month columns without date and measure', async () => {
+    const { fixture, api, page } = await createFixture();
+    await typeName(fixture, 'Plan TEST');
+    await choose(fixture, 'rpt-edit-source', 'Bez dat TEST (nod)');
+    expect(saveButton(fixture).disabled).toBe(true);
+    await click(fixture, 'rpt-edit-period-months');
+    expect(saveButton(fixture).disabled).toBe(false);
+
+    await choose(fixture, 'rpt-edit-source', 'Vydachi TEST (vyd)');
+    const fill = byTestId(fixture, 'rpt-edit-fill-months')[0].querySelector('button') as HTMLButtonElement;
+    expect(fill.disabled).toBe(true);
+    await choose(fixture, 'rpt-edit-month', 'Summa', 0);
+    await click(fixture, 'rpt-edit-fill-months');
+
+    expect(page.form().monthFields).toEqual(months('amount', 'qty'));
+    await choose(fixture, 'rpt-edit-level1', ru('rpt.edit.origin_source', { label: 'Filial' }));
+    await click(fixture, 'rpt-edit-save');
+
+    expect(api.create.mock.calls[0][0]).toEqual({
+      name: 'Plan TEST',
+      measureName: null,
+      sourceId: 1,
+      sourceSheet: 1,
+      dateField: null,
+      monthFields: months('amount', 'qty'),
+      measure: null,
+      divisor: 1,
+      decimals: 0,
+      ref: null,
+      level1: { origin: 'source', field: 'branch' },
+      level2: null,
+      second: null
+    });
+  });
+
+  it('the checkbox opens the second measure block and sends it; unticked the body has no second measure', async () => {
+    const { fixture, api } = await createFixture();
+    await fillCountReport(fixture);
+    expect(isChecked(fixture, 'rpt-edit-use-second')).toBe(false);
+    expect(byTestId(fixture, 'rpt-edit-measure2')).toHaveLength(0);
+
+    await click(fixture, 'rpt-edit-use-second');
+    expect(byTestId(fixture, 'rpt-edit-measure2')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-m2-measure-title')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.edit.block_measure2']);
+    expect(byTestId(fixture, 'rpt-edit-m2-hint-levels')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.edit.hint_levels']);
+    expect(byTestId(fixture, 'rpt-edit-m2-hint-ratio')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.edit.hint_ratio']);
+
+    await typeInto(fixture, 'rpt-edit-m2-measure-name', 'Plan TEST');
+    await choose(fixture, 'rpt-edit-m2-source', 'Bez dat TEST (nod)');
+    await click(fixture, 'rpt-edit-m2-period-months');
+    await choose(fixture, 'rpt-edit-m2-month', 'Znachenie', 0);
+    await choose(fixture, 'rpt-edit-m2-level1', ru('rpt.edit.origin_source', { label: 'Imya' }));
+    expect(byTestId(fixture, 'rpt-edit-m2-match-level1')[0].textContent?.trim()).toBe(
+      ru('rpt.edit.level_matches', { label: 'Filial' })
+    );
+    await click(fixture, 'rpt-edit-save');
+
+    expect(api.create.mock.calls[0][0].second).toEqual({
+      name: 'Plan TEST',
+      sourceId: 3,
+      sourceSheet: 1,
+      dateField: null,
+      monthFields: months('value'),
+      measure: null,
+      divisor: 1,
+      decimals: 0,
+      ref: null,
+      level1: { origin: 'source', field: 'name' },
+      level2: null
+    });
+
+    await click(fixture, 'rpt-edit-use-second');
+    expect(byTestId(fixture, 'rpt-edit-measure2')).toHaveLength(0);
+    await click(fixture, 'rpt-edit-save');
+    expect(api.create.mock.calls[1][0].second).toBeNull();
+  });
+
+  it('shows level 2 of the second measure only when the first measure has level 2', async () => {
+    const { fixture, page } = await createFixture();
+    await fillCountReport(fixture);
+    await click(fixture, 'rpt-edit-use-second');
+    await choose(fixture, 'rpt-edit-m2-source', 'Vydachi TEST (vyd)');
+    expect(byTestId(fixture, 'rpt-edit-m2-level1')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-m2-level2')).toHaveLength(0);
+
+    await choose(fixture, 'rpt-edit-level2', ru('rpt.edit.origin_source', { label: 'Oblast' }));
+    expect(byTestId(fixture, 'rpt-edit-m2-level2')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-m2-match-level2')[0].textContent?.trim()).toBe(
+      ru('rpt.edit.level_matches', { label: 'Oblast' })
+    );
+    await choose(fixture, 'rpt-edit-m2-level2', ru('rpt.edit.origin_source', { label: 'Oblast' }));
+    expect(page.form().second.level2).toEqual({ origin: 'source', field: 'region' });
+
+    await choose(fixture, 'rpt-edit-level2', PACKAGED_RUSSIAN['rpt.edit.no_level2']);
+    expect(byTestId(fixture, 'rpt-edit-m2-level2')).toHaveLength(0);
+    expect(page.form().second.level2).toBeNull();
+  });
+
+  it('shows the level count error inside the second measure block and a month error at its own month', async () => {
+    const problem: ProblemDetail = {
+      title: 'TEST',
+      status: 422,
+      code: 'TEST',
+      detail: 'RPT_DEFINITION_INVALID',
+      errors: [
+        { field: 'second.level2', code: 'RPT_LEVELS_MISMATCH', message: 'RPT_LEVELS_MISMATCH' },
+        { field: 'monthFields[3]', code: 'RPT_COLUMN_TYPE', message: 'RPT_COLUMN_TYPE' }
+      ]
+    };
+    const { fixture } = await createFixture({
+      id: 7,
+      report: () => of(twoMeasureReport()),
+      save: () => throwError(() => problem)
+    });
+
+    await click(fixture, 'rpt-edit-save');
+
+    const secondBlock = byTestId(fixture, 'rpt-edit-measure2')[0];
+    const levelError = secondBlock.querySelector('[data-testid="rpt-edit-m2-error-level2"]');
+    expect(levelError?.textContent?.trim()).toBe(PACKAGED_RUSSIAN['rpt.err.RPT_LEVELS_MISMATCH']);
+    expect(byTestId(fixture, 'rpt-edit-error-level2')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-edit-error-month-3')[0].textContent?.trim()).toBe(
+      ru('rpt.err.RPT_COLUMN_TYPE', { label: 'Kolichestvo', need: PACKAGED_RUSSIAN['rpt.edit.need.number'] })
+    );
+    expect(byTestId(fixture, 'rpt-edit-error-month-2')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-edit-m2-error-month-3')).toHaveLength(0);
+  });
+
+  it('opens a saved report with two measures; a gone column of the second measure asks to choose again in its block', async () => {
+    const report = twoMeasureReport();
+    delete report.labels['second.source:name'];
+    const { fixture, api, page } = await createFixture({ id: 7, report: () => of(report) });
+
+    expect(api.layout).toHaveBeenCalledWith(3, 1);
+    expect(isChecked(fixture, 'rpt-edit-use-second')).toBe(true);
+    expect(isChecked(fixture, 'rpt-edit-period-months')).toBe(true);
+    expect(isChecked(fixture, 'rpt-edit-m2-period-months')).toBe(true);
+    expect((byTestId(fixture, 'rpt-edit-measure-name')[0] as HTMLInputElement).value).toBe('Fakt TEST');
+    expect((byTestId(fixture, 'rpt-edit-m2-measure-name')[0] as HTMLInputElement).value).toBe('Plan TEST');
+    expect(page.form().monthFields).toEqual(months('amount', 'qty', 'amount', 'qty'));
+    expect(page.form().second.level1).toBeNull();
+    expect(byTestId(fixture, 'rpt-edit-m2-again-level1')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-again-level1')).toHaveLength(0);
+  });
+
+  it('opens an old report without the new fields as before: one measure by a date column, the checkbox unticked', async () => {
+    const old: Partial<RptDefinition> = savedReport();
+    delete old.measureName;
+    delete old.monthFields;
+    delete old.second;
+    const { fixture, api } = await createFixture({ id: 7, report: () => of(old as RptDefinition) });
+
+    expect(isChecked(fixture, 'rpt-edit-use-second')).toBe(false);
+    expect(byTestId(fixture, 'rpt-edit-measure2')).toHaveLength(0);
+    expect(isChecked(fixture, 'rpt-edit-period-date')).toBe(true);
+    expect(byTestId(fixture, 'rpt-edit-measure-kind')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-months')).toHaveLength(0);
+    expect((byTestId(fixture, 'rpt-edit-measure-name')[0] as HTMLInputElement).value).toBe('');
+    expect(byTestId(fixture, 'rpt-edit-measure-title')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.edit.block_measure1']);
+
+    await click(fixture, 'rpt-edit-save');
+
+    const input = api.update.mock.calls[0][1];
+    expect(input.second).toBeNull();
+    expect(input.monthFields).toBeNull();
+    expect(input.measureName).toBeNull();
+    expect(input.dateField).toBe('date_out');
+    expect(input.measure).toEqual({ kind: 'total', field: 'amount' });
   });
 });

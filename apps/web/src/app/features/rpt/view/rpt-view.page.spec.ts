@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PACKAGED_RUSSIAN } from '../../../core/i18n/packaged-russian';
 import { FieldErrorItem, ProblemDetail } from '../../../core/models/common.models';
 import { PermissionService } from '../../../core/services/permission.service';
-import { RptApiService, RptCellQuery, RptCellRows, RptLine, RptReportView } from '../shared/rpt-api';
+import { RptApiService, RptCellQuery, RptCellRows, RptLine, RptMeasureValues, RptReportView } from '../shared/rpt-api';
 import { RptViewPage } from './rpt-view.page';
 
 const NBSP = ' ';
@@ -16,7 +16,7 @@ function cells(first: string | null, second: string | null = null): (string | nu
 }
 
 function line(first: string | null, second: string | null, total: string | null): RptLine {
-  return { cells: cells(first, second), total, count: 3 };
+  return { cells: cells(first, second), total, count: 3, m2: null, ratio: null };
 }
 
 function reportView(patch: Partial<RptReportView> = {}): RptReportView {
@@ -43,8 +43,51 @@ function reportView(patch: Partial<RptReportView> = {}): RptReportView {
     ],
     undated: null,
     refDuplicateKeys: 0,
+    ytdMonth: 12,
+    measures: [{ name: null, divisor: 1000000, decimals: 2, byMonthColumns: false }],
+    undated2: null,
     ...patch
   };
+}
+
+function values(first: string | null, second: string | null, total: string | null): RptMeasureValues {
+  return { cells: cells(first, second), total, count: 2 };
+}
+
+/** Line of a report with two measures: first measure, second measure (null — none) and the ratio (null — none). */
+function line2(m1: RptMeasureValues, m2: RptMeasureValues | null, ratio: RptMeasureValues | null): RptLine {
+  return { ...m1, m2, ratio: ratio === null ? null : { cells: ratio.cells, total: ratio.total } };
+}
+
+function twoMeasureView(patch: Partial<RptReportView> = {}): RptReportView {
+  return reportView({
+    name: 'Plan i fakt TEST',
+    divisor: 1000000,
+    decimals: 1,
+    labels: { level1: 'Gruppa TEST', level2: 'Podgruppa TEST', measure: 'Summa TEST' },
+    grand: line2(values('26.4', '42.6', '146.2'), values('30', '40', '180'), values('88.000000', '106.400000', '81.222222')),
+    lines: [
+      {
+        key: 'test-a',
+        name: 'TEST-A',
+        ...line2(values('10', '12.5', '40'), values('12', '0', '72'), values('83.333333', null, '55.555556')),
+        lines: [
+          { key: 'test-a-1', name: 'TEST-A-1', ...line2(values('6', '8.5', '25'), null, null) },
+          { key: 'test-a-2', name: 'TEST-A-2', ...line2(values(null, null, null), values('6', '6', '36'), values('0.000000', '0.000000', '0.000000')) }
+        ]
+      }
+    ],
+    ytdMonth: 6,
+    measures: [
+      { name: 'Fakt TEST', divisor: 1000000, decimals: 1, byMonthColumns: false },
+      { name: 'Plan TEST', divisor: 1000000, decimals: 1, byMonthColumns: true }
+    ],
+    ...patch
+  });
+}
+
+function ytd(month: number): string {
+  return ru('rpt.view.ytd', { month: ru(`rpt.month.${month}`).toLowerCase() });
 }
 
 const cellRows: RptCellRows = { total: 1, offset: 0, limit: 200, value: '8500000', items: [] };
@@ -116,6 +159,12 @@ function rowNames(fixture: ComponentFixture<RptViewPage>): string[] {
   return bodyRows(fixture).map(row => row.querySelector('[data-testid="rpt-row-name"]')?.textContent?.trim() ?? '');
 }
 
+function headRows(fixture: ComponentFixture<RptViewPage>): string[][] {
+  return Array.from(byTestId(fixture, 'rpt-view-table')[0].querySelectorAll('thead tr')).map(row =>
+    Array.from(row.querySelectorAll('th')).map(cell => cell.textContent?.trim() ?? '')
+  );
+}
+
 function rowCells(row: HTMLTableRowElement): string[] {
   return Array.from(row.querySelectorAll('td')).map(cell => cell.textContent?.trim() ?? '');
 }
@@ -141,7 +190,7 @@ describe('RptViewPage', () => {
     const head = Array.from(byTestId(fixture, 'rpt-view-table')[0].querySelectorAll('thead th')).map(cell => cell.textContent?.trim());
     expect(head).toHaveLength(14);
     expect(head[1]).toBe(ru('rpt.month.1'));
-    expect(head[13]).toBe(ru('rpt.view.total'));
+    expect(head[13]).toBe(ytd(12));
   });
 
   it('rounds the numbers to the digits of the report and groups the thousands', async () => {
@@ -271,7 +320,7 @@ describe('RptViewPage', () => {
   });
 
   it('says there is no data instead of the table when the source has no dated rows', async () => {
-    const empty = reportView({ year: null, years: [], lines: [], grand: { cells: cells(null), total: null, count: 0 } });
+    const empty = reportView({ year: null, years: [], lines: [], grand: { cells: cells(null), total: null, count: 0, m2: null, ratio: null } });
     const { fixture } = await createFixture({ view: of(empty) });
 
     expect(byTestId(fixture, 'rpt-view-no-data')[0].textContent).toContain(ru('rpt.view.no_data'));
@@ -309,5 +358,130 @@ describe('RptViewPage', () => {
     fixture.detectChanges();
     expect(byTestId(fixture, 'rpt-view-loading')).toHaveLength(0);
     expect(bodyRows(fixture)).toHaveLength(6);
+  });
+
+  it('names the last column of a report with one measure "January – month N"', async () => {
+    const { fixture } = await createFixture({ view: of(reportView({ ytdMonth: 6 })) });
+
+    const head = headRows(fixture);
+    expect(head).toHaveLength(1);
+    expect(head[0]).toHaveLength(14);
+    expect(head[0][13]).toBe(`${ru('rpt.month.1')} – ${ru('rpt.month.6').toLowerCase()}`);
+    expect(byTestId(fixture, 'rpt-cell-m2')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-cell-ratio')).toHaveLength(0);
+  });
+
+  it('calls the last column of a report with one measure just "January" when N = 1', async () => {
+    const { fixture } = await createFixture({ view: of(reportView({ ytdMonth: 1 })) });
+
+    expect(headRows(fixture)[0][13]).toBe(ru('rpt.month.1'));
+  });
+
+  it('draws a report with two measures under a head of two rows, three columns per month', async () => {
+    const { fixture } = await createFixture({ view: of(twoMeasureView()) });
+
+    const head = headRows(fixture);
+    expect(head).toHaveLength(2);
+    expect(head[0]).toHaveLength(14);
+    expect(head[0][1]).toBe(ru('rpt.month.1'));
+    expect(head[0][13]).toBe(ytd(6));
+    expect(head[1]).toHaveLength(39);
+    expect(head[1].slice(0, 3)).toEqual(['Fakt TEST', 'Plan TEST', ru('rpt.view.ratio')]);
+    expect(head[1].slice(36)).toEqual(['Fakt TEST', 'Plan TEST', ru('rpt.view.ratio')]);
+    const grand = rowCells(bodyRows(fixture)[0]);
+    expect(grand).toHaveLength(40);
+    expect(grand.slice(1, 7)).toEqual(['26,4', '30,0', '88', '42,6', '40,0', '106']);
+    expect(grand.slice(37)).toEqual(['146,2', '180,0', '81']);
+  });
+
+  it('rounds the ratio to an integer, leaves it empty without a value and shows zero', async () => {
+    const { fixture } = await createFixture({ view: of(twoMeasureView()) });
+
+    const group = bodyRows(fixture)[1];
+    expect(rowCells(group).slice(1, 7)).toEqual(['10,0', '12,0', '83', '12,5', '0,0', '']);
+    expect(group.querySelectorAll('[data-testid="rpt-cell-ratio"] button')).toHaveLength(0);
+    const onlyPlan = rowCells(bodyRows(fixture)[3]);
+    expect(onlyPlan.slice(1, 4)).toEqual(['', '6,0', '0']);
+    expect(onlyPlan.slice(37)).toEqual(['', '36,0', '0']);
+  });
+
+  it('leaves the second measure empty on a line that has only the first one', async () => {
+    const { fixture } = await createFixture({ view: of(twoMeasureView()) });
+
+    const onlyFact = bodyRows(fixture)[2];
+    expect(rowCells(onlyFact).slice(1, 4)).toEqual(['6,0', '', '']);
+    expect(rowCells(onlyFact).slice(37)).toEqual(['25,0', '', '']);
+    expect(onlyFact.querySelectorAll('[data-testid="rpt-cell-m2"]')).toHaveLength(0);
+    expect(onlyFact.querySelectorAll('[data-testid="rpt-cell-total-m2"]')).toHaveLength(0);
+  });
+
+  it('asks the rows of the second measure and names the measure in the panel heading', async () => {
+    const { fixture, api } = await createFixture({ view: of(twoMeasureView()) });
+
+    (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell-m2"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(api.cells).toHaveBeenCalledWith(7, { year: 2026, period: { kind: 'month', month: 1 }, path: [], offset: 0, measure: 2 });
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent).toContain(
+      `Plan TEST · ${ru('rpt.view.grand')} · ${ru('rpt.month_year', { month: ru('rpt.month.1'), year: 2026 })}`
+    );
+
+    (bodyRows(fixture)[1].querySelector('[data-testid="rpt-cell-total-m2"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(api.cells).toHaveBeenLastCalledWith(7, { year: 2026, period: { kind: 'year' }, path: ['test-a'], offset: 0, measure: 2 });
+
+    (bodyRows(fixture)[0].querySelector('[data-testid="rpt-cell"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(api.cells).toHaveBeenLastCalledWith(7, { year: 2026, period: { kind: 'month', month: 1 }, path: [], offset: 0, measure: 1 });
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent).toContain(`Fakt TEST · ${ru('rpt.view.grand')}`);
+  });
+
+  it('writes the digits of each measure and marks the measure by month columns', async () => {
+    const { fixture } = await createFixture({ view: of(twoMeasureView()) });
+
+    const measures = byTestId(fixture, 'rpt-view-measure').map(node => node.textContent?.trim());
+    expect(measures).toEqual([ru('rpt.view.measure', { label: 'Fakt TEST' }), ru('rpt.view.measure', { label: 'Plan TEST' })]);
+    expect(byTestId(fixture, 'rpt-view-digits')).toHaveLength(2);
+    expect(byTestId(fixture, 'rpt-view-digits')[1].textContent).toContain(ru('rpt.view.digits', { unit: ru('rpt.unit_short.1000000'), n: 1 }));
+    const noYear = byTestId(fixture, 'rpt-view-months-no-year');
+    expect(noYear).toHaveLength(1);
+    expect(noYear[0].textContent).toContain(ru('rpt.view.months_no_year'));
+    expect(byTestId(fixture, 'rpt-view-measure-info')[1].contains(noYear[0])).toBe(true);
+  });
+
+  it('shows the table without a year when both measures take the months from columns', async () => {
+    const columnsOnly = twoMeasureView({
+      year: null,
+      years: [],
+      measures: [
+        { name: 'Fakt TEST', divisor: 1000000, decimals: 1, byMonthColumns: true },
+        { name: 'Plan TEST', divisor: 1000000, decimals: 1, byMonthColumns: true }
+      ]
+    });
+    const { fixture } = await createFixture({ view: of(columnsOnly) });
+
+    expect(byTestId(fixture, 'rpt-view-year')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-view-no-data')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-view-table')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-view-months-no-year')).toHaveLength(2);
+  });
+
+  it('shows an undated strip for each measure by date and opens the rows of its measure', async () => {
+    const bothDated = twoMeasureView({
+      measures: [
+        { name: 'Fakt TEST', divisor: 1000000, decimals: 1, byMonthColumns: false },
+        { name: 'Plan TEST', divisor: 1000000, decimals: 1, byMonthColumns: false }
+      ],
+      undated: { count: 3, value: '1.25' },
+      undated2: { count: 2, value: '0.5' }
+    });
+    const { fixture, api } = await createFixture({ view: of(bothDated) });
+
+    const strips = byTestId(fixture, 'rpt-view-undated');
+    expect(strips).toHaveLength(2);
+    expect(strips[0].textContent).toContain(ru('rpt.view.undated_measure', { measure: 'Fakt TEST', count: 3, value: '1,3' }));
+    expect(strips[1].textContent).toContain(ru('rpt.view.undated_measure', { measure: 'Plan TEST', count: 2, value: '0,5' }));
+    click(fixture, 'rpt-view-show-undated', 1);
+    expect(api.cells).toHaveBeenLastCalledWith(7, { year: 2026, period: { kind: 'undated' }, path: [], offset: 0, measure: 2 });
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent).toContain(`Plan TEST · ${ru('rpt.panel.undated')}`);
   });
 });
