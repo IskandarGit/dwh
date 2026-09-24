@@ -1819,7 +1819,6 @@
   "rpt.panel.from": "Откуда",
   "rpt.panel.date": "Дата",
   "rpt.panel.rows_count": "Число строк",
-  "rpt.panel.year_total": "Итого за {year}",
   "rpt.panel.undated": "Без даты",
   "rpt.panel.page": "{page} из {pages}",
   "rpt.panel.column": "Колонка",

@@ -80,7 +80,6 @@ const SCREEN_KEYS = [
   'rpt.panel.from',
   'rpt.panel.date',
   'rpt.panel.rows_count',
-  'rpt.panel.year_total',
   'rpt.panel.undated',
   'rpt.panel.page',
   'rpt.panel.column',

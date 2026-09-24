@@ -477,6 +477,19 @@ describe('RptEditPage — measure name, month columns, second measure', () => {
     expect(byTestId(fixture, 'rpt-edit-months')).toHaveLength(0);
   });
 
+  it('shows the measure name hint for measure 1 only while its period is a date column', async () => {
+    const { fixture } = await createFixture();
+    await choose(fixture, 'rpt-edit-source', 'Vydachi TEST (vyd)');
+    expect(byTestId(fixture, 'rpt-edit-measure-name-hint')).toHaveLength(1);
+    expect(byTestId(fixture, 'rpt-edit-measure-name-hint')[0].textContent).toContain(PACKAGED_RUSSIAN['rpt.edit.measure_name_hint']);
+
+    await click(fixture, 'rpt-edit-period-months');
+    expect(byTestId(fixture, 'rpt-edit-measure-name-hint')).toHaveLength(0);
+
+    await click(fixture, 'rpt-edit-period-date');
+    expect(byTestId(fixture, 'rpt-edit-measure-name-hint')).toHaveLength(1);
+  });
+
   it('fills the months in order from January and sends a measure by month columns without date and measure', async () => {
     const { fixture, api, page } = await createFixture();
     await typeName(fixture, 'Plan TEST');

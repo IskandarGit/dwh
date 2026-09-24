@@ -98,8 +98,8 @@
           [ngModel]="measureNameOf(m)"
           (ngModelChange)="setMeasureName(m, $event)"
         />
-        @if (m === 1) {
-          <span class="rpt-edit-note">{{ 'rpt.edit.measure_name_hint' | t }}</span>
+        @if (m === 1 && f.periodKind === 'date') {
+          <span class="rpt-edit-note" [attr.data-testid]="tid(m, 'measure-name-hint')">{{ 'rpt.edit.measure_name_hint' | t }}</span>
         }
         @if (fieldError(measureNameField(m)); as error) {
           <span class="rpt-edit-error" [attr.data-testid]="tid(m, 'error-measureName')">{{ error }}</span>
