@@ -1,0 +1,55 @@
+<div class="rpt-list-page">
+  <div class="rpt-list-header">
+    <h1 class="rpt-list-title">{{ 'rpt.title' | t }}</h1>
+    @if (canEdit() && state() === 'ready' && reports().length > 0) {
+      <ui-button variant="primary" icon="add" data-testid="rpt-list-new" (onClick)="create()">{{ 'rpt.list.new' | t }}</ui-button>
+    }
+  </div>
+
+  @if (state() === 'loading') {
+    <p class="rpt-list-muted" data-testid="rpt-list-loading">{{ 'rpt.list.loading' | t }}</p>
+  }
+
+  @if (loadError(); as error) {
+    <div class="alert alert-error rpt-list-alert" role="alert" data-testid="rpt-list-error">{{ error }}</div>
+  }
+
+  @if (state() === 'ready') {
+    @if (reports().length === 0) {
+      <div class="rpt-list-empty" data-testid="rpt-list-empty">
+        <p class="rpt-list-empty-text">{{ 'rpt.list.empty' | t }}</p>
+        @if (canEdit()) {
+          <p class="rpt-list-muted" data-testid="rpt-list-empty-hint">{{ 'rpt.list.empty_hint' | t }}</p>
+          <ui-button variant="primary" icon="add" data-testid="rpt-list-new" (onClick)="create()">{{ 'rpt.list.new' | t }}</ui-button>
+        }
+      </div>
+    } @else {
+      <div class="table-card rpt-list-card">
+        <table class="rpt-list-table" data-testid="rpt-list-table">
+          <thead>
+            <tr>
+              <th>{{ 'rpt.list.name' | t }}</th>
+              <th>{{ 'rpt.list.source' | t }}</th>
+              <th>{{ 'rpt.list.modified' | t }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of reports(); track item.id) {
+              <tr
+                class="rpt-list-row"
+                data-testid="rpt-list-row"
+                tabindex="0"
+                (click)="open(item)"
+                (keydown.enter)="open(item)"
+              >
+                <td>{{ item.name }}</td>
+                <td>{{ item.sourceName }}</td>
+                <td class="rpt-list-date">{{ modified(item) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

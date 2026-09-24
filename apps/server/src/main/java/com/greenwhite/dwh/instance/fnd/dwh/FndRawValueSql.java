@@ -38,10 +38,42 @@ public final class FndRawValueSql {
         return "coalesce((" + converted(type, text) + ")::text, " + text + ")";
     }
 
+    /** SQL-выражение значения уровня строк: число — по значению: 12 = 12.0 (как ключ 4.2); иначе как {@link #canonical}. */
+    public static String level(FndRawSpec.Type type, String text) {
+        if (type == FndRawSpec.Type.NUMBER) {
+            return "coalesce(trim_scale(" + numberSql(text) + ")::text, " + text + ")";
+        }
+        return canonical(type, text);
+    }
+
     /** Шаблон «содержит» для {@code ilike ... escape '\'}: спецсимволы LIKE экранированы. */
     public static String likePattern(String value) {
         String escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
         return "%" + escaped + "%";
+    }
+
+    /**
+     * Ключ связи со справочником (контракт отчёта 4.2): число — по значению ({@code 1183} = {@code 1183.0}),
+     * иначе текст без пробелов по краям с регистром; пусто и null — пустая строка (пусто = пусто);
+     * длинная ячейка — null: ни с чем не совпадает.
+     */
+    public static String key(String text) {
+        return "(case when length(" + text + ") > " + MAX_CELL_LENGTH + " then null else coalesce(trim_scale("
+                + numberSql(text) + ")::text, nullif(" + stripped(text) + ", ''), '') end)";
+    }
+
+    /**
+     * Название группы для сравнения (контракт отчёта 4.4): без пробелов по краям, строчными; пустое — null.
+     * Строчные — по Unicode (ICU), не по языковым настройкам базы: на базе с {@code LC_CTYPE = C}
+     * {@code lower} не трогает кириллицу.
+     */
+    public static String groupKey(String text) {
+        return "nullif(lower((" + stripped(text) + ") collate \"und-x-icu\"), '')";
+    }
+
+    /** Название без пробелов по краям — написание для глаз; пустое — null. */
+    public static String trimmed(String text) {
+        return "nullif(" + stripped(text) + ", '')";
     }
 
     private static String numberSql(String t) {

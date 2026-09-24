@@ -34,8 +34,8 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
             "notify.preferences:view", "notify.preferences:update",
             "platform.announcements:view");
 
-    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages); V116 — upl.packages:apply только chief_admin и admin; V117 — ovw.data:view. */
-    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload", "ovw.data:view");
+    /** Правило И3+: модули добавляют analyst свои рабочие пары своей миграцией (V112 — upl.sources, V115 — upl.packages); V116 — upl.packages:apply только chief_admin и admin; V117 — ovw.data:view; V119 — rpt.reports:view (edit — только chief_admin и admin). */
+    static final List<String> LATER_MODULE_ANALYST_PAIRS = List.of("upl.sources:view", "upl.packages:view", "upl.packages:upload", "ovw.data:view", "rpt.reports:view");
 
     private static List<String> allAnalystPairs() {
         return java.util.stream.Stream.concat(ANALYST_PAIRS.stream(), LATER_MODULE_ANALYST_PAIRS.stream()).toList();
@@ -154,6 +154,32 @@ class A1InstanceRolesTest extends EmbeddedPostgresTest {
                 order by r.pcode
                 """).query(String.class).list();
         assertThat(holders).contains("admin", "analyst", "chief_admin");
+    }
+
+    @Test
+    @DisplayName("И15: модуль rpt активен; «Просмотр» отчётов у chief_admin, admin и analyst, «Описание отчётов» — без analyst")
+    void reportsModuleAndRights() {
+        List<Map<String, Object>> module = jdbc
+                .sql("select route, is_system, status from md_installed_modules where code = 'rpt'")
+                .query()
+                .listOfRows();
+        assertThat(module).hasSize(1);
+        assertThat(module.getFirst())
+                .containsEntry("route", "/rpt/reports")
+                .containsEntry("is_system", false)
+                .containsEntry("status", "ACTIVE");
+
+        assertThat(holdersOf("rpt.reports", "view")).contains("admin", "analyst", "chief_admin");
+        assertThat(holdersOf("rpt.reports", "edit")).contains("admin", "chief_admin").doesNotContain("analyst");
+    }
+
+    private List<String> holdersOf(String formCode, String action) {
+        return jdbc.sql("""
+                select r.pcode from md_role_permissions p
+                join md_roles r on r.id = p.role_id
+                where p.form_code = :form and p.action = :action
+                order by r.pcode
+                """).param("form", formCode).param("action", action).query(String.class).list();
     }
 
     @Test
