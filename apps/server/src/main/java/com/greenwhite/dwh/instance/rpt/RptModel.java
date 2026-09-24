@@ -78,25 +78,49 @@ public final class RptModel {
 
     public record SourceLayout(long sourceId, List<SheetItem> sheets, Integer sheet, List<ColumnItem> columns) { }
 
-    public record Line(List<String> cells, String total, long count) { }
+    /** Линия отчёта; {@code m2} и {@code ratio} — мера 2 и отношение (контракт И15б, 10.7), у отчёта с одной мерой null. */
+    public record Line(List<String> cells, String total, long count, M2 m2, Ratio ratio) { }
 
-    public record Line2(String key, String name, List<String> cells, String total, long count) { }
+    public record Line2(String key, String name, List<String> cells, String total, long count, M2 m2, Ratio ratio) { }
 
-    public record Line1(String key, String name, List<String> cells, String total, long count, List<Line2> lines) { }
+    public record Line1(String key, String name, List<String> cells, String total, long count, List<Line2> lines,
+                        M2 m2, Ratio ratio) { }
+
+    /** Мера 2 линии: 12 месяцев, итог за месяцы 1…N, число строк за них. */
+    public record M2(List<String> cells, String total, long count) { }
+
+    /** Отношение меры 1 к мере 2 в процентах: строка с 6 знаками или null. */
+    public record Ratio(List<String> cells, String total) { }
+
+    /** Мера в ответе отчёта: {@code byMonthColumns} — месяцы из колонок-месяцев, а не из колонки-даты. */
+    public record MeasureInfo(String name, int divisor, int decimals, boolean byMonthColumns) { }
 
     public record Labels(String level1, String level2, String measure) { }
 
     public record Undated(long count, String value) { }
 
+    /**
+     * Отчёт: {@code cells}, {@code total}, {@code divisor}, {@code decimals}, {@code undated} — мера 1; {@code ytdMonth} — N,
+     * итог = месяцы 1…N; {@code undated2} — строки без даты меры 2 или null.
+     */
     public record ReportView(long reportId, String name, Integer year, List<Integer> years, int divisor, int decimals,
-                             Labels labels, Line grand, List<Line1> lines, Undated undated, int refDuplicateKeys) { }
+                             Labels labels, Line grand, List<Line1> lines, Undated undated, int refDuplicateKeys,
+                             int ytdMonth, List<MeasureInfo> measures, Undated undated2) { }
 
     public record Period(String kind, Integer month) { }
 
-    public record CellQuery(Integer year, Period period, List<String> path, Integer offset) { }
+    /** Запрос строк ячейки; {@code measure} — 1 или 2, null — 1. */
+    public record CellQuery(Integer year, Period period, List<String> path, Integer offset, Integer measure) {
 
+        /** Запрос строк ячейки меры 1. */
+        public CellQuery(Integer year, Period period, List<String> path, Integer offset) {
+            this(year, period, path, offset, null);
+        }
+    }
+
+    /** Строка ячейки; {@code column} — подпись колонки-месяца из анкеты, у меры по дате null. */
     public record CellItem(String file, String sheet, Integer excelRow, String date, String measure, String level1,
-                           String level2) { }
+                           String level2, String column) { }
 
     public record CellRows(long total, int offset, int limit, String value, List<CellItem> items) { }
 }

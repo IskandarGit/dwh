@@ -11,6 +11,7 @@ import com.greenwhite.dwh.instance.rpt.RptModel.DefinitionInput;
 import com.greenwhite.dwh.instance.rpt.RptModel.KeyPair;
 import com.greenwhite.dwh.instance.rpt.RptModel.LevelPart;
 import com.greenwhite.dwh.instance.rpt.RptModel.Measure;
+import com.greenwhite.dwh.instance.rpt.RptModel.MeasureInput;
 import com.greenwhite.dwh.instance.rpt.RptModel.RefPart;
 import com.greenwhite.dwh.instance.rpt.RptTestData.RefRow;
 import com.greenwhite.dwh.instance.rpt.RptTestData.SourceRow;
@@ -239,6 +240,39 @@ class RptReportControllerTest extends EmbeddedPostgresTest {
 
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(400);
         assertThat((String) read(response, "$.detail")).isEqualTo(RptErrors.RPT_MODULE_DISABLED);
+    }
+
+    @Test
+    @DisplayName("10.7, 10.8: отчёт из двух мер — меры в ответе; строки ячейки меры 2 с подписью колонки; мера 2 без неё — 422")
+    void secondMeasureCells() throws Exception {
+        Session admin = login(adminLogin);
+        DefinitionInput first = input("TEST report two");
+        long twoMeasures = definitions.create(new DefinitionInput(first.name(), first.sourceId(), first.sourceSheet(),
+                first.dateField(), first.measure(), first.divisor(), first.decimals(), first.ref(), first.level1(),
+                first.level2(), null, "TEST мера 1", null,
+                new MeasureInput("TEST мера 2", sourceId, 1, null, RptTestData.months(RptTestData.AMOUNT), null, 1, 0,
+                        null, new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP),
+                        new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.CODE))), systemUserId).id();
+
+        var view = send(admin, get(BASE + "/reports/" + twoMeasures + "/view"));
+        assertThat(view.getStatus()).as(view.getContentAsString()).isEqualTo(200);
+        List<String> names = read(view, "$.measures[*].name");
+        assertThat(names).containsExactly("TEST мера 1", "TEST мера 2");
+        assertThat((Integer) read(view, "$.ytdMonth")).isEqualTo(1);
+
+        var cells = send(admin, jsonPost(BASE + "/reports/" + twoMeasures + "/cells",
+                "{\"period\":{\"kind\":\"year\"},\"path\":[],\"offset\":0,\"measure\":2}"));
+        assertThat(cells.getStatus()).as(cells.getContentAsString()).isEqualTo(200);
+        assertThat((Integer) read(cells, "$.total")).isEqualTo(2);
+        assertThat((String) read(cells, "$.value")).isEqualTo("12.5");
+        List<String> columns = read(cells, "$.items[*].column");
+        assertThat(columns).containsExactly("Сумма TEST", "Сумма TEST");
+
+        var invalid = send(admin, jsonPost(report("/cells"),
+                "{\"year\":2026,\"period\":{\"kind\":\"year\"},\"path\":[],\"offset\":0,\"measure\":2}"));
+        assertThat(invalid.getStatus()).as(invalid.getContentAsString()).isEqualTo(422);
+        List<String> fields = read(invalid, "$.errors[*].field");
+        assertThat(fields).containsExactly("measure");
     }
 
     // ---------- помощники ----------
