@@ -327,6 +327,42 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
         assertThat((String) read(list, "$.items[0].status")).isEqualTo(UplPackageModel.VERIFIED);
     }
 
+    @Test
+    @DisplayName("Новый месяц AC-4: скрытая применённая загрузка отдаёт replacedBy, скрывающая и неприменённая — нет")
+    void replacedByInListAndApplyResponse() throws Exception {
+        Session admin = login(adminLogin);
+        String idA = uploadAndParse(admin, "2026-01-01", "2026-06-30");
+        var appliedA = send(admin, post(BASE + "/" + idA + "/apply"));
+        assertThat(appliedA.getStatus()).as(appliedA.getContentAsString()).isEqualTo(200);
+
+        String idB = uploadAndParse(admin, "2026-01-01", "2026-07-31");
+        var appliedB = send(admin, post(BASE + "/" + idB + "/apply"));
+        assertThat(appliedB.getStatus()).as(appliedB.getContentAsString()).isEqualTo(200);
+        assertThat(appliedB.getContentAsString()).doesNotContain("replacedBy");
+
+        String idC = uploadAndParse(admin, "2026-01-01", "2026-08-31");
+
+        var list = sendGet(admin, BASE, 200);
+        String itemA = "$.items[?(@.id == '" + idA + "')]";
+        assertThat((List<Object>) read(list, itemA + ".replacedBy.id")).containsExactly(idB);
+        assertThat((List<Object>) read(list, itemA + ".replacedBy.fileName")).containsExactly("TEST.xlsx");
+        assertThat((List<Object>) read(list, itemA + ".replacedBy.periodFrom")).containsExactly("2026-01-01");
+        assertThat((List<Object>) read(list, itemA + ".replacedBy.periodTo")).containsExactly("2026-07-31");
+        List<Object> uploadedAt = read(list, itemA + ".replacedBy.uploadedAt");
+        assertThat(uploadedAt).hasSize(1);
+        assertThat(String.valueOf(uploadedAt.get(0))).isNotBlank();
+        assertThat((List<Object>) read(list, itemA + ".status")).containsExactly(UplPackageModel.APPLIED);
+        assertThat((List<Object>) read(list, "$.items[*].id")).containsExactlyInAnyOrder(idA, idB, idC);
+        assertThat(list.getContentAsString().split("\"replacedBy\"", -1)).hasSize(2);
+    }
+
+    private String uploadAndParse(Session session, String from, String to) throws Exception {
+        var accepted = upload(session, String.valueOf(sourceId), from, to, UplPackageTestData.workbook(3, 0));
+        assertThat(accepted.getStatus()).as(accepted.getContentAsString()).isEqualTo(202);
+        assertThat(jobs.runQueued()).isEqualTo(1);
+        return read(accepted, "$.id");
+    }
+
     // ---------- помощники ----------
 
     private MockHttpServletResponse upload(Session session, String source, String from, String to, byte[] content)

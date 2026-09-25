@@ -3,6 +3,7 @@ package com.greenwhite.dwh.instance.upl.upload;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ErrorRow;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.NewPackage;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.PackageRow;
+import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ReplacedBy;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.ObjectMapper;
@@ -29,9 +30,16 @@ public class UplPackageRepository {
                    p.format_version, p.period_from, p.period_to, p.file_id, p.file_name, p.file_sha256,
                    p.file_size_bytes, p.status, p.rows_total, p.rows_accepted, p.rows_rejected, p.errors_total,
                    p.reject_code, p.reject_params::text as reject_params, p.load_id, p.raw_rows,
-                   p.uploaded_at, p.uploaded_by
+                   p.uploaded_at, p.uploaded_by,
+                   r.public_id as r_public_id, r.file_name as r_file_name, r.period_from as r_period_from,
+                   r.period_to as r_period_to, r.uploaded_at as r_uploaded_at
               from upl_packages p
               join upl_sources s on s.id = p.source_id
+              left join lateral (select b.public_id, b.file_name, b.period_from, b.period_to, b.uploaded_at
+                                   from upl_packages b
+                                  where b.source_id = p.source_id and b.status = 'applied' and p.status = 'applied'
+                                    and b.id > p.id and b.period_from <= p.period_to and p.period_from <= b.period_to
+                                  order by b.id desc limit 1) r on true
             """;
 
     private static final String ERROR_SELECT = """
@@ -224,7 +232,10 @@ public class UplPackageRepository {
     /** Источник с хотя бы одним применённым пакетом (обзор данных). */
     public record AppliedSource(long id, String code, String name) { }
 
-    /** Показываемый пакет: из применённых пакетов одного периода — с наибольшим load_id. */
+    /**
+     * Видимая применённая загрузка: нет применённой позже (больший id) с пересекающимся периодом;
+     * одинаковые периоды — частный случай.
+     */
     public record AppliedPackage(long loadId, String fileName, LocalDate periodFrom, LocalDate periodTo,
                                  int formatVersion) { }
 
@@ -243,13 +254,13 @@ public class UplPackageRepository {
 
     public List<AppliedPackage> appliedPackages(long sourceId) {
         return jdbc.sql("""
-                        select * from (
-                            select distinct on (period_from, period_to)
-                                   load_id, file_name, period_from, period_to, format_version
-                              from upl_packages
-                             where source_id = :sourceId and status = :applied
-                             order by period_from, period_to, load_id desc) p
-                         order by period_from, period_to
+                        select a.load_id, a.file_name, a.period_from, a.period_to, a.format_version
+                          from upl_packages a
+                         where a.source_id = :sourceId and a.status = :applied
+                           and not exists (select 1 from upl_packages b
+                                            where b.source_id = a.source_id and b.status = :applied and b.id > a.id
+                                              and b.period_from <= a.period_to and a.period_from <= b.period_to)
+                         order by a.period_from, a.period_to, a.id
                         """)
                 .param("sourceId", sourceId)
                 .param("applied", UplPackageModel.APPLIED)
@@ -286,7 +297,21 @@ public class UplPackageRepository {
                 rs.getObject("load_id", Long.class),
                 rs.getObject("raw_rows", Integer.class),
                 toInstant(rs.getTimestamp("uploaded_at")),
-                rs.getString("uploaded_by"));
+                rs.getString("uploaded_by"),
+                replacedBy(rs));
+    }
+
+    private ReplacedBy replacedBy(ResultSet rs) throws SQLException {
+        UUID id = rs.getObject("r_public_id", UUID.class);
+        if (id == null) {
+            return null;
+        }
+        return new ReplacedBy(
+                id,
+                rs.getString("r_file_name"),
+                rs.getObject("r_period_from", LocalDate.class),
+                rs.getObject("r_period_to", LocalDate.class),
+                toInstant(rs.getTimestamp("r_uploaded_at")));
     }
 
     private ErrorRow mapError(ResultSet rs, int rowNum) throws SQLException {

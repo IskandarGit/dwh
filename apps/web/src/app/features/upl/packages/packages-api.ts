@@ -10,6 +10,15 @@ export type UplPackageStatus = 'received' | 'verified' | 'rejected' | 'applied';
 /** Параметры русского текста ошибки: подставляются в фигурные скобки ключа `upl.err.*`. */
 export type UplPackageParams = Record<string, string | number>;
 
+/** Скрывающая загрузка: применённая позже с пересекающимся периодом (контракт file-upload-api.md раздел 11). */
+export interface UplPackageReplacedBy {
+  id: string;
+  fileName: string;
+  periodFrom: string;
+  periodTo: string;
+  uploadedAt: string;
+}
+
 export interface UplPackageItem {
   id: string;
   sourceId: number;
@@ -31,6 +40,7 @@ export interface UplPackageItem {
   rejectParams: UplPackageParams | null;
   loadId: number | null;
   rawRows: number | null;
+  replacedBy?: UplPackageReplacedBy | null;
 }
 
 export interface UplPackageErrorItem {

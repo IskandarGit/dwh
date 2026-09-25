@@ -53,6 +53,9 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
         <ui-badge [variant]="statusVariant[item.status]">{{ statusKey[item.status] | t }}</ui-badge>
       </div>
       <div class="upl-pkg-card-meta" data-testid="upl-pkg-card-meta">{{ metaText() }}</div>
+      @if (replacedText(); as line) {
+        <p class="upl-pkg-replaced" data-testid="upl-pkg-replaced">{{ line }}</p>
+      }
       @if (applyError(); as message) {
         <div class="alert alert-error upl-pkg-alert" data-testid="upl-pkg-apply-error">{{ message }}</div>
       }
@@ -179,6 +182,12 @@ const NOT_FOUND = 'UPL_PKG_NOT_FOUND';
     }
 
     .upl-pkg-card-meta {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .upl-pkg-replaced {
+      margin: 4px 0 0;
       color: var(--text-muted);
       font-size: 0.875rem;
     }
@@ -317,6 +326,19 @@ export class PackageCardComponent implements OnChanges {
       return '';
     }
     return this.i18n.translate('upl.pkg.card.reconciliation', { n: rowsTotal, m: rawRows });
+  }
+
+  /** Строка замены: только когда сервер отдал скрывающую загрузку (контракт file-upload-api.md раздел 11). */
+  replacedText(): string {
+    const r = this.item.replacedBy;
+    if (!r) {
+      return '';
+    }
+    return this.i18n.translate('upl.pkg.card.replaced_by', {
+      when: formatUplDateTime(r.uploadedAt),
+      file: r.fileName,
+      period: formatUplPeriod(r.periodFrom, r.periodTo)
+    });
   }
 
   apply(): void {
