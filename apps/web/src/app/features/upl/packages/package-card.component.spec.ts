@@ -12,6 +12,7 @@ import {
   UplPackagesApiService
 } from './packages-api';
 import { PackageCardComponent } from './package-card.component';
+import { UPL_PACKAGE_STATUS_KEY, formatUplDateTime, formatUplPeriod } from './packages-labels';
 
 function item(patch: Partial<UplPackageItem> = {}): UplPackageItem {
   return {
@@ -382,5 +383,41 @@ describe('PackageCardComponent', () => {
 
     expect(testId(fixture, 'upl-pkg-rejected')[0].textContent).toContain('Сверка не сошлась: в файле 10 строк, в базе 9');
     expect(testId(fixture, 'upl-pkg-reconciliation')).toHaveLength(0);
+  });
+
+  it('AC-4: у заменённой загрузки надпись с датой, файлом и периодом скрывающей', async () => {
+    const replaced = item({
+      status: 'applied',
+      loadId: 9,
+      rowsTotal: 3,
+      rawRows: 3,
+      replacedBy: {
+        id: 'b',
+        fileName: 'TEST-07.xlsx',
+        periodFrom: '2026-01-01',
+        periodTo: '2026-07-31',
+        uploadedAt: '2026-07-10T09:15:00Z'
+      }
+    });
+    const { fixture } = await createFixture(replaced);
+
+    const line = testId(fixture, 'upl-pkg-replaced');
+    expect(line).toHaveLength(1);
+    const content = line[0].textContent?.trim() ?? '';
+    expect(content.startsWith('Заменена загрузкой от')).toBe(true);
+    expect(content).toContain('TEST-07.xlsx');
+    expect(content).toContain(formatUplPeriod('2026-01-01', '2026-07-31'));
+    expect(content).toContain(formatUplDateTime('2026-07-10T09:15:00Z'));
+    const badge = fixture.debugElement.query(By.css('ui-badge')).nativeElement as HTMLElement;
+    expect(badge.textContent?.trim()).toBe(PACKAGED_RUSSIAN[UPL_PACKAGE_STATUS_KEY['applied']]);
+  });
+
+  it('AC-4: без поля replacedBy надписи нет', async () => {
+    const absent = await createFixture(item({ status: 'applied', loadId: 9 }));
+    expect(testId(absent.fixture, 'upl-pkg-replaced')).toHaveLength(0);
+
+    TestBed.resetTestingModule();
+    const nulled = await createFixture(item({ status: 'applied', loadId: 9, replacedBy: null }));
+    expect(testId(nulled.fixture, 'upl-pkg-replaced')).toHaveLength(0);
   });
 });

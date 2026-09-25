@@ -120,6 +120,17 @@ public final class RptTestData {
                 from, to);
     }
 
+    /** Пакет источника «проверен», не применён. */
+    public PackageRow verifiedSource(long sourceId, List<SourceRow> rows, LocalDate from, LocalDate to) {
+        List<List<Object>> cells = new ArrayList<>();
+        for (int i = 0; i < rows.size(); i++) {
+            SourceRow row = rows.get(i);
+            cells.add(Arrays.asList(objectKey(i), row.date(), row.amount(), row.qty(), row.code(), row.group()));
+        }
+        return verified(sourceId, 1, UplXlsxFixtures.workbook(new SheetSpec(SOURCE_SHEET, 1, SOURCE_HEADER, cells)),
+                from, to);
+    }
+
     /** Применённый пакет источника по версии анкеты без колонки группы ({@link #republishSourceWithoutGroup}). */
     public PackageRow applySourceWithoutGroup(long sourceId, int formatVersion, List<SourceRow> rows,
                                               LocalDate from, LocalDate to) {
@@ -144,6 +155,15 @@ public final class RptTestData {
     }
 
     private PackageRow apply(long sourceId, int formatVersion, byte[] content, LocalDate from, LocalDate to) {
+        PackageRow parsed = verified(sourceId, formatVersion, content, from, to);
+        PackageRow applied = applies.apply(parsed.publicId().toString(), userId);
+        if (!UplPackageModel.APPLIED.equals(applied.status())) {
+            throw new IllegalStateException("Тестовый пакет не применён: " + applied.status());
+        }
+        return applied;
+    }
+
+    private PackageRow verified(long sourceId, int formatVersion, byte[] content, LocalDate from, LocalDate to) {
         FileRecord file = files.uploadFile("TEST.xlsx", UplPackageTestData.XLSX_MIME,
                 new ByteArrayInputStream(content), content.length, userId);
         PackageRow row = packages.register(new NewPackage(sourceId, formatVersion, from, to, file.id(),
@@ -153,11 +173,7 @@ public final class RptTestData {
         if (!UplPackageModel.VERIFIED.equals(parsed.status())) {
             throw new IllegalStateException("Тестовый пакет не прошёл проверку: " + parsed.status());
         }
-        PackageRow applied = applies.apply(parsed.publicId().toString(), userId);
-        if (!UplPackageModel.APPLIED.equals(applied.status())) {
-            throw new IllegalStateException("Тестовый пакет не применён: " + applied.status());
-        }
-        return applied;
+        return parsed;
     }
 
     private long published(String codePrefix, String name, Sheet sheet) {

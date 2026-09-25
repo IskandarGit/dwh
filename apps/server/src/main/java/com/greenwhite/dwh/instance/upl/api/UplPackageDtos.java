@@ -2,6 +2,7 @@ package com.greenwhite.dwh.instance.upl.api;
 
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ErrorRow;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.ErrorsView;
+import com.greenwhite.dwh.instance.upl.upload.UplPackageModel;
 import com.greenwhite.dwh.instance.upl.upload.UplPackageModel.PackageRow;
 
 import java.time.Instant;
@@ -21,14 +22,24 @@ public final class UplPackageDtos {
                               LocalDate periodFrom, LocalDate periodTo, String fileName, long fileSizeBytes,
                               String uploadedBy, Instant uploadedAt, String status,
                               Integer rowsTotal, Integer rowsAccepted, Integer rowsRejected, Integer errorsTotal,
-                              String rejectCode, Map<String, Object> rejectParams, Long loadId, Integer rawRows) {
+                              String rejectCode, Map<String, Object> rejectParams, Long loadId, Integer rawRows,
+                              ReplacedBy replacedBy) {
 
         public static PackageItem of(PackageRow row) {
             return new PackageItem(row.publicId(), row.sourceId(), row.sourceCode(), row.sourceName(),
                     row.formatVersion(), row.periodFrom(), row.periodTo(), row.fileName(), row.fileSizeBytes(),
                     row.uploadedBy(), row.uploadedAt(), row.status(),
                     row.rowsTotal(), row.rowsAccepted(), row.rowsRejected(), row.errorsTotal(),
-                    row.rejectCode(), row.rejectParams(), row.loadId(), row.rawRows());
+                    row.rejectCode(), row.rejectParams(), row.loadId(), row.rawRows(),
+                    ReplacedBy.of(row.replacedBy()));
+        }
+    }
+
+    /** Скрывающая загрузка: применённая позже (больший id) с пересекающимся периодом; null — загрузка видна. */
+    public record ReplacedBy(UUID id, String fileName, LocalDate periodFrom, LocalDate periodTo, Instant uploadedAt) {
+
+        static ReplacedBy of(UplPackageModel.ReplacedBy r) {
+            return r == null ? null : new ReplacedBy(r.id(), r.fileName(), r.periodFrom(), r.periodTo(), r.uploadedAt());
         }
     }
 

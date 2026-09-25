@@ -1639,6 +1639,7 @@ export const PACKAGED_RUSSIAN: Readonly<Record<string, string>> = Object.freeze(
   "upl.pkg.card.reconciliation": "В файле {n} строк = в базе {m} строк",
   "upl.pkg.card.rejected": "Файл отклонён",
   "upl.pkg.card.rejected_hint": "Исправьте файл и загрузите его заново — это будет новая загрузка",
+  "upl.pkg.card.replaced_by": "Заменена загрузкой от {when}: {file}, период {period}",
   "upl.pkg.card.rows_accepted": "Принято",
   "upl.pkg.card.rows_rejected": "С ошибками",
   "upl.pkg.card.rows_total": "Всего",

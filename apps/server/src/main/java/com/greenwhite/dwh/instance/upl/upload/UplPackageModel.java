@@ -27,7 +27,11 @@ public final class UplPackageModel {
                              String fileName, String fileSha256, long fileSizeBytes, String status,
                              Integer rowsTotal, Integer rowsAccepted, Integer rowsRejected, Integer errorsTotal,
                              String rejectCode, Map<String, Object> rejectParams, Long loadId, Integer rawRows,
-                             Instant uploadedAt, String uploadedBy) {
+                             Instant uploadedAt, String uploadedBy, ReplacedBy replacedBy) {
+    }
+
+    /** Скрывающая загрузка: применённая позже (больший id) с пересекающимся периодом; null — загрузка видна. */
+    public record ReplacedBy(UUID id, String fileName, LocalDate periodFrom, LocalDate periodTo, Instant uploadedAt) {
     }
 
     /** Данные нового пакета: всё, что известно в момент приёма файла. */
