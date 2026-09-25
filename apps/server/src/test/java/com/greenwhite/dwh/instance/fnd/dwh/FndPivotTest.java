@@ -265,7 +265,7 @@ class FndPivotTest extends EmbeddedPostgresTest {
         FndRawSpec empty = new FndRawSpec(List.of(), DATA_SHEET, dataColumns());
         FndPivotSpec spec = new FndPivotSpec(empty, "dt", "amount", null, List.of(), DATA_GROUP, null, YEAR);
 
-        assertThat(offline.pivot(spec)).isEqualTo(new FndPivotSpec.Pivot(List.of(), List.of(), 0, BigDecimal.ZERO, 0));
+        assertThat(offline.pivot(spec)).isEqualTo(new FndPivotSpec.Pivot(List.of(), List.of(), 0, BigDecimal.ZERO, 0, List.of()));
         FndPivotSpec.CellRows rows = offline.pivotRows(spec,
                 new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.YEAR, null, List.of()), 0, 5);
         assertThat(rows.total()).isZero();
@@ -277,6 +277,123 @@ class FndPivotTest extends EmbeddedPostgresTest {
         assertThatThrownBy(() -> reader.pivotRows(withoutYear,
                 new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.MONTH, 1, List.of()), 0, 5))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("10.5 п.3: колонки-месяцы — пара «месяц, значение», месяц без колонки и пустое значение — не пара, год не фильтрует")
+    void monthColumnsArePairs() {
+        insert(DATA_LOAD, DATA_SHEET, 1, Map.of("grp", "TEST-G0", "m01", "10", "m02", "99", "m03", "", "m04", "4"));
+        insert(DATA_LOAD, DATA_SHEET, 2, Map.of("grp", "TEST-G1", "m01", "5", "m04", "abc"));
+        FndPivotSpec spec = monthsSpec(null);
+
+        FndPivotSpec.Pivot pivot = reader.pivot(spec);
+
+        assertThat(pivot.years()).isEmpty();
+        assertThat(pivot.undatedCount()).isZero();
+        assertThat(pivot.undatedValue()).isEqualByComparingTo("0");
+        assertThat(pivot.monthsWithRows()).containsExactly(1, 4);
+        FndPivotSpec.Cell total = find(pivot, 0, null, null, null);
+        assertThat(total.count()).isEqualTo(3);
+        assertThat(total.value()).isEqualByComparingTo("19");
+        assertThat(find(pivot, 0, null, null, 1).value()).isEqualByComparingTo("15");
+        assertThat(find(pivot, 0, null, null, 4).count()).isEqualTo(1);
+        assertThat(pivot.cells()).noneSatisfy(cell -> assertThat(cell.month()).isIn(2, 3));
+        assertConverges(pivot, 1);
+
+        FndPivotSpec.CellRows january = reader.pivotRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.MONTH, 1, List.of()), 0, 5);
+        assertThat(january.total()).isEqualTo(2);
+        assertThat(january.value()).isEqualByComparingTo("15");
+        assertThat(january.rows()).allSatisfy(row -> {
+            assertThat(row.column()).isEqualTo("m01");
+            assertThat(row.date()).isNull();
+        });
+        assertCellRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.YEAR, null, List.of()), total.count(), total.value());
+        assertThat(reader.pivotRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.UNDATED, null, List.of()), 0, 5).total())
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("10.5 п.4: untilMonth — итог за год только месяцы 1..N, ячейки месяцев все; строки ячейки года — тот же фильтр")
+    void untilMonthLimitsYearTotal() {
+        insert(DATA_LOAD, DATA_SHEET, 1, Map.of("dt", "2026-01-10", "amount", "1", "grp", "TEST-G0"));
+        insert(DATA_LOAD, DATA_SHEET, 2, Map.of("dt", "2026-02-10", "amount", "2", "grp", "TEST-G0"));
+        insert(DATA_LOAD, DATA_SHEET, 3, Map.of("dt", "2026-03-10", "amount", "4", "grp", "TEST-G0"));
+        insert(DATA_LOAD, DATA_SHEET, 4, Map.of("dt", "2025-12-10", "amount", "8", "grp", "TEST-G0"));
+        FndPivotSpec spec = new FndPivotSpec(data(), new FndPivotSpec.DatePeriod("dt"), "amount", null, List.of(),
+                DATA_GROUP, null, YEAR, 2);
+
+        FndPivotSpec.Pivot pivot = reader.pivot(spec);
+
+        assertThat(pivot.monthsWithRows()).containsExactly(1, 2, 3);
+        FndPivotSpec.Cell total = find(pivot, 0, null, null, null);
+        assertThat(total.count()).isEqualTo(2);
+        assertThat(total.value()).isEqualByComparingTo("3");
+        assertThat(find(pivot, 1, "test-g0", null, null).value()).isEqualByComparingTo("3");
+        assertThat(find(pivot, 0, null, null, 3).value()).isEqualByComparingTo("4");
+        assertThat(pivot.cells()).filteredOn(cell -> cell.depth() == 0 && cell.month() != null).hasSize(3);
+        assertCellRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.YEAR, null, List.of()), 2, new BigDecimal("3"));
+
+        insert(DATA_LOAD, DATA_SHEET, 5, Map.of("grp", "TEST-G0", "m01", "10", "m04", "4"));
+        FndPivotSpec.Pivot untilJanuary = reader.pivot(monthsSpec(1));
+        assertThat(find(untilJanuary, 0, null, null, null).value()).isEqualByComparingTo("10");
+        assertThat(find(untilJanuary, 0, null, null, null).count()).isEqualTo(1);
+        assertThat(find(untilJanuary, 0, null, null, 4).value()).isEqualByComparingTo("4");
+    }
+
+    @Test
+    @DisplayName("10.5 п.1: отклонённые строки не входят ни в ячейку, ни в «без даты», ни в строки ячейки, ни в годы, ни в справочник")
+    void rejectedRowsAreIgnored() {
+        insert(DATA_LOAD, DATA_SHEET, 1, Map.of("dt", "2026-01-10", "amount", "1", "code", "1"));
+        insert(DATA_LOAD, DATA_SHEET, 2, Map.of("dt", "2026-01-11", "amount", "2", "code", "2"));
+        insertRejected(DATA_LOAD, DATA_SHEET, 3, Map.of("dt", "2026-01-12", "amount", "100", "code", "1"));
+        insertRejected(DATA_LOAD, DATA_SHEET, 4, Map.of("amount", "50", "code", "1"));
+        insertRejected(DATA_LOAD, DATA_SHEET, 5, Map.of("dt", "2024-05-01", "amount", "7", "code", "1"));
+        insert(REF_LOAD, REF_SHEET, 1, Map.of("rcode", "1", "rname", "TEST-A"));
+        insertRejected(REF_LOAD, REF_SHEET, 2, Map.of("rcode", "2", "rname", "TEST-R"));
+        insertRejected(REF_LOAD_2, REF_SHEET, 1, Map.of("rcode", "1", "rname", "TEST-Z"));
+        FndPivotSpec spec = oneRefLevel(YEAR);
+
+        FndPivotSpec.Pivot pivot = reader.pivot(spec);
+
+        assertThat(pivot.years()).containsExactly(YEAR);
+        assertThat(pivot.undatedCount()).isZero();
+        assertThat(pivot.refDuplicateKeys()).isZero();
+        FndPivotSpec.Cell total = find(pivot, 0, null, null, null);
+        assertThat(total.count()).isEqualTo(2);
+        assertThat(total.value()).isEqualByComparingTo("3");
+        FndPivotSpec.Cell named = find(pivot, 1, "test-a", null, null);
+        assertThat(named.name1()).isEqualTo("TEST-A");
+        assertThat(named.value()).isEqualByComparingTo("1");
+        assertThat(find(pivot, 1, null, null, null).value()).isEqualByComparingTo("2");
+        assertCellRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.YEAR, null, List.of()), 2, new BigDecimal("3"));
+        assertThat(reader.pivotRows(spec, new FndPivotSpec.CellQuery(FndPivotSpec.PeriodKind.UNDATED, null, List.of()), 0, 5).total())
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("10.4: прежний конструктор — те же цифры, что DatePeriod без untilMonth; колонки-месяцы проверяются")
+    void oldConstructorSameNumbersAndMonthsChecked() {
+        insertTwoLevelData();
+        FndPivotSpec old = twoLevels(YEAR, "amount");
+        FndPivotSpec explicit = new FndPivotSpec(data(), new FndPivotSpec.DatePeriod("dt"), "amount", ref(), List.of(CODE),
+                REF_NAME, DATA_GROUP, YEAR, null);
+
+        assertThat(old).isEqualTo(explicit);
+        assertThat(old.dateField()).isEqualTo("dt");
+        assertThat(reader.pivot(old)).isEqualTo(reader.pivot(explicit));
+
+        List<String> eleven = new ArrayList<>(monthFields());
+        eleven.removeLast();
+        assertThatThrownBy(() -> new FndPivotSpec.MonthsPeriod(eleven)).isInstanceOf(IllegalArgumentException.class);
+        List<String> none = new ArrayList<>();
+        monthFields().forEach(field -> none.add(null));
+        assertThatThrownBy(() -> new FndPivotSpec.MonthsPeriod(none)).isInstanceOf(IllegalArgumentException.class);
+        FndPivotSpec.MonthsPeriod period = new FndPivotSpec.MonthsPeriod(monthFields());
+        assertThatThrownBy(() -> new FndPivotSpec(monthsData(), period, "m01", null, List.of(), DATA_GROUP, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new FndPivotSpec(monthsData(), period, null, null, List.of(), DATA_GROUP, null, null, 13))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(monthsSpec(null).dateField()).isNull();
     }
 
     /**
@@ -394,6 +511,38 @@ class FndPivotTest extends EmbeddedPostgresTest {
         columns.put("code2", FndRawSpec.Type.TEXT);
         columns.put("grp", FndRawSpec.Type.TEXT);
         return columns;
+    }
+
+    /** Колонки-месяцы m01..m12, у февраля колонки нет. */
+    private static List<String> monthFields() {
+        List<String> fields = new ArrayList<>();
+        for (int month = 1; month <= 12; month++) {
+            fields.add(month == 2 ? null : String.format("m%02d", month));
+        }
+        return fields;
+    }
+
+    private static FndPivotSpec monthsSpec(Integer untilMonth) {
+        return new FndPivotSpec(monthsData(), new FndPivotSpec.MonthsPeriod(monthFields()), null, null, List.of(),
+                DATA_GROUP, null, YEAR, untilMonth);
+    }
+
+    private static FndRawSpec monthsData() {
+        LinkedHashMap<String, FndRawSpec.Type> columns = new LinkedHashMap<>();
+        columns.put("grp", FndRawSpec.Type.TEXT);
+        for (int month = 1; month <= 12; month++) {
+            columns.put(String.format("m%02d", month), FndRawSpec.Type.NUMBER);
+        }
+        return new FndRawSpec(List.of(DATA_LOAD, DATA_LOAD_2), DATA_SHEET, columns);
+    }
+
+    private void insertRejected(long loadId, String sheet, int rowNo, Map<String, Object> fields) {
+        insert(loadId, sheet, rowNo, fields);
+        dwhJdbc.sql("update raw.rows set rejected = true where load_id = :loadId and sheet = :sheet and row_no = :rowNo")
+                .param("loadId", loadId)
+                .param("sheet", sheet)
+                .param("rowNo", rowNo)
+                .update();
     }
 
     private void insert(long loadId, String sheet, int rowNo, Map<String, Object> fields) {

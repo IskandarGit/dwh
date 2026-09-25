@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -76,6 +77,15 @@ public final class RptTestData {
 
     /** Строка файла справочника: код связи и название. */
     public record RefRow(String code, String name) { }
+
+    /** Колонки-месяцы меры: первые месяцы — данные поля, остальные до 12 — «нет» (null). */
+    public static List<String> months(String... firstMonths) {
+        List<String> months = new ArrayList<>(Arrays.asList(new String[12]));
+        for (int i = 0; i < firstMonths.length; i++) {
+            months.set(i, firstMonths[i]);
+        }
+        return Collections.unmodifiableList(months);
+    }
 
     /** Источник с опубликованной анкетой: ключ объекта, дата, сумма, количество, код, группа. */
     public long publishedSource() {

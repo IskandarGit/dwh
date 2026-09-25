@@ -40,8 +40,8 @@ public class JdbcFndRawWriter implements FndRawWriter {
     private static final Logger log = LoggerFactory.getLogger(JdbcFndRawWriter.class);
     private static final int BATCH = 500;
     private static final String INSERT = """
-            insert into raw.rows (load_id, source_file_id, row_no, sheet, source_row_no, fields)
-            values (?, ?, ?, ?, ?, cast(? as jsonb))
+            insert into raw.rows (load_id, source_file_id, row_no, sheet, source_row_no, fields, rejected)
+            values (?, ?, ?, ?, ?, cast(? as jsonb), ?)
             """;
 
     private final DataSource dwh;
@@ -83,6 +83,7 @@ public class JdbcFndRawWriter implements FndRawWriter {
                         statement.setInt(5, row.sourceRowNo());
                     }
                     statement.setString(6, json.writeValueAsString(row.fields() == null ? Map.of() : row.fields()));
+                    statement.setBoolean(7, row.rejected());
                     statement.addBatch();
                     written++;
                     if (++inBatch == BATCH) {

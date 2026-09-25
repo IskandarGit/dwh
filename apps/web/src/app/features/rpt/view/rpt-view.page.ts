@@ -9,16 +9,25 @@ import { I18nService, TranslatePipe } from '../../../core/services/i18n.service'
 import { PermissionService } from '../../../core/services/permission.service';
 import { UiButtonComponent } from '../../../shared/ui/ui-button.component';
 import { parseUplProblem } from '../../upl/formats/upl-format-errors';
-import { RptApiService, RptPeriod, RptReportView } from '../shared/rpt-api';
+import { RptApiService, RptDivisor, RptMeasureInfo, RptPeriod, RptReportView, RptUndated } from '../shared/rpt-api';
 import { formatRptNumber, rptUnitKey } from '../shared/rpt-format';
 import { RptRow, rptAllGroupIds, rptVisibleRows } from '../shared/rpt-tree';
-import { RptCellPanelComponent, RptCellTarget, RptPanelLabels } from './rpt-cell-panel.component';
+import { RptCellPanelComponent, RptCellTarget, RptMeasureNo, RptPanelLabels } from './rpt-cell-panel.component';
 
 /** Everything the panel "where the number comes from" needs about the clicked cell. */
 export interface RptPanelState {
   target: RptCellTarget;
   heading: string;
   tableValue: string;
+  divisor: RptDivisor;
+  decimals: number;
+  labels: RptPanelLabels;
+}
+
+/** One "undated" strip: the measure it belongs to and its rows. */
+export interface RptUndatedStrip {
+  measure: RptMeasureNo;
+  undated: RptUndated;
 }
 
 const REPORTS_FORM = 'rpt.reports';
@@ -35,6 +44,11 @@ const STATUS_CODES: Record<number, string> = {
 
 function parseYear(value: string | null): number | null {
   return value !== null && YEAR_PATTERN.test(value) ? Number(value) : null;
+}
+
+/** A report without the list of measures is an old answer with one measure by date. */
+function hasDatedMeasure(view: RptReportView): boolean {
+  return view.measures.length === 0 || view.measures.some(measure => !measure.byMonthColumns);
 }
 
 @Component({
@@ -69,9 +83,31 @@ export class RptViewPage implements OnInit {
     return current === null ? [] : rptVisibleRows(current, this.collapsed());
   });
   readonly hasLevel2 = computed(() => (this.view()?.labels.level2 ?? null) !== null);
-  readonly panelLabels = computed<RptPanelLabels | null>(() => {
-    const labels = this.view()?.labels ?? null;
-    return labels === null ? null : { measure: labels.measure, level1: labels.level1, level2: labels.level2 };
+  readonly twoMeasures = computed(() => (this.view()?.measures.length ?? 0) > 1);
+  /** Measures of the caption above the table, in the order of the report. */
+  readonly measureList = computed<RptMeasureNo[]>(() => (this.twoMeasures() ? [1, 2] : [1]));
+  /** The table is drawn when there are dated rows or when no measure needs a date at all. */
+  readonly tableVisible = computed(() => {
+    const current = this.view();
+    return current !== null && (current.years.length > 0 || !hasDatedMeasure(current));
+  });
+  readonly noDatedRows = computed(() => {
+    const current = this.view();
+    return current !== null && current.years.length === 0 && hasDatedMeasure(current);
+  });
+  readonly undatedStrips = computed<RptUndatedStrip[]>(() => {
+    const current = this.view();
+    if (current === null) {
+      return [];
+    }
+    const strips: RptUndatedStrip[] = [];
+    if (current.undated !== null) {
+      strips.push({ measure: 1, undated: current.undated });
+    }
+    if (current.undated2 !== null && current.measures.length > 1) {
+      strips.push({ measure: 2, undated: current.undated2 });
+    }
+    return strips;
   });
 
   ngOnInit(): void {
@@ -92,20 +128,50 @@ export class RptViewPage implements OnInit {
     void this.router.navigate([], { queryParams: { y: year }, queryParamsHandling: 'merge' });
   }
 
-  digitsText(): string {
+  digitsText(measure: RptMeasureNo): string {
     const current = this.view();
     if (current === null) {
       return '';
     }
+    const info = this.measureInfo(measure);
     return this.i18n.translate('rpt.view.digits', {
-      unit: this.i18n.translate(rptUnitKey(current.divisor)),
-      n: current.decimals
+      unit: this.i18n.translate(rptUnitKey(info?.divisor ?? current.divisor)),
+      n: info?.decimals ?? current.decimals
     });
   }
 
-  measureText(): string {
-    const measure = this.view()?.labels.measure ?? null;
-    return this.i18n.translate('rpt.view.measure', { label: measure ?? this.i18n.translate('rpt.view.count_measure') });
+  measureText(measure: RptMeasureNo): string {
+    return this.i18n.translate('rpt.view.measure', { label: this.measureName(measure) });
+  }
+
+  byMonthColumns(measure: RptMeasureNo): boolean {
+    return this.measureInfo(measure)?.byMonthColumns ?? false;
+  }
+
+  /**
+   * Name of the measure from the description; the first measure without a name keeps the former caption.
+   * A measure by month columns always sums values, so it is never called "number of rows".
+   */
+  measureName(measure: RptMeasureNo): string {
+    const current = this.view();
+    const name = current?.measures[measure - 1]?.name ?? null;
+    if (name !== null) {
+      return name;
+    }
+    if (measure === 2) {
+      return this.i18n.translate('rpt.edit.block_measure2');
+    }
+    const fallbackKey = this.byMonthColumns(1) ? 'rpt.edit.block_measure1' : 'rpt.view.count_measure';
+    return current?.labels.measure ?? this.i18n.translate(fallbackKey);
+  }
+
+  /** Caption of the last block: "January – <month N>", just "January" when N = 1. */
+  ytdText(): string {
+    const month = this.view()?.ytdMonth ?? 12;
+    if (month <= 1) {
+      return this.monthName(1);
+    }
+    return this.i18n.translate('rpt.view.ytd', { month: this.monthName(month).toLowerCase() });
   }
 
   expandAll(): void {
@@ -151,38 +217,44 @@ export class RptViewPage implements OnInit {
     return formatRptNumber(value, this.view()?.decimals ?? 0);
   }
 
+  number2(value: string | null): string {
+    return formatRptNumber(value, this.measureInfo(2)?.decimals ?? 0);
+  }
+
+  /** The ratio comes from the server; the screen only rounds it to an integer. */
+  percent(value: string | null): string {
+    return formatRptNumber(value, 0);
+  }
+
   monthName(month: number): string {
     return this.i18n.translate('rpt.month.' + month);
   }
 
-  openMonth(row: RptRow, month: number): void {
-    this.openCell(row.path, { kind: 'month', month }, row.cells[month - 1]);
+  openMonth(row: RptRow, month: number, measure: RptMeasureNo = 1): void {
+    const cells = measure === 1 ? row.cells : row.m2?.cells ?? [];
+    this.openCell(row.path, { kind: 'month', month }, cells[month - 1] ?? null, measure);
   }
 
-  openYear(row: RptRow): void {
-    this.openCell(row.path, { kind: 'year' }, row.total);
+  openYear(row: RptRow, measure: RptMeasureNo = 1): void {
+    const total = measure === 1 ? row.total : row.m2?.total ?? null;
+    this.openCell(row.path, { kind: 'year' }, total, measure);
   }
 
-  openUndated(): void {
-    const undated = this.view()?.undated ?? null;
-    if (undated !== null) {
-      this.openCell([], { kind: 'undated' }, undated.value);
-    }
+  openUndated(strip: RptUndatedStrip): void {
+    this.openCell([], { kind: 'undated' }, strip.undated.value, strip.measure);
   }
 
   closePanel(): void {
     this.panel.set(null);
   }
 
-  undatedText(): string {
-    const current = this.view();
-    if (current?.undated == null) {
-      return '';
+  undatedText(strip: RptUndatedStrip): string {
+    const count = formatRptNumber(String(strip.undated.count), 0);
+    const value = formatRptNumber(strip.undated.value, this.measureInfo(strip.measure)?.decimals ?? this.view()?.decimals ?? 0);
+    if (!this.twoMeasures()) {
+      return this.i18n.translate('rpt.view.undated', { n: count, value });
     }
-    return this.i18n.translate('rpt.view.undated', {
-      n: formatRptNumber(String(current.undated.count), 0),
-      value: formatRptNumber(current.undated.value, current.decimals)
-    });
+    return this.i18n.translate('rpt.view.undated_measure', { measure: this.measureName(strip.measure), count, value });
   }
 
   duplicatesText(): string {
@@ -235,19 +307,38 @@ export class RptViewPage implements OnInit {
     return problem?.detail || problem?.title || this.i18n.translate('common.error');
   }
 
-  private openCell(path: (string | null)[], period: RptPeriod, value: string | null): void {
-    if (value === null) {
-      return;
-    }
-    this.panel.set({ target: { period, path }, heading: this.heading(path, period), tableValue: value });
+  private measureInfo(measure: RptMeasureNo): RptMeasureInfo | null {
+    return this.view()?.measures[measure - 1] ?? null;
   }
 
-  private heading(path: (string | null)[], period: RptPeriod): string {
-    const periodText = this.periodText(period);
-    if (period.kind === 'undated') {
-      return periodText;
+  private openCell(path: (string | null)[], period: RptPeriod, value: string | null, measure: RptMeasureNo): void {
+    const current = this.view();
+    if (value === null || current === null) {
+      return;
     }
-    return [...this.pathNames(path), periodText].join(' · ');
+    const two = this.twoMeasures();
+    const info = this.measureInfo(measure);
+    this.panel.set({
+      target: two ? { period, path, measure } : { period, path },
+      heading: this.heading(path, period, measure, two),
+      tableValue: value,
+      divisor: info?.divisor ?? current.divisor,
+      decimals: info?.decimals ?? current.decimals,
+      labels: this.panelLabels(current, measure)
+    });
+  }
+
+  /** The value column of the second measure is captioned with its name; the first one keeps the column caption. */
+  private panelLabels(view: RptReportView, measure: RptMeasureNo): RptPanelLabels {
+    const caption = measure === 1 ? view.labels.measure : this.measureName(2);
+    return { measure: caption, level1: view.labels.level1, level2: view.labels.level2 };
+  }
+
+  /** "<measure> · <line names> · <period>"; the measure name only when the report has two measures. */
+  private heading(path: (string | null)[], period: RptPeriod, measure: RptMeasureNo, named: boolean): string {
+    const periodText = this.periodText(period, measure);
+    const parts = period.kind === 'undated' ? [periodText] : [...this.pathNames(path), periodText];
+    return (named ? [this.measureName(measure), ...parts] : parts).join(' · ');
   }
 
   private pathNames(path: (string | null)[]): string[] {
@@ -264,14 +355,22 @@ export class RptViewPage implements OnInit {
     return names;
   }
 
-  private periodText(period: RptPeriod): string {
-    const year = this.view()?.year ?? '';
-    if (period.kind === 'month') {
-      return this.i18n.translate('rpt.month_year', { month: this.monthName(period.month), year });
-    }
+  /**
+   * Period of the panel heading: the total cell carries the same caption as the head of the table;
+   * a month of a measure by month columns, or of a report without a year, is written without a year.
+   */
+  private periodText(period: RptPeriod, measure: RptMeasureNo): string {
     if (period.kind === 'year') {
-      return this.i18n.translate('rpt.panel.year_total', { year });
+      return this.ytdText();
     }
-    return this.i18n.translate('rpt.panel.undated');
+    if (period.kind === 'undated') {
+      return this.i18n.translate('rpt.panel.undated');
+    }
+    const month = this.monthName(period.month);
+    const year = this.view()?.year ?? null;
+    if (year === null || this.byMonthColumns(measure)) {
+      return month;
+    }
+    return this.i18n.translate('rpt.month_year', { month, year });
   }
 }

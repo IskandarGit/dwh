@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, Signal, WritableSignal, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, forkJoin, of } from 'rxjs';
@@ -22,29 +23,59 @@ import {
 } from '../shared/rpt-api';
 import {
   RPT_FIELD,
+  RPT_MONTHS,
   RptFormChange,
   RptFormLevel,
   RptFormState,
   RptLevelOption,
+  RptMeasureFormState,
+  RptMeasureNo,
+  RptPeriodKind,
   rptDateColumns,
   rptEmptyForm,
+  rptFillMonthsInOrder,
   rptFormFromDefinition,
   rptFormToInput,
   rptKeyColumns,
   rptLevelOptions,
   rptMeasureColumns,
+  rptMonthColumns,
   rptOnRefChanged,
   rptOnSourceChanged,
+  rptSyncSecondLevels,
 } from '../shared/rpt-definition-form';
 
 type RptEditState = 'loading' | 'ready' | 'error';
 type RptLevelSlot = 'level1' | 'level2';
+type RptLayoutKind = 'source' | 'ref';
+type RptMeasureFields = Omit<RptMeasureFormState, 'name'>;
 
-/** Field names of the contract (2.2) that the form model has no constant for. */
+/** Columns and options one measure block of the form offers, from the layouts of its source and reference. */
+interface RptMeasureView {
+  refSources: RptSourceItem[];
+  dateColumns: RptColumn[];
+  measureColumns: RptColumn[];
+  monthColumns: RptColumn[];
+  sourceKeyColumns: RptColumn[];
+  refKeyColumns: RptColumn[];
+  noDateColumns: boolean;
+  levelOptions: RptLevelOption[];
+  levelSourceOptions: RptLevelOption[];
+  levelRefOptions: RptLevelOption[];
+}
+
+/** Field names of the contract (2.2, 10.3) that the form model has no constant for. */
 const FIELD_NAME = 'name';
 const FIELD_SOURCE = 'sourceId';
 const FIELD_REF_SOURCE = 'ref.sourceId';
 const FIELD_KEYS = 'ref.keys';
+const FIELD_MONTHS = 'monthFields';
+/** `RPT_LEVELS_MISMATCH` comes at `second.level2` (contract 10.9), not at `second.level2.field`. */
+const FIELD_LEVEL2 = 'level2';
+const KEY_FIELD = /^ref\.keys\[(\d+)\]\.(field|refField)$/;
+const MONTH_FIELD = /^monthFields\[(\d+)\]$/;
+const TEST_ID_FIRST = 'rpt-edit-';
+const TEST_ID_SECOND = 'rpt-edit-m2-';
 const MAX_KEY_PAIRS = 2;
 const CONFLICT_CODE = 'RPT_CONFLICT';
 const HTTP_CONFLICT = 409;
@@ -55,15 +86,25 @@ export function rptLevelKey(level: RptFormLevel | RptLevelOption | null): string
   return level === null ? null : `${level.origin}:${level.field}`;
 }
 
+/** Field name without the `second.` prefix of the second measure. */
+function baseField(name: string): string {
+  return name.startsWith(RPT_FIELD.secondPrefix) ? name.slice(RPT_FIELD.secondPrefix.length) : name;
+}
+
 /** What kind of column a field needs: the text for `{need}` of `RPT_COLUMN_TYPE`. */
-function needKey(field: string): string {
+function needKey(name: string): string {
+  const field = baseField(name);
   if (field === RPT_FIELD.dateField) {
     return 'rpt.edit.need.date';
   }
-  if (field === RPT_FIELD.measureField) {
+  if (field === RPT_FIELD.measureField || MONTH_FIELD.test(field)) {
     return 'rpt.edit.need.number';
   }
   return 'rpt.edit.need.not_date';
+}
+
+function layoutSignals(): Record<RptLayoutKind, WritableSignal<RptSourceLayout | null>> {
+  return { source: signal<RptSourceLayout | null>(null), ref: signal<RptSourceLayout | null>(null) };
 }
 
 @Component({
@@ -72,7 +113,7 @@ function needKey(field: string): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './rpt-edit.page.html',
   styleUrl: './rpt-edit.page.scss',
-  imports: [FormsModule, TranslatePipe, UiButtonComponent, UiModalComponent]
+  imports: [FormsModule, NgTemplateOutlet, TranslatePipe, UiButtonComponent, UiModalComponent]
 })
 export class RptEditPage implements OnInit, RecordNavigationPage {
   private readonly api = inject(RptApiService);
@@ -85,6 +126,7 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
   readonly decimalsList = RPT_DECIMALS;
   readonly maxKeyPairs = MAX_KEY_PAIRS;
   readonly field = RPT_FIELD;
+  readonly monthIndexes = Array.from({ length: RPT_MONTHS }, (_, index) => index);
 
   readonly reportId = signal<number | null>(null);
   readonly state = signal<RptEditState>('loading');
@@ -92,8 +134,6 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
   readonly form = signal<RptFormState>(rptEmptyForm());
   readonly savedName = signal<string | null>(null);
   readonly sources = signal<RptSourceItem[]>([]);
-  readonly sourceLayout = signal<RptSourceLayout | null>(null);
-  readonly refLayout = signal<RptSourceLayout | null>(null);
   readonly chooseAgain = signal<ReadonlySet<string>>(new Set());
   readonly fieldErrors = signal<UplFieldError[]>([]);
   readonly saveError = signal<string | null>(null);
@@ -103,16 +143,22 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
   readonly isLeaveOpen = signal(false);
   private lockVersion: number | undefined;
 
-  readonly refSources = computed(() => this.sources().filter(source => source.id !== this.form().sourceId));
-  readonly dateColumns = computed(() => this.columnsOf(this.sourceLayout(), rptDateColumns));
-  readonly measureColumns = computed(() => this.columnsOf(this.sourceLayout(), rptMeasureColumns));
-  readonly sourceKeyColumns = computed(() => this.columnsOf(this.sourceLayout(), rptKeyColumns));
-  readonly refKeyColumns = computed(() => this.columnsOf(this.refLayout(), rptKeyColumns));
-  readonly noDateColumns = computed(() => this.sourceLayout() !== null && this.dateColumns().length === 0);
-  readonly levelOptions = computed(() => this.buildLevelOptions());
-  readonly levelSourceOptions = computed(() => this.levelOptions().filter(option => option.origin === 'source'));
-  readonly levelRefOptions = computed(() => this.levelOptions().filter(option => option.origin === 'ref'));
-  readonly canSave = computed(() => this.state() === 'ready' && !this.saving() && !this.noDateColumns());
+  private readonly layouts: Record<RptMeasureNo, Record<RptLayoutKind, WritableSignal<RptSourceLayout | null>>> = {
+    1: layoutSignals(),
+    2: layoutSignals(),
+  };
+  private readonly views: Record<RptMeasureNo, Signal<RptMeasureView>> = {
+    1: computed(() => this.buildView(1)),
+    2: computed(() => this.buildView(2)),
+  };
+
+  readonly canSave = computed(
+    () =>
+      this.state() === 'ready' &&
+      !this.saving() &&
+      !this.isPeriodBlocked(1) &&
+      !(this.form().useSecond && this.isPeriodBlocked(2))
+  );
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -133,8 +179,55 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
     return this.i18n.translate(key, { label: option.label });
   }
 
-  levelValue(slot: RptLevelSlot): string | null {
-    return rptLevelKey(this.form()[slot]);
+  /** Fields of one measure: the first lives at the top of the form state, the second in `second`. */
+  fields(measure: RptMeasureNo): RptMeasureFields {
+    return this.fieldsIn(this.form(), measure);
+  }
+
+  view(measure: RptMeasureNo): RptMeasureView {
+    return this.views[measure]();
+  }
+
+  layoutOf(measure: RptMeasureNo, kind: RptLayoutKind): RptSourceLayout | null {
+    return this.layouts[measure][kind]();
+  }
+
+  /** `data-testid` and element id of a control: the second measure gets its own prefix. */
+  tid(measure: RptMeasureNo, name: string): string {
+    return (measure === 2 ? TEST_ID_SECOND : TEST_ID_FIRST) + name;
+  }
+
+  /** Server field name of a measure field (contract 10.3): the second measure has the `second.` prefix. */
+  fieldOf(measure: RptMeasureNo, name: string): string {
+    return measure === 2 ? RPT_FIELD.secondPrefix + name : name;
+  }
+
+  measureNameOf(measure: RptMeasureNo): string {
+    const state = this.form();
+    return measure === 1 ? state.measureName : state.second.name;
+  }
+
+  measureNameField(measure: RptMeasureNo): string {
+    return measure === 1 ? RPT_FIELD.measureName : RPT_FIELD.secondName;
+  }
+
+  levelValue(slot: RptLevelSlot, measure: RptMeasureNo = 1): string | null {
+    return rptLevelKey(this.fields(measure)[slot]);
+  }
+
+  /** The second measure has level 2 only when the first one has it. */
+  showsLevel2(measure: RptMeasureNo): boolean {
+    return measure === 1 || this.form().level2 !== null;
+  }
+
+  /** "matches «label» of measure 1" next to a level of the second measure; null while the first measure has no such level. */
+  levelMatch(slot: RptLevelSlot): string | null {
+    const level = this.form()[slot];
+    if (level === null) {
+      return null;
+    }
+    const label = this.labelIn(this.layoutOf(1, level.origin), level.field);
+    return this.i18n.translate('rpt.edit.level_matches', { label });
   }
 
   isChooseAgain(name: string): boolean {
@@ -152,142 +245,190 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
     return uplFieldErrorText({ ...error, key: 'rpt.err.' + error.code }, key => this.i18n.translate(key, params));
   }
 
+  /** Error at a level; level 2 of the second measure also shows the level count mismatch. */
+  levelError(measure: RptMeasureNo, slot: RptLevelSlot): string | null {
+    const field = slot === 'level1' ? RPT_FIELD.level1 : RPT_FIELD.level2;
+    const error = this.fieldError(this.fieldOf(measure, field));
+    if (error !== null || slot === 'level1') {
+      return error;
+    }
+    return this.fieldError(this.fieldOf(measure, FIELD_LEVEL2));
+  }
+
   setName(name: string): void {
     this.patch({ name }, [FIELD_NAME]);
   }
 
-  setSource(sourceId: number | null): void {
-    const current = this.form();
-    if (sourceId === current.sourceId) {
+  setMeasureName(measure: RptMeasureNo, name: string): void {
+    if (measure === 1) {
+      this.patch({ measureName: name }, [RPT_FIELD.measureName]);
       return;
     }
-    let change = rptOnSourceChanged({ ...current, sourceId });
-    if (sourceId !== null && change.state.refSourceId === sourceId) {
-      change = this.dropRefSource(change);
-    }
-    this.applyChange(change, [FIELD_SOURCE]);
-    this.sourceLayout.set(null);
-    if (sourceId !== null) {
-      this.loadSourceLayout(sourceId, null);
+    this.patch({ second: { ...this.form().second, name } }, [RPT_FIELD.secondName]);
+  }
+
+  /** Unticked — the block is hidden and the body carries `second = null`; the typed fields stay until the page is left. */
+  setUseSecond(useSecond: boolean): void {
+    this.patch({ useSecond }, []);
+    if (useSecond) {
+      this.loadMissingLayouts(2);
     }
   }
 
-  setSourceSheet(sheet: number | null): void {
-    const current = this.form();
+  setSource(measure: RptMeasureNo, sourceId: number | null): void {
+    if (sourceId === this.fields(measure).sourceId) {
+      return;
+    }
+    let change = rptOnSourceChanged(this.withMeasure(this.form(), measure, { sourceId }), measure);
+    if (sourceId !== null && this.fieldsIn(change.state, measure).refSourceId === sourceId) {
+      change = this.dropRefSource(change, measure);
+    }
+    this.applyChange(change, [this.fieldOf(measure, FIELD_SOURCE)]);
+    this.layouts[measure].source.set(null);
+    if (sourceId !== null) {
+      this.loadLayout(measure, 'source', sourceId, null);
+    }
+  }
+
+  setSourceSheet(measure: RptMeasureNo, sheet: number | null): void {
+    const current = this.fields(measure);
     if (sheet === current.sourceSheet || current.sourceId === null) {
       return;
     }
-    const change = rptOnSourceChanged(current);
-    this.applyChange(this.keepValue(change, { sourceSheet: sheet }, RPT_FIELD.sourceSheet), [RPT_FIELD.sourceSheet]);
-    this.loadSourceLayout(current.sourceId, sheet);
+    const name = this.fieldOf(measure, RPT_FIELD.sourceSheet);
+    const change = rptOnSourceChanged(this.form(), measure);
+    this.applyChange(this.keepValue(change, measure, { sourceSheet: sheet }, name), [name]);
+    this.loadLayout(measure, 'source', current.sourceId, sheet);
   }
 
-  setDateField(dateField: string | null): void {
-    this.patch({ dateField }, [RPT_FIELD.dateField]);
+  setPeriodKind(measure: RptMeasureNo, periodKind: RptPeriodKind): void {
+    this.patchMeasure(measure, { periodKind }, [RPT_FIELD.dateField, FIELD_MONTHS]);
   }
 
-  setMeasureKind(measureKind: RptMeasureKind): void {
-    this.patch({ measureKind }, [RPT_FIELD.measureField]);
+  setDateField(measure: RptMeasureNo, dateField: string | null): void {
+    this.patchMeasure(measure, { dateField }, [RPT_FIELD.dateField]);
   }
 
-  setMeasureField(measureField: string | null): void {
-    const current = this.form();
+  setMonthField(measure: RptMeasureNo, index: number, field: string | null): void {
+    const monthFields = this.fields(measure).monthFields.map((month, i) => (i === index ? field : month));
+    this.patchMeasure(measure, { monthFields }, [RPT_FIELD.monthField(index), FIELD_MONTHS]);
+  }
+
+  /** "Fill in order": the number columns of the form one after another, starting with the one chosen for January. */
+  fillMonths(measure: RptMeasureNo): void {
+    const layout = this.layoutOf(measure, 'source');
+    if (layout === null) {
+      return;
+    }
+    const monthFields = rptFillMonthsInOrder(layout.columns, this.fields(measure).monthFields[0] ?? null);
+    const filled = this.monthIndexes.map(index => RPT_FIELD.monthField(index));
+    this.patchMeasure(measure, { monthFields }, [FIELD_MONTHS, ...filled]);
+  }
+
+  setMeasureKind(measure: RptMeasureNo, measureKind: RptMeasureKind): void {
+    this.patchMeasure(measure, { measureKind }, [RPT_FIELD.measureField]);
+  }
+
+  setMeasureField(measure: RptMeasureNo, measureField: string | null): void {
+    const current = this.fields(measure);
     const cleared: string[] = [];
-    const level1 = this.dropMeasureLevel(current.level1, measureField, RPT_FIELD.level1, cleared);
-    const level2 = this.dropMeasureLevel(current.level2, measureField, RPT_FIELD.level2, cleared);
-    this.applyChange({ state: { ...current, measureField, level1, level2 }, cleared }, [RPT_FIELD.measureField]);
+    const level1 = this.dropMeasureLevel(current.level1, measureField, this.fieldOf(measure, RPT_FIELD.level1), cleared);
+    const level2 = this.dropMeasureLevel(current.level2, measureField, this.fieldOf(measure, RPT_FIELD.level2), cleared);
+    const state = this.withMeasure(this.form(), measure, { measureField, level1, level2 });
+    this.applyChange({ state, cleared }, [this.fieldOf(measure, RPT_FIELD.measureField)]);
   }
 
-  setDivisor(divisor: RptDivisor): void {
-    this.patch({ divisor }, ['divisor']);
+  setDivisor(measure: RptMeasureNo, divisor: RptDivisor): void {
+    this.patchMeasure(measure, { divisor }, ['divisor']);
   }
 
-  setDecimals(decimals: RptDecimals): void {
-    this.patch({ decimals }, ['decimals']);
+  setDecimals(measure: RptMeasureNo, decimals: RptDecimals): void {
+    this.patchMeasure(measure, { decimals }, ['decimals']);
   }
 
-  setUseRef(useRef: boolean): void {
-    const current = this.form();
+  setUseRef(measure: RptMeasureNo, useRef: boolean): void {
+    const current = this.fields(measure);
     if (useRef) {
-      this.patch({ useRef }, []);
-      if (current.refSourceId !== null && this.refLayout() === null) {
-        this.loadRefLayout(current.refSourceId, current.refSheet);
+      this.patchMeasure(measure, { useRef }, []);
+      if (current.refSourceId !== null && this.layoutOf(measure, 'ref') === null) {
+        this.loadLayout(measure, 'ref', current.refSourceId, current.refSheet);
       }
       return;
     }
     const cleared: string[] = [];
-    const level1 = this.dropRefLevel(current.level1, RPT_FIELD.level1, cleared);
-    const level2 = this.dropRefLevel(current.level2, RPT_FIELD.level2, cleared);
-    this.applyChange({ state: { ...current, useRef, level1, level2 }, cleared }, []);
+    const level1 = this.dropRefLevel(current.level1, this.fieldOf(measure, RPT_FIELD.level1), cleared);
+    const level2 = this.dropRefLevel(current.level2, this.fieldOf(measure, RPT_FIELD.level2), cleared);
+    this.applyChange({ state: this.withMeasure(this.form(), measure, { useRef, level1, level2 }), cleared }, []);
   }
 
-  setRefSource(refSourceId: number | null): void {
-    const current = this.form();
-    if (refSourceId === current.refSourceId) {
+  setRefSource(measure: RptMeasureNo, refSourceId: number | null): void {
+    if (refSourceId === this.fields(measure).refSourceId) {
       return;
     }
-    this.applyChange(rptOnRefChanged({ ...current, refSourceId }), [FIELD_REF_SOURCE]);
-    this.refLayout.set(null);
+    const change = rptOnRefChanged(this.withMeasure(this.form(), measure, { refSourceId }), measure);
+    this.applyChange(change, [this.fieldOf(measure, FIELD_REF_SOURCE)]);
+    this.layouts[measure].ref.set(null);
     if (refSourceId !== null) {
-      this.loadRefLayout(refSourceId, null);
+      this.loadLayout(measure, 'ref', refSourceId, null);
     }
   }
 
-  setRefSheet(sheet: number | null): void {
-    const current = this.form();
+  setRefSheet(measure: RptMeasureNo, sheet: number | null): void {
+    const current = this.fields(measure);
     if (sheet === current.refSheet || current.refSourceId === null) {
       return;
     }
-    const change = rptOnRefChanged(current);
-    this.applyChange(this.keepValue(change, { refSheet: sheet }, RPT_FIELD.refSheet), [RPT_FIELD.refSheet]);
-    this.loadRefLayout(current.refSourceId, sheet);
+    const name = this.fieldOf(measure, RPT_FIELD.refSheet);
+    const change = rptOnRefChanged(this.form(), measure);
+    this.applyChange(this.keepValue(change, measure, { refSheet: sheet }, name), [name]);
+    this.loadLayout(measure, 'ref', current.refSourceId, sheet);
   }
 
-  setKeyField(index: number, field: string | null): void {
-    const keys = this.form().keys.map((key, i) => (i === index ? { ...key, field } : key));
-    this.patch({ keys }, [RPT_FIELD.keyField(index), FIELD_KEYS]);
+  setKeyField(measure: RptMeasureNo, index: number, field: string | null): void {
+    const keys = this.fields(measure).keys.map((key, i) => (i === index ? { ...key, field } : key));
+    this.patchMeasure(measure, { keys }, [RPT_FIELD.keyField(index), FIELD_KEYS]);
   }
 
-  setKeyRefField(index: number, refField: string | null): void {
-    const keys = this.form().keys.map((key, i) => (i === index ? { ...key, refField } : key));
-    this.patch({ keys }, [RPT_FIELD.keyRefField(index), FIELD_KEYS]);
+  setKeyRefField(measure: RptMeasureNo, index: number, refField: string | null): void {
+    const keys = this.fields(measure).keys.map((key, i) => (i === index ? { ...key, refField } : key));
+    this.patchMeasure(measure, { keys }, [RPT_FIELD.keyRefField(index), FIELD_KEYS]);
   }
 
-  addPair(): void {
-    const keys = this.form().keys;
+  addPair(measure: RptMeasureNo): void {
+    const keys = this.fields(measure).keys;
     if (keys.length >= MAX_KEY_PAIRS) {
       return;
     }
-    this.patch({ keys: [...keys, { field: null, refField: null }] }, [FIELD_KEYS]);
+    this.patchMeasure(measure, { keys: [...keys, { field: null, refField: null }] }, [FIELD_KEYS]);
   }
 
-  removePair(index: number): void {
-    const keys = this.form().keys;
+  removePair(measure: RptMeasureNo, index: number): void {
+    const keys = this.fields(measure).keys;
     if (keys.length <= 1) {
       return;
     }
-    this.patch({ keys: keys.filter((_key, i) => i !== index) }, [
+    this.patchMeasure(measure, { keys: keys.filter((_key, i) => i !== index) }, [
       FIELD_KEYS,
       RPT_FIELD.keyField(index),
       RPT_FIELD.keyRefField(index),
     ]);
   }
 
-  setLevel(slot: RptLevelSlot, value: string | null): void {
-    const level = this.levelOptions().find(option => rptLevelKey(option) === value) ?? null;
-    const next: RptFormLevel | null = level === null ? null : { origin: level.origin, field: level.field };
-    const current = this.form();
+  setLevel(measure: RptMeasureNo, slot: RptLevelSlot, value: string | null): void {
+    const option = this.view(measure).levelOptions.find(item => rptLevelKey(item) === value) ?? null;
+    const next: RptFormLevel | null = option === null ? null : { origin: option.origin, field: option.field };
+    const current = this.fields(measure);
     if (slot === 'level1') {
       const sameAsLevel2 = next !== null && rptLevelKey(next) === rptLevelKey(current.level2);
-      this.patch({ level1: next, level2: sameAsLevel2 ? null : current.level2 }, [RPT_FIELD.level1]);
+      this.patchMeasure(measure, { level1: next, level2: sameAsLevel2 ? null : current.level2 }, [RPT_FIELD.level1]);
       return;
     }
-    this.patch({ level2: next }, [RPT_FIELD.level2]);
+    this.patchMeasure(measure, { level2: next }, [RPT_FIELD.level2, FIELD_LEVEL2]);
   }
 
   /** Level 2 cannot repeat level 1. */
-  isLevel2Blocked(option: RptLevelOption): boolean {
-    return rptLevelKey(option) === this.levelValue('level1');
+  isLevel2Blocked(measure: RptMeasureNo, option: RptLevelOption): boolean {
+    return rptLevelKey(option) === this.levelValue('level1', measure);
   }
 
   save(): void {
@@ -358,8 +499,10 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
 
   private applyDefinition(definition: RptDefinition | null): void {
     this.touched.set(false);
-    this.sourceLayout.set(null);
-    this.refLayout.set(null);
+    ([1, 2] as const).forEach(measure => {
+      this.layouts[measure].source.set(null);
+      this.layouts[measure].ref.set(null);
+    });
     if (definition === null) {
       this.form.set(rptEmptyForm());
       this.chooseAgain.set(new Set());
@@ -370,50 +513,50 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
     this.chooseAgain.set(new Set(loaded.staleFields));
     this.savedName.set(definition.name);
     this.lockVersion = definition.lockVersion;
-    if (loaded.state.sourceId !== null) {
-      this.loadSourceLayout(loaded.state.sourceId, loaded.state.sourceSheet);
-    }
-    if (loaded.state.useRef && loaded.state.refSourceId !== null) {
-      this.loadRefLayout(loaded.state.refSourceId, loaded.state.refSheet);
+    this.loadMissingLayouts(1);
+    if (loaded.state.useSecond) {
+      this.loadMissingLayouts(2);
     }
   }
 
-  private loadSourceLayout(sourceId: number, sheet: number | null): void {
-    this.sourceLayout.set(null);
+  /** Loads the source and reference layouts of a measure that are chosen but not loaded yet. */
+  private loadMissingLayouts(measure: RptMeasureNo): void {
+    const fields = this.fields(measure);
+    if (fields.sourceId !== null && this.layoutOf(measure, 'source') === null) {
+      this.loadLayout(measure, 'source', fields.sourceId, fields.sourceSheet);
+    }
+    if (fields.useRef && fields.refSourceId !== null && this.layoutOf(measure, 'ref') === null) {
+      this.loadLayout(measure, 'ref', fields.refSourceId, fields.refSheet);
+    }
+  }
+
+  private loadLayout(measure: RptMeasureNo, kind: RptLayoutKind, sourceId: number, sheet: number | null): void {
+    const target = this.layouts[measure][kind];
+    target.set(null);
     this.api.layout(sourceId, sheet).subscribe({
       next: layout => {
-        if (this.form().sourceId !== sourceId) {
+        const fields = this.fields(measure);
+        if ((kind === 'source' ? fields.sourceId : fields.refSourceId) !== sourceId) {
           return;
         }
-        this.sourceLayout.set(layout);
-        this.takeLayoutSheet('sourceSheet', RPT_FIELD.sourceSheet, layout.sheet);
-      },
-      error: (problem: ProblemDetail) => this.saveError.set(this.problemText(problem))
-    });
-  }
-
-  private loadRefLayout(refSourceId: number, sheet: number | null): void {
-    this.refLayout.set(null);
-    this.api.layout(refSourceId, sheet).subscribe({
-      next: layout => {
-        if (this.form().refSourceId !== refSourceId) {
-          return;
-        }
-        this.refLayout.set(layout);
-        this.takeLayoutSheet('refSheet', RPT_FIELD.refSheet, layout.sheet);
+        target.set(layout);
+        this.takeLayoutSheet(measure, kind, layout.sheet);
       },
       error: (problem: ProblemDetail) => this.saveError.set(this.problemText(problem))
     });
   }
 
   /** An empty sheet takes the sheet the server read the columns from; the field is filled, so "choose again" goes away. */
-  private takeLayoutSheet(slot: 'sourceSheet' | 'refSheet', name: string, sheet: number | null): void {
-    if (this.form()[slot] !== null || sheet === null) {
+  private takeLayoutSheet(measure: RptMeasureNo, kind: RptLayoutKind, sheet: number | null): void {
+    const fields = this.fields(measure);
+    const current = kind === 'source' ? fields.sourceSheet : fields.refSheet;
+    if (current !== null || sheet === null) {
       return;
     }
-    this.form.update(state => ({ ...state, [slot]: sheet }));
+    const values: Partial<RptMeasureFields> = kind === 'source' ? { sourceSheet: sheet } : { refSheet: sheet };
+    this.form.update(state => this.withMeasure(state, measure, values));
     const again = new Set(this.chooseAgain());
-    again.delete(name);
+    again.delete(this.fieldOf(measure, kind === 'source' ? RPT_FIELD.sourceSheet : RPT_FIELD.refSheet));
     this.chooseAgain.set(again);
   }
 
@@ -450,25 +593,49 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
     this.applyChange({ state: { ...this.form(), ...values }, cleared: [] }, filled);
   }
 
+  /** User change of one measure; `filled` are the field names without the measure prefix. */
+  private patchMeasure(measure: RptMeasureNo, values: Partial<RptMeasureFields>, filled: string[]): void {
+    const state = this.withMeasure(this.form(), measure, values);
+    this.applyChange({ state, cleared: [] }, filled.map(name => this.fieldOf(measure, name)));
+  }
+
+  /** Every change keeps the second measure at the level count of the first one. */
   private applyChange(change: RptFormChange, filled: string[]): void {
+    const synced = rptSyncSecondLevels(change.state);
     const again = new Set(this.chooseAgain());
     filled.forEach(name => again.delete(name));
-    change.cleared.forEach(name => again.add(name));
-    this.form.set(change.state);
+    [...change.cleared, ...synced.cleared].forEach(name => again.add(name));
+    this.form.set(synced.state);
     this.chooseAgain.set(again);
     this.fieldErrors.update(list => list.filter(error => !filled.includes(error.field)));
     this.touched.set(true);
   }
 
-  private keepValue(change: RptFormChange, values: Partial<RptFormState>, name: string): RptFormChange {
-    return { state: { ...change.state, ...values }, cleared: change.cleared.filter(item => item !== name) };
+  private keepValue(
+    change: RptFormChange,
+    measure: RptMeasureNo,
+    values: Partial<RptMeasureFields>,
+    name: string,
+  ): RptFormChange {
+    return { state: this.withMeasure(change.state, measure, values), cleared: change.cleared.filter(item => item !== name) };
+  }
+
+  private fieldsIn(state: RptFormState, measure: RptMeasureNo): RptMeasureFields {
+    return measure === 1 ? state : state.second;
+  }
+
+  private withMeasure(state: RptFormState, measure: RptMeasureNo, values: Partial<RptMeasureFields>): RptFormState {
+    return measure === 1 ? { ...state, ...values } : { ...state, second: { ...state.second, ...values } };
   }
 
   /** The reference cannot be the source itself: a source equal to the chosen reference drops the reference. */
-  private dropRefSource(change: RptFormChange): RptFormChange {
-    const refChange = rptOnRefChanged({ ...change.state, refSourceId: null });
-    this.refLayout.set(null);
-    return { state: refChange.state, cleared: [...change.cleared, ...refChange.cleared, FIELD_REF_SOURCE] };
+  private dropRefSource(change: RptFormChange, measure: RptMeasureNo): RptFormChange {
+    const refChange = rptOnRefChanged(this.withMeasure(change.state, measure, { refSourceId: null }), measure);
+    this.layouts[measure].ref.set(null);
+    return {
+      state: refChange.state,
+      cleared: [...change.cleared, ...refChange.cleared, this.fieldOf(measure, FIELD_REF_SOURCE)],
+    };
   }
 
   private dropRefLevel(level: RptFormLevel | null, name: string, cleared: string[]): RptFormLevel | null {
@@ -492,14 +659,40 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
     return null;
   }
 
-  private buildLevelOptions(): RptLevelOption[] {
-    const source = this.sourceLayout();
+  /** A measure by a date column cannot be saved while its source has no date column. */
+  private isPeriodBlocked(measure: RptMeasureNo): boolean {
+    return this.fields(measure).periodKind === 'date' && this.view(measure).noDateColumns;
+  }
+
+  private buildView(measure: RptMeasureNo): RptMeasureView {
+    const fields = this.fields(measure);
+    const source = this.layoutOf(measure, 'source');
+    const ref = this.layoutOf(measure, 'ref');
+    const levelOptions = this.buildLevelOptions(fields, source, ref);
+    return {
+      refSources: this.sources().filter(item => item.id !== fields.sourceId),
+      dateColumns: this.columnsOf(source, rptDateColumns),
+      measureColumns: this.columnsOf(source, rptMeasureColumns),
+      monthColumns: this.columnsOf(source, rptMonthColumns),
+      sourceKeyColumns: this.columnsOf(source, rptKeyColumns),
+      refKeyColumns: this.columnsOf(ref, rptKeyColumns),
+      noDateColumns: source !== null && rptDateColumns(source).length === 0,
+      levelOptions,
+      levelSourceOptions: levelOptions.filter(option => option.origin === 'source'),
+      levelRefOptions: levelOptions.filter(option => option.origin === 'ref'),
+    };
+  }
+
+  private buildLevelOptions(
+    fields: RptMeasureFields,
+    source: RptSourceLayout | null,
+    ref: RptSourceLayout | null,
+  ): RptLevelOption[] {
     if (source === null) {
       return [];
     }
-    const state = this.form();
-    const measureField = state.measureKind === 'total' ? state.measureField : null;
-    return rptLevelOptions(source, state.useRef ? this.refLayout() : null, measureField);
+    const byColumn = fields.periodKind === 'date' && fields.measureKind === 'total';
+    return rptLevelOptions(source, fields.useRef ? ref : null, byColumn ? fields.measureField : null);
   }
 
   private columnsOf(layout: RptSourceLayout | null, pick: (layout: RptSourceLayout) => RptColumn[]): RptColumn[] {
@@ -508,25 +701,36 @@ export class RptEditPage implements OnInit, RecordNavigationPage {
 
   /** Label of the column chosen in the field (for the error text); the raw field name when the column is unknown. */
   private chosenLabel(name: string): string {
-    const state = this.form();
-    const keyMatch = /^ref\.keys\[(\d+)\]\.(field|refField)$/.exec(name);
+    const measure: RptMeasureNo = name.startsWith(RPT_FIELD.secondPrefix) ? 2 : 1;
+    const field = baseField(name);
+    const fields = this.fields(measure);
+    const source = this.layoutOf(measure, 'source');
+    const keyMatch = KEY_FIELD.exec(field);
     if (keyMatch) {
-      const key = state.keys[Number(keyMatch[1])];
+      const key = fields.keys[Number(keyMatch[1])];
       return keyMatch[2] === 'field'
-        ? this.labelIn(this.sourceLayout(), key?.field ?? null)
-        : this.labelIn(this.refLayout(), key?.refField ?? null);
+        ? this.labelIn(source, key?.field ?? null)
+        : this.labelIn(this.layoutOf(measure, 'ref'), key?.refField ?? null);
     }
-    if (name === RPT_FIELD.dateField) {
-      return this.labelIn(this.sourceLayout(), state.dateField);
+    const monthMatch = MONTH_FIELD.exec(field);
+    if (monthMatch) {
+      return this.labelIn(source, fields.monthFields[Number(monthMatch[1])] ?? null);
     }
-    if (name === RPT_FIELD.measureField) {
-      return this.labelIn(this.sourceLayout(), state.measureField);
+    if (field === RPT_FIELD.dateField) {
+      return this.labelIn(source, fields.dateField);
     }
-    if (name === RPT_FIELD.level1 || name === RPT_FIELD.level2) {
-      const level = name === RPT_FIELD.level1 ? state.level1 : state.level2;
-      return this.labelIn(level?.origin === 'ref' ? this.refLayout() : this.sourceLayout(), level?.field ?? null);
+    if (field === RPT_FIELD.measureField) {
+      return this.labelIn(source, fields.measureField);
     }
-    return '';
+    return this.chosenLevelLabel(measure, field);
+  }
+
+  private chosenLevelLabel(measure: RptMeasureNo, field: string): string {
+    if (field !== RPT_FIELD.level1 && field !== RPT_FIELD.level2 && field !== FIELD_LEVEL2) {
+      return '';
+    }
+    const level = field === RPT_FIELD.level1 ? this.fields(measure).level1 : this.fields(measure).level2;
+    return this.labelIn(this.layoutOf(measure, level?.origin ?? 'source'), level?.field ?? null);
   }
 
   private labelIn(layout: RptSourceLayout | null, field: string | null): string {

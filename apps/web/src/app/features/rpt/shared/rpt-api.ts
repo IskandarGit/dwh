@@ -43,18 +43,42 @@ export interface RptLevelPart {
   field: string;
 }
 
-/** Body of POST/PUT: the screen may send an incomplete description, the server answers 422 with errors by field. */
-export interface RptDefinitionInput {
+/** Months of a measure by month columns: 12 fields, January first; null — no column for the month. */
+export type RptMonthFields = (string | null)[];
+
+/** Second measure of a report: exactly one of `dateField` / `monthFields`; `measure` is null with `monthFields`. */
+export interface RptMeasureInput {
   name: string;
   sourceId: number | null;
   sourceSheet: number | null;
   dateField: string | null;
-  measure: RptMeasure;
+  monthFields: RptMonthFields | null;
+  measure: RptMeasure | null;
   divisor: RptDivisor;
   decimals: RptDecimals;
   ref: RptRefPart | null;
   level1: RptLevelPart | null;
   level2: RptLevelPart | null;
+}
+
+/** Body of POST/PUT: the screen may send an incomplete description, the server answers 422 with errors by field. */
+export interface RptDefinitionInput {
+  name: string;
+  /** null — the former measure caption. */
+  measureName: string | null;
+  sourceId: number | null;
+  sourceSheet: number | null;
+  dateField: string | null;
+  /** Instead of `dateField`; then `measure` is null. */
+  monthFields: RptMonthFields | null;
+  measure: RptMeasure | null;
+  divisor: RptDivisor;
+  decimals: RptDecimals;
+  ref: RptRefPart | null;
+  level1: RptLevelPart | null;
+  level2: RptLevelPart | null;
+  /** null — a report with one measure. */
+  second: RptMeasureInput | null;
   lockVersion?: number;
 }
 
@@ -63,7 +87,10 @@ export interface RptDefinition extends RptDefinitionInput {
   lockVersion: number;
   modifiedAt: string;
   modifiedBy: string;
-  /** Column labels by the current form: key `source:<field>` or `ref:<field>`; a missing key means the column is gone. */
+  /**
+   * Column labels by the current form: key `source:<field>` or `ref:<field>`, for the second measure
+   * `second.source:<field>` or `second.ref:<field>`; a missing key means the column is gone.
+   */
   labels: Record<string, string>;
 }
 
@@ -91,11 +118,25 @@ export interface RptSourceLayout {
   columns: RptColumn[];
 }
 
-export interface RptLine {
+export interface RptMeasureValues {
   /** Month i+1; null — no rows in the cell, "0" — rows exist and sum to zero. */
   cells: (string | null)[];
+  /** Sum of months 1…ytdMonth. */
   total: string | null;
   count: number;
+}
+
+/** Second measure to first measure, 6 digits; the screen rounds it. */
+export interface RptRatio {
+  cells: (string | null)[];
+  total: string | null;
+}
+
+/** `cells`, `total`, `count` — the first measure. */
+export interface RptLine extends RptMeasureValues {
+  /** null — a report with one measure. */
+  m2: RptMeasureValues | null;
+  ratio: RptRatio | null;
 }
 
 export interface RptLine2 extends RptLine {
@@ -118,6 +159,14 @@ export interface RptUndated {
   value: string;
 }
 
+/** Measure of the report view: [0] — the first measure, [1] — the second one when present. */
+export interface RptMeasureInfo {
+  name: string | null;
+  divisor: RptDivisor;
+  decimals: RptDecimals;
+  byMonthColumns: boolean;
+}
+
 export interface RptReportView {
   reportId: number;
   name: string;
@@ -130,6 +179,11 @@ export interface RptReportView {
   lines: RptLine1[];
   undated: RptUndated | null;
   refDuplicateKeys: number;
+  /** Last month N of the total "January – month N", 1..12. */
+  ytdMonth: number;
+  measures: RptMeasureInfo[];
+  /** "Undated" of the second measure; null for a measure by month columns or without a second measure. */
+  undated2: RptUndated | null;
 }
 
 export type RptPeriod = { kind: 'month'; month: number } | { kind: 'year' } | { kind: 'undated' };
@@ -140,6 +194,8 @@ export interface RptCellQuery {
   /** [] — grand total; [k1] — level 1 line; [k1, k2] — level 2 line; keys as the server sent them. */
   path: (string | null)[];
   offset: number;
+  /** Missing — the first measure. */
+  measure?: 1 | 2;
 }
 
 export interface RptCellItem {
@@ -150,6 +206,8 @@ export interface RptCellItem {
   measure: string | null;
   level1: string | null;
   level2: string | null;
+  /** Month column label from the form; null for a measure by date. */
+  column: string | null;
 }
 
 export interface RptCellRows {

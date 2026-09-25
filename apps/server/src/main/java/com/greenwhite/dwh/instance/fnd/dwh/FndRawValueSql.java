@@ -53,13 +53,13 @@ public final class FndRawValueSql {
     }
 
     /**
-     * Ключ связи со справочником (контракт отчёта 4.2): число — по значению ({@code 1183} = {@code 1183.0}),
-     * иначе текст без пробелов по краям с регистром; пусто и null — пустая строка (пусто = пусто);
-     * длинная ячейка — null: ни с чем не совпадает.
+     * Ключ связи со справочником (контракт отчёта 4.2, 10.5 [С10]): число — по значению ({@code 1183} = {@code 1183.0}),
+     * иначе текст без пробелов по краям и без учёта регистра — как название группы {@link #groupKey};
+     * пусто и null — пустая строка (пусто = пусто); длинная ячейка — null: ни с чем не совпадает.
      */
     public static String key(String text) {
         return "(case when length(" + text + ") > " + MAX_CELL_LENGTH + " then null else coalesce(trim_scale("
-                + numberSql(text) + ")::text, nullif(" + stripped(text) + ", ''), '') end)";
+                + numberSql(text) + ")::text, " + groupKey(text) + ", '') end)";
     }
 
     /**
@@ -78,7 +78,7 @@ public final class FndRawValueSql {
 
     private static String numberSql(String t) {
         // Экспонента ограничена 3 цифрами: иначе переполнение numeric роняет весь запрос вместо null
-        return shortOnly(t, "(case when " + t + " ~ '^\\s*-?[0-9]+([.,][0-9]+)?([eE][-+]?[0-9]{1,3})?\\s*$'"
+        return shortOnly(t, "(case when " + stripped(t) + " ~ '^-?[0-9]+([.,][0-9]+)?([eE][-+]?[0-9]{1,3})?$'"
                 + " then replace(" + stripped(t) + ", ',', '.')::numeric end)");
     }
 
@@ -108,7 +108,8 @@ public final class FndRawValueSql {
      * считает пробелом, а обрезка нет, роняет запрос.
      */
     private static String stripped(String t) {
-        return "regexp_replace(" + t + ", '^\\s+|\\s+$', '', 'g')";
+        // неразрывный пробел: на базе с языком C `\s` его не берёт
+        return "regexp_replace(" + t + ", '^[\\s\\u00a0]+|[\\s\\u00a0]+$', '', 'g')";
     }
 
     /**

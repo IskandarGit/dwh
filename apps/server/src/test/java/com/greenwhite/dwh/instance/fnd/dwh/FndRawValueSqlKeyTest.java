@@ -71,6 +71,14 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
+    @DisplayName("контракт отчёта 4.2: число с неразрывным пробелом по краям — по значению (1183.0 + U+00A0 = 1183)")
+    void numericKeyWithNonBreakingSpace() {
+        assertThat(evalKey("1183.0\u00a0")).isEqualTo(evalKey("1183"));
+        assertThat(evalKey("\u00a01183.0")).isEqualTo(evalKey("1183"));
+        assertThat(evalKey("1183.0\u00a0")).isEqualTo("1183");
+    }
+
+    @Test
     @DisplayName("контракт отчёта 4.2: пусто, null и пробелы — пустая строка (пусто = пусто)")
     void emptyKeyIsEmptyString() {
         assertThat(evalKey(null)).isEqualTo("");
@@ -79,11 +87,12 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("контракт отчёта 4.2: текстовый ключ — без пробелов по краям, с учётом регистра")
-    void textKeyTrimmedCaseSensitive() {
-        assertThat(evalKey("A1")).isEqualTo("A1");
-        assertThat(evalKey("a1")).isEqualTo("a1");
-        assertThat(evalKey("A1")).isNotEqualTo(evalKey("a1"));
+    @DisplayName("контракт отчёта 10.5 [С10]: текстовый ключ — без пробелов по краям, без учёта регистра, кириллица тоже")
+    void textKeyTrimmedCaseInsensitive() {
+        assertThat(evalKey("A1")).isEqualTo("a1");
+        assertThat(evalKey("A1")).isEqualTo(evalKey("a1"));
+        assertThat(evalKey(" Ипак ")).isEqualTo(evalKey("ипак"));
+        assertThat(evalKey(" Ипак ")).isEqualTo("ипак");
         assertThat(evalKey(" x y ")).isEqualTo("x y");
     }
 
@@ -109,6 +118,16 @@ class FndRawValueSqlKeyTest extends EmbeddedPostgresTest {
         String upper = evalSql(FndRawValueSql.groupKey("('ИПАК ЙЎЛИ ҚҒҲ'::text collate \"C\")"));
         assertThat(mixed).isEqualTo("ипак йўли қғҳ");
         assertThat(upper).isEqualTo(mixed);
+    }
+
+    @Test
+    @DisplayName("контракт отчёта 4.2, 4.4: неразрывный пробел по краям снимается и на базе с языком C")
+    void nonBreakingSpaceStripped() {
+        assertThat(evalKey(" TEST ")).isEqualTo("test");
+        assertThat(evalSql(FndRawValueSql.key("(' TEST '::text collate \"C\")"))).isEqualTo("test");
+        assertThat(evalGroupKey(" Ипак йўли ")).isEqualTo(evalGroupKey("Ипак йўли"));
+        String groupC = evalSql(FndRawValueSql.groupKey("(' Ипак йўли '::text collate \"C\")"));
+        assertThat(groupC).isEqualTo("ипак йўли");
     }
 
     @Test

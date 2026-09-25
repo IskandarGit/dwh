@@ -9,21 +9,28 @@ import { RptCellPanelComponent, RptCellTarget, RptPanelLabels } from './rpt-cell
 
 const NBSP = ' ';
 
-function item(index: number): RptCellItem {
+function item(index: number, byColumns = false): RptCellItem {
   return {
     file: 'jan_feb.xlsx',
     sheet: 'TEST',
     excelRow: index + 5,
-    date: '2026-02-01',
+    date: byColumns ? null : '2026-02-01',
     measure: '500000',
     level1: 'TEST-A',
-    level2: null
+    level2: null,
+    column: byColumns ? 'Yanvar TEST' : null
   };
 }
 
-function page(offset: number, total = 450): RptCellRows {
+function page(offset: number, total = 450, byColumns = false): RptCellRows {
   const count = Math.min(200, total - offset);
-  return { total, offset, limit: 200, value: '8500000', items: Array.from({ length: count }, (_, index) => item(offset + index)) };
+  return {
+    total,
+    offset,
+    limit: 200,
+    value: '8500000',
+    items: Array.from({ length: count }, (_, index) => item(offset + index, byColumns))
+  };
 }
 
 function ru(key: string, params: Record<string, string | number> = {}): string {
@@ -38,12 +45,14 @@ interface FixtureOptions {
   divisor?: RptDivisor;
   total?: number;
   failure?: ProblemDetail;
+  heading?: string;
+  byColumns?: boolean;
 }
 
 async function createFixture(options: FixtureOptions = {}) {
   const api = {
     cells: vi.fn((_id: number, query: RptCellQuery) =>
-      options.failure ? throwError(() => options.failure) : of(page(query.offset, options.total))
+      options.failure ? throwError(() => options.failure) : of(page(query.offset, options.total, options.byColumns))
     )
   };
   await TestBed.configureTestingModule({
@@ -56,7 +65,7 @@ async function createFixture(options: FixtureOptions = {}) {
   fixture.componentRef.setInput('reportId', 7);
   fixture.componentRef.setInput('year', 2026);
   fixture.componentRef.setInput('target', options.target ?? { period: { kind: 'month', month: 2 }, path: ['test-a', 'test-a-1'] });
-  fixture.componentRef.setInput('heading', 'TEST-A · TEST-A-1');
+  fixture.componentRef.setInput('heading', options.heading ?? 'TEST-A · TEST-A-1');
   fixture.componentRef.setInput('tableValue', '8.5');
   fixture.componentRef.setInput('divisor', options.divisor ?? 1000000);
   fixture.componentRef.setInput('decimals', 2);
@@ -162,5 +171,29 @@ describe('RptCellPanelComponent', () => {
 
     expect(byTestId(fixture, 'rpt-panel-error')[0].textContent).toContain(ru('rpt.err.RPT_CELL_INVALID'));
     expect(byTestId(fixture, 'rpt-panel-table')).toHaveLength(0);
+  });
+
+  it('shows the month column instead of the date for a measure by month columns and asks its measure', async () => {
+    const { fixture, api } = await createFixture({
+      target: { period: { kind: 'year' }, path: ['test-a', 'test-a-1'], measure: 2 },
+      labels: { measure: 'Plan TEST', level1: 'Gruppa TEST', level2: 'Podgruppa TEST' },
+      heading: 'Plan TEST · TEST-A · TEST-A-1',
+      byColumns: true
+    });
+
+    expect(api.cells).toHaveBeenCalledWith(7, { year: 2026, period: { kind: 'year' }, path: ['test-a', 'test-a-1'], offset: 0, measure: 2 });
+    expect(byTestId(fixture, 'rpt-panel-heading')[0].textContent?.trim()).toMatch(/^Plan TEST · /);
+    expect(byTestId(fixture, 'rpt-panel-col-column')[0].textContent).toContain(ru('rpt.panel.column'));
+    expect(byTestId(fixture, 'rpt-panel-col-date')).toHaveLength(0);
+    expect(byTestId(fixture, 'rpt-panel-col-measure')[0].textContent).toContain('Plan TEST');
+    const cells = Array.from(byTestId(fixture, 'rpt-panel-row')[0].querySelectorAll('td')).map(cell => cell.textContent?.trim());
+    expect(cells).toEqual(['jan_feb.xlsx · TEST · 5', 'Yanvar TEST', `500${NBSP}000`]);
+  });
+
+  it('keeps the date column for a measure by date', async () => {
+    const { fixture } = await createFixture();
+
+    expect(byTestId(fixture, 'rpt-panel-col-date')[0].textContent).toContain(ru('rpt.panel.date'));
+    expect(byTestId(fixture, 'rpt-panel-col-column')).toHaveLength(0);
   });
 });

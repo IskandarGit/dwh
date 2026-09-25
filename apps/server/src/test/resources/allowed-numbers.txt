@@ -15,6 +15,8 @@ src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:1000 # предел
 src/main/java/com/greenwhite/dwh/instance/ovw/OvwLimits.java:2000 # предел обзора, не норматив: цифр до и после точки у числа группы
 src/main/resources/db/migration/V118__rpt_reports.sql:1000 # делитель отображения отчёта (тысячи), не норматив
 src/main/resources/db/migration/V118__rpt_reports.sql:1000000 # делитель отображения отчёта (миллионы), не норматив
+src/main/resources/db/migration/V120__rpt_second_measure.sql:1000 # делитель отображения второй меры (тысячи), не норматив
+src/main/resources/db/migration/V120__rpt_second_measure.sql:1000000 # делитель отображения второй меры (миллионы), не норматив
 src/main/java/com/greenwhite/dwh/instance/rpt/RptLimits.java:2000 # предел отчёта, не норматив: строк уровней 1 и 2 вместе
 src/main/java/com/greenwhite/dwh/instance/rpt/RptLimits.java:1000 # делитель отчёта, не норматив: тысячи
 src/main/java/com/greenwhite/dwh/instance/rpt/RptLimits.java:1000000 # делитель отчёта, не норматив: миллионы

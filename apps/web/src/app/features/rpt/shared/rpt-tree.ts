@@ -1,4 +1,4 @@
-import { RptLine, RptLine1, RptReportView } from './rpt-api';
+import { RptLine, RptLine1, RptMeasureValues, RptRatio, RptReportView } from './rpt-api';
 
 export type RptRowKind = 'grand' | 'l1' | 'l2';
 
@@ -13,6 +13,10 @@ export interface RptRow {
   cells: (string | null)[];
   total: string | null;
   count: number;
+  /** Second measure of the line; null — a report with one measure. */
+  m2: RptMeasureValues | null;
+  /** Second measure to first measure as the server sent it; null — a report with one measure. */
+  ratio: RptRatio | null;
   hasChildren: boolean;
   collapsed: boolean;
 }
@@ -78,6 +82,8 @@ function lineRow(
     cells: line.cells,
     total: line.total,
     count: line.count,
+    m2: line.m2,
+    ratio: line.ratio,
     hasChildren: false,
     collapsed: false,
   };

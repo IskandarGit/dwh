@@ -23,7 +23,11 @@
         <thead>
           <tr>
             <th>{{ 'rpt.panel.from' | t }}</th>
-            <th>{{ 'rpt.panel.date' | t }}</th>
+            @if (byColumns()) {
+              <th data-testid="rpt-panel-col-column">{{ 'rpt.panel.column' | t }}</th>
+            } @else {
+              <th data-testid="rpt-panel-col-date">{{ 'rpt.panel.date' | t }}</th>
+            }
             @if (labels.measure !== null) {
               <th class="rpt-panel-num" data-testid="rpt-panel-col-measure">{{ labels.measure }}</th>
             }
@@ -39,7 +43,11 @@
           @for (item of items(); track $index) {
             <tr data-testid="rpt-panel-row">
               <td class="rpt-panel-origin">{{ item.origin }}</td>
-              <td class="rpt-panel-date">{{ item.date }}</td>
+              @if (byColumns()) {
+                <td class="rpt-panel-column">{{ item.column }}</td>
+              } @else {
+                <td class="rpt-panel-date">{{ item.date }}</td>
+              }
               @if (labels.measure !== null) {
                 <td class="rpt-panel-num">{{ item.measure }}</td>
               }

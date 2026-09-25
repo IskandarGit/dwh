@@ -249,8 +249,8 @@ public class UplXlsxParser {
                         continue;
                     }
                     total++;
-                    rows.accept(dataRow(sheet, row.getRowNum(), values));
                     List<ErrorRecord> rowErrors = checkRow(sheet, row.getRowNum(), values);
+                    rows.accept(dataRow(sheet, row.getRowNum(), values, !rowErrors.isEmpty()));
                     if (!rowErrors.isEmpty()) {
                         rejected++;
                         errorsTotal += rowErrors.size();
@@ -389,12 +389,12 @@ public class UplXlsxParser {
         return values;
     }
 
-    private static DataRow dataRow(SheetMatch sheet, int rowNo, List<CellValue> values) {
+    private static DataRow dataRow(SheetMatch sheet, int rowNo, List<CellValue> values, boolean rejected) {
         Map<String, Object> fields = new LinkedHashMap<>();
         for (int index = 0; index < sheet.columns().size(); index++) {
             fields.put(sheet.columns().get(index).column().targetField(), values.get(index).text());
         }
-        return new DataRow(sheet.spec().sheetName(), rowNo, fields);
+        return new DataRow(sheet.spec().sheetName(), rowNo, fields, rejected);
     }
 
     private int filledCells(Row row) {
@@ -458,8 +458,11 @@ public class UplXlsxParser {
         return sorted;
     }
 
-    /** Строка данных как в файле: лист, № строки Excel и значения по полям анкеты ({@code null} — пустая ячейка). */
-    public record DataRow(String sheet, int sourceRowNo, Map<String, Object> fields) {
+    /**
+     * Строка данных как в файле: лист, № строки Excel, значения по полям анкеты ({@code null} — пустая ячейка)
+     * и признак отклонения — у строки есть хотя бы одна ошибка проверки.
+     */
+    public record DataRow(String sheet, int sourceRowNo, Map<String, Object> fields, boolean rejected) {
     }
 
     /** Значение ячейки: текст как в файле ({@code null} — пусто) и признак числовой ячейки. */

@@ -13,6 +13,7 @@ import com.greenwhite.dwh.instance.rpt.RptModel.DefinitionInput;
 import com.greenwhite.dwh.instance.rpt.RptModel.KeyPair;
 import com.greenwhite.dwh.instance.rpt.RptModel.LevelPart;
 import com.greenwhite.dwh.instance.rpt.RptModel.Measure;
+import com.greenwhite.dwh.instance.rpt.RptModel.MeasureInput;
 import com.greenwhite.dwh.instance.rpt.RptModel.RefPart;
 import com.greenwhite.dwh.instance.rpt.RptModel.ReportItem;
 import com.greenwhite.dwh.instance.rpt.RptModel.SheetItem;
@@ -37,6 +38,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -86,6 +89,8 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
     private JdbcClient dwhJdbc;
     @Autowired
     private TransactionTemplate tx;
+    @Autowired
+    private JsonMapper json;
 
     private long userId;
     private long sourceId;
@@ -330,7 +335,7 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("Запись: создание даёт одну строку rpt_reports; SQL записи в rpt — только в хранилище и только в rpt_reports")
+    @DisplayName("Запись: создание даёт одну строку rpt_reports; SQL записи в rpt — только в хранилище и только в rpt_reports или rpt_report_measures2")
     void writesOnlyReportsTable() throws IOException {
         service.create(valid().build(), userId);
 
@@ -346,9 +351,221 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
             boolean repository = file.getFileName().toString().equals(REPOSITORY_FILE);
             while (matcher.find()) {
                 assertThat(repository).as(file.toString()).isTrue();
-                assertThat(tableOf(matcher)).as(file.toString()).isEqualToIgnoringCase("rpt_reports");
+                assertThat(tableOf(matcher).toLowerCase(Locale.ROOT)).as(file.toString())
+                        .isIn("rpt_reports", "rpt_report_measures2");
             }
         }
+    }
+
+    // ---------- И15б: название меры, колонки-месяцы, мера 2 (контракт 10.3, 10.10) ----------
+
+    @Test
+    @DisplayName("10.3: прежнее тело JSON без новых полей — отчёт создаётся, measureName/monthFields/second = null")
+    void oldJsonBodyAccepted() {
+        String body = """
+                {"name": "TEST old body", "sourceId": %d, "sourceSheet": 1, "dateField": "%s",
+                 "measure": {"kind": "total", "field": "%s"}, "divisor": 1000, "decimals": 2,
+                 "ref": {"sourceId": %d, "sheet": 1, "keys": [{"field": "%s", "refField": "%s"}]},
+                 "level1": {"origin": "ref", "field": "%s"}, "level2": {"origin": "source", "field": "%s"}}
+                """.formatted(sourceId, RptTestData.DATE, RptTestData.AMOUNT, refId, RptTestData.CODE,
+                RptTestData.REF_CODE, RptTestData.REF_NAME, RptTestData.GROUP);
+
+        DefinitionInput input = json.readValue(body, DefinitionInput.class);
+        Definition created = service.create(input, userId);
+        Definition read = service.get(created.id());
+
+        assertThat(input.measureName()).isNull();
+        assertThat(input.monthFields()).isNull();
+        assertThat(input.second()).isNull();
+        assertThat(read.measureName()).isNull();
+        assertThat(read.monthFields()).isNull();
+        assertThat(read.second()).isNull();
+        assertThat(read.dateField()).isEqualTo(RptTestData.DATE);
+        assertThat(read.measure()).isEqualTo(new Measure(RptModel.MEASURE_TOTAL, RptTestData.AMOUNT));
+        assertThat(jdbc.sql("select count(*) from rpt_report_measures2").query(Long.class).single()).isZero();
+    }
+
+    @Test
+    @DisplayName("10.3: название меры и колонки-месяцы сохраняются; в базе вид months, в API measure = null")
+    void measureNameAndMonthFields() {
+        List<String> months = RptTestData.months(RptTestData.AMOUNT, null, RptTestData.QTY);
+
+        Definition created = service.create(valid().measureName("  TEST мера  ").dateField(null).measure(null)
+                .monthFields(months).build(), userId);
+        Definition read = service.get(created.id());
+
+        assertThat(read.measureName()).isEqualTo("TEST мера");
+        assertThat(read.monthFields()).containsExactlyElementsOf(months);
+        assertThat(read.dateField()).isNull();
+        assertThat(read.measure()).isNull();
+        assertThat(read.labels()).contains(
+                entry("source:" + RptTestData.AMOUNT, "Сумма TEST"),
+                entry("source:" + RptTestData.QTY, "Количество TEST"));
+        assertThat(jdbc.sql("select measure_kind from rpt_reports where id = :id").param("id", created.id())
+                .query(String.class).single()).isEqualTo(RptModel.MEASURE_MONTHS);
+    }
+
+    @Test
+    @DisplayName("10.3: мера 2 с тем же источником, что мера 1, принимается и читается как введена, подписи — с приставкой second.")
+    void secondMeasureReadBack() {
+        MeasureInput second = second(null, RptTestData.months(RptTestData.AMOUNT, RptTestData.QTY), null,
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP));
+
+        Definition created = service.create(valid().second(second).build(), userId);
+        Definition read = service.get(created.id());
+
+        assertThat(read.second()).isEqualTo(second);
+        assertThat(read.labels()).contains(
+                entry("second.source:" + RptTestData.AMOUNT, "Сумма TEST"),
+                entry("second.source:" + RptTestData.QTY, "Количество TEST"),
+                entry("second.source:" + RptTestData.CODE, "Код TEST"),
+                entry("second.source:" + RptTestData.GROUP, "Группа TEST"),
+                entry("second.ref:" + RptTestData.REF_CODE, "Код справочника TEST"),
+                entry("second.ref:" + RptTestData.REF_NAME, "Название TEST"));
+        assertThat(jdbc.sql("select count(*) from rpt_report_measures2 where report_id = :id")
+                .param("id", created.id()).query(Long.class).single()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("10.3: правка с новой мерой 2 заменяет прежнюю; правка без меры 2 удаляет её строку")
+    void updateWithoutSecondRemovesIt() {
+        MeasureInput byMonths = second(null, RptTestData.months(RptTestData.AMOUNT), null,
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP));
+        Definition created = service.create(valid().second(byMonths).build(), userId);
+
+        MeasureInput byDate = second(RptTestData.DATE, null, new Measure(RptModel.MEASURE_COUNT, null),
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP));
+        Definition replaced = service.update(created.id(), valid().second(byDate).lockVersion(0).build(), userId);
+        assertThat(replaced.second()).isEqualTo(byDate);
+
+        Definition removed = service.update(created.id(), valid().lockVersion(1).build(), userId);
+
+        assertThat(removed.second()).isNull();
+        assertThat(jdbc.sql("select count(*) from rpt_report_measures2 where report_id = :id")
+                .param("id", created.id()).query(Long.class).single()).isZero();
+    }
+
+    @Test
+    @DisplayName("10.3: нет ни колонки-даты, ни колонок-месяцев — dateField RPT_PERIOD_INVALID")
+    void noPeriod() {
+        assertInvalid(valid().dateField(null), "dateField", RptErrors.RPT_PERIOD_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: заданы и колонка-дата, и колонки-месяцы — dateField RPT_PERIOD_INVALID")
+    void bothPeriods() {
+        assertInvalid(valid().measureName("TEST мера").measure(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
+                "dateField", RptErrors.RPT_PERIOD_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: мера задана при колонках-месяцах — dateField RPT_PERIOD_INVALID")
+    void measureWithMonths() {
+        assertInvalid(valid().measureName("TEST мера").dateField(null).monthFields(RptTestData.months(RptTestData.AMOUNT)),
+                "dateField", RptErrors.RPT_PERIOD_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: колонок-месяцев не 12 — monthFields RPT_PERIOD_INVALID")
+    void monthsNotTwelve() {
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null).monthFields(List.of(RptTestData.AMOUNT)),
+                "monthFields", RptErrors.RPT_PERIOD_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: все 12 месяцев «нет» — monthFields RPT_MONTHS_EMPTY")
+    void monthsEmpty() {
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null).monthFields(RptTestData.months()),
+                "monthFields", RptErrors.RPT_MONTHS_EMPTY);
+    }
+
+    @Test
+    @DisplayName("10.3: колонка месяца текстовая — monthFields[1] RPT_COLUMN_TYPE, неизвестная — monthFields[2] RPT_COLUMN_UNKNOWN")
+    void monthColumnTypeAndUnknown() {
+        assertInvalid(valid().measureName("TEST мера").dateField(null).measure(null)
+                        .monthFields(RptTestData.months(RptTestData.AMOUNT, RptTestData.CODE, "TEST_none")),
+                tuple("monthFields[1]", RptErrors.RPT_COLUMN_TYPE),
+                tuple("monthFields[2]", RptErrors.RPT_COLUMN_UNKNOWN));
+    }
+
+    @Test
+    @DisplayName("10.3: название меры пусто или длиннее 100 — measureName RPT_MEASURE_NAME_INVALID")
+    void measureNameLength() {
+        assertInvalid(valid().measureName("   "), "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+        assertInvalid(valid().measureName("T".repeat(101)), "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: мера 1 по колонкам-месяцам без названия — measureName RPT_MEASURE_NAME_INVALID; с названием — создаётся")
+    void monthMeasureNameRequired() {
+        List<String> months = RptTestData.months(RptTestData.AMOUNT);
+        assertInvalid(valid().dateField(null).measure(null).monthFields(months),
+                "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+        assertInvalid(valid().measureName("  ").dateField(null).measure(null).monthFields(months),
+                "measureName", RptErrors.RPT_MEASURE_NAME_INVALID);
+
+        Definition created = service.create(valid().name("TEST named months").measureName("TEST мера")
+                .dateField(null).measure(null).monthFields(months).build(), userId);
+
+        assertThat(service.get(created.id()).measureName()).isEqualTo("TEST мера");
+    }
+
+    @Test
+    @DisplayName("10.3: у меры 2 нет названия — second.name RPT_MEASURE_NAME_INVALID")
+    void secondNameRequired() {
+        MeasureInput valid = second(RptTestData.DATE, null, new Measure(RptModel.MEASURE_COUNT, null),
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP));
+        MeasureInput noName = new MeasureInput(null, valid.sourceId(), valid.sourceSheet(), valid.dateField(),
+                valid.monthFields(), valid.measure(), valid.divisor(), valid.decimals(), valid.ref(), valid.level1(),
+                valid.level2());
+
+        assertInvalid(valid().second(noName), "second.name", RptErrors.RPT_MEASURE_NAME_INVALID);
+    }
+
+    @Test
+    @DisplayName("10.3: у меры 2 другое число уровней — second.level2 RPT_LEVELS_MISMATCH (в обе стороны)")
+    void levelsMismatch() {
+        MeasureInput oneLevel = second(RptTestData.DATE, null, new Measure(RptModel.MEASURE_COUNT, null), null);
+        MeasureInput twoLevels = second(RptTestData.DATE, null, new Measure(RptModel.MEASURE_COUNT, null),
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP));
+
+        assertInvalid(valid().second(oneLevel), "second.level2", RptErrors.RPT_LEVELS_MISMATCH);
+        assertInvalid(valid().level2(null).second(twoLevels), "second.level2", RptErrors.RPT_LEVELS_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("10.3: правила меры 1 действуют и у меры 2 — поле с приставкой second.")
+    void secondUsesSameRules() {
+        LevelPart group = new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP);
+        assertInvalid(valid().second(second(RptTestData.CODE, null, new Measure(RptModel.MEASURE_COUNT, null), group)),
+                "second.dateField", RptErrors.RPT_COLUMN_TYPE);
+        assertInvalid(valid().second(second(null, null, null, group)),
+                "second.dateField", RptErrors.RPT_PERIOD_INVALID);
+        assertInvalid(valid().second(second(null, RptTestData.months(RptTestData.CODE), null, group)),
+                "second.monthFields[0]", RptErrors.RPT_COLUMN_TYPE);
+        assertInvalid(valid().second(second(null, RptTestData.months(), null, group)),
+                "second.monthFields", RptErrors.RPT_MONTHS_EMPTY);
+
+        MeasureInput base = second(RptTestData.DATE, null, new Measure(RptModel.MEASURE_COUNT, null), group);
+        MeasureInput refIsSource = new MeasureInput(base.name(), base.sourceId(), base.sourceSheet(), base.dateField(),
+                base.monthFields(), base.measure(), base.divisor(), base.decimals(),
+                new RefPart(sourceId, 1, List.of(new KeyPair(RptTestData.CODE, RptTestData.CODE))),
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.CODE), group);
+        assertInvalid(valid().second(refIsSource), "second.ref.sourceId", RptErrors.RPT_SOURCE_UNKNOWN);
+
+        MeasureInput unknownSource = new MeasureInput(base.name(), -1L, base.sourceSheet(), base.dateField(),
+                base.monthFields(), base.measure(), 10, base.decimals(), null,
+                new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.CODE), group);
+        assertInvalid(valid().second(unknownSource),
+                tuple("second.sourceId", RptErrors.RPT_SOURCE_UNKNOWN),
+                tuple("second.divisor", RptErrors.RPT_FORMAT_INVALID));
+    }
+
+    /** Мера 2 по тому же источнику и справочнику, что мера 1; уровень 1 — название из справочника. */
+    private MeasureInput second(String dateField, List<String> monthFields, Measure measure, LevelPart level2) {
+        return new MeasureInput("TEST мера 2", sourceId, 1, dateField, monthFields, measure, 1, 0,
+                new RefPart(refId, 1, List.of(new KeyPair(RptTestData.CODE, RptTestData.REF_CODE))),
+                new LevelPart(RptModel.ORIGIN_REF, RptTestData.REF_NAME), level2);
     }
 
     // ---------- помощники ----------
@@ -419,6 +636,9 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
         private LevelPart level1 = new LevelPart(RptModel.ORIGIN_REF, RptTestData.REF_NAME);
         private LevelPart level2 = new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP);
         private Integer lockVersion;
+        private String measureName;
+        private List<String> monthFields;
+        private MeasureInput second;
 
         InputBuilder(long sourceId, long refId) {
             this.sourceId = sourceId;
@@ -480,9 +700,24 @@ class RptDefinitionServiceTest extends EmbeddedPostgresTest {
             return this;
         }
 
+        InputBuilder measureName(String value) {
+            measureName = value;
+            return this;
+        }
+
+        InputBuilder monthFields(List<String> value) {
+            monthFields = value;
+            return this;
+        }
+
+        InputBuilder second(MeasureInput value) {
+            second = value;
+            return this;
+        }
+
         DefinitionInput build() {
             return new DefinitionInput(name, sourceId, sourceSheet, dateField, measure, divisor, decimals, ref,
-                    level1, level2, lockVersion);
+                    level1, level2, lockVersion, measureName, monthFields, second);
         }
     }
 }

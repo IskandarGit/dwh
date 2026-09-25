@@ -25,9 +25,21 @@
           </select>
         </div>
       }
-      <span class="rpt-view-muted" data-testid="rpt-view-digits">{{ digitsText() }}</span>
-      <span class="rpt-view-muted" data-testid="rpt-view-measure">{{ measureText() }}</span>
-      @if (hasLevel2() && current.years.length > 0) {
+      @for (measure of measureList(); track measure) {
+        <span class="rpt-view-measure-info" data-testid="rpt-view-measure-info">
+          @if (twoMeasures()) {
+            <span class="rpt-view-muted" data-testid="rpt-view-measure">{{ measureText(measure) }}</span>
+            <span class="rpt-view-muted" data-testid="rpt-view-digits">{{ digitsText(measure) }}</span>
+          } @else {
+            <span class="rpt-view-muted" data-testid="rpt-view-digits">{{ digitsText(measure) }}</span>
+            <span class="rpt-view-muted" data-testid="rpt-view-measure">{{ measureText(measure) }}</span>
+          }
+          @if (byMonthColumns(measure)) {
+            <span class="rpt-view-muted" data-testid="rpt-view-months-no-year">{{ 'rpt.view.months_no_year' | t }}</span>
+          }
+        </span>
+      }
+      @if (hasLevel2() && tableVisible()) {
         <div class="rpt-view-actions">
           <ui-button variant="secondary" size="sm" data-testid="rpt-view-expand-all" (onClick)="expandAll()">
             {{ 'rpt.view.expand_all' | t }}
@@ -63,20 +75,40 @@
   }
 
   @if (view(); as current) {
-    @if (current.years.length === 0) {
+    @if (noDatedRows()) {
       <p class="rpt-view-empty" data-testid="rpt-view-no-data">{{ 'rpt.view.no_data' | t }}</p>
-    } @else {
+    } @else if (tableVisible()) {
       <div class="table-card rpt-view-card" [class.rpt-view-busy]="loading()">
         <div class="rpt-view-scroll">
-          <table class="rpt-view-table" data-testid="rpt-view-table">
+          <table class="rpt-view-table" [class.rpt-view-two]="twoMeasures()" data-testid="rpt-view-table">
             <thead>
-              <tr>
-                <th class="rpt-view-name"></th>
-                @for (month of months; track month) {
-                  <th class="rpt-view-num">{{ monthName(month) }}</th>
-                }
-                <th class="rpt-view-num">{{ 'rpt.view.total' | t }}</th>
-              </tr>
+              @if (twoMeasures()) {
+                <tr data-testid="rpt-view-head-blocks">
+                  <th class="rpt-view-name" rowspan="2"></th>
+                  @for (month of months; track month) {
+                    <th class="rpt-view-block" colspan="3">{{ monthName(month) }}</th>
+                  }
+                  <th class="rpt-view-block" colspan="3" data-testid="rpt-view-ytd">{{ ytdText() }}</th>
+                </tr>
+                <tr class="rpt-view-head-measures" data-testid="rpt-view-head-measures">
+                  @for (month of months; track month) {
+                    <th class="rpt-view-num">{{ measureName(1) }}</th>
+                    <th class="rpt-view-num">{{ measureName(2) }}</th>
+                    <th class="rpt-view-num rpt-view-ratio">{{ 'rpt.view.ratio' | t }}</th>
+                  }
+                  <th class="rpt-view-num">{{ measureName(1) }}</th>
+                  <th class="rpt-view-num">{{ measureName(2) }}</th>
+                  <th class="rpt-view-num rpt-view-ratio">{{ 'rpt.view.ratio' | t }}</th>
+                </tr>
+              } @else {
+                <tr>
+                  <th class="rpt-view-name"></th>
+                  @for (month of months; track month) {
+                    <th class="rpt-view-num">{{ monthName(month) }}</th>
+                  }
+                  <th class="rpt-view-num" data-testid="rpt-view-ytd">{{ ytdText() }}</th>
+                </tr>
+              }
             </thead>
             <tbody>
               @for (row of rows(); track row.id) {
@@ -110,6 +142,16 @@
                         </button>
                       }
                     </td>
+                    @if (twoMeasures()) {
+                      <td class="rpt-view-num">
+                        @if (row.m2 !== null && row.m2.cells[month - 1] !== null) {
+                          <button type="button" class="rpt-view-cell" data-testid="rpt-cell-m2" (click)="openMonth(row, month, 2)">
+                            {{ number2(row.m2.cells[month - 1]) }}
+                          </button>
+                        }
+                      </td>
+                      <td class="rpt-view-num rpt-view-ratio" data-testid="rpt-cell-ratio">{{ percent(row.ratio?.cells?.[month - 1] ?? null) }}</td>
+                    }
                   }
                   <td class="rpt-view-num rpt-view-row-total">
                     @if (row.total !== null) {
@@ -118,6 +160,16 @@
                       </button>
                     }
                   </td>
+                  @if (twoMeasures()) {
+                    <td class="rpt-view-num rpt-view-row-total">
+                      @if (row.m2 !== null && row.m2.total !== null) {
+                        <button type="button" class="rpt-view-cell" data-testid="rpt-cell-total-m2" (click)="openYear(row, 2)">
+                          {{ number2(row.m2.total) }}
+                        </button>
+                      }
+                    </td>
+                    <td class="rpt-view-num rpt-view-ratio rpt-view-row-total" data-testid="rpt-cell-ratio">{{ percent(row.ratio?.total ?? null) }}</td>
+                  }
                 </tr>
               }
             </tbody>
@@ -126,10 +178,10 @@
       </div>
     }
 
-    @if (current.undated !== null) {
+    @for (strip of undatedStrips(); track strip.measure) {
       <div class="alert rpt-view-warning rpt-view-undated" data-testid="rpt-view-undated">
-        <span>⚠ {{ undatedText() }}</span>
-        <ui-button variant="secondary" size="sm" data-testid="rpt-view-show-undated" (onClick)="openUndated()">
+        <span>⚠ {{ undatedText(strip) }}</span>
+        <ui-button variant="secondary" size="sm" data-testid="rpt-view-show-undated" (onClick)="openUndated(strip)">
           {{ 'rpt.view.show_rows' | t }}
         </ui-button>
       </div>
@@ -140,19 +192,17 @@
     }
 
     @if (panel(); as state) {
-      @if (panelLabels(); as labels) {
-        <app-rpt-cell-panel
-          [reportId]="current.reportId"
-          [year]="current.year"
-          [target]="state.target"
-          [heading]="state.heading"
-          [tableValue]="state.tableValue"
-          [divisor]="current.divisor"
-          [decimals]="current.decimals"
-          [labels]="labels"
-          (closed)="closePanel()"
-        />
-      }
+      <app-rpt-cell-panel
+        [reportId]="current.reportId"
+        [year]="current.year"
+        [target]="state.target"
+        [heading]="state.heading"
+        [tableValue]="state.tableValue"
+        [divisor]="state.divisor"
+        [decimals]="state.decimals"
+        [labels]="state.labels"
+        (closed)="closePanel()"
+      />
     }
   }
 </div>

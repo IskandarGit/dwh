@@ -16,6 +16,8 @@ import com.greenwhite.dwh.instance.rpt.RptModel.Line;
 import com.greenwhite.dwh.instance.rpt.RptModel.Line1;
 import com.greenwhite.dwh.instance.rpt.RptModel.Line2;
 import com.greenwhite.dwh.instance.rpt.RptModel.Measure;
+import com.greenwhite.dwh.instance.rpt.RptModel.MeasureInfo;
+import com.greenwhite.dwh.instance.rpt.RptModel.MeasureInput;
 import com.greenwhite.dwh.instance.rpt.RptModel.Period;
 import com.greenwhite.dwh.instance.rpt.RptModel.RefPart;
 import com.greenwhite.dwh.instance.rpt.RptModel.ReportView;
@@ -313,6 +315,199 @@ class RptViewServiceTest extends EmbeddedPostgresTest {
         });
     }
 
+    // ---------- И15б: две меры (контракт 10.6–10.8) ----------
+
+    @Test
+    @DisplayName("10.7: отчёт И15а — прежние поля те же, новые: ytdMonth = N, одна мера, m2 и ratio пусты")
+    void singleMeasureReportGetsNewFieldsOnly() {
+        ReportView view = service.view(twoLevels(), 2026);
+
+        assertThat(view.ytdMonth()).isEqualTo(4);
+        assertThat(view.measures()).containsExactly(new MeasureInfo("Сумма TEST", DIVISOR, 2, false));
+        assertThat(view.undated2()).isNull();
+        assertThat(view.grand().m2()).isNull();
+        assertThat(view.grand().ratio()).isNull();
+        assertThat(view.lines()).isNotEmpty().allSatisfy(line -> {
+            assertThat(line.m2()).isNull();
+            assertThat(line.ratio()).isNull();
+            assertThat(line.lines()).allSatisfy(child -> {
+                assertThat(child.m2()).isNull();
+                assertThat(child.ratio()).isNull();
+            });
+        });
+    }
+
+    @Test
+    @DisplayName("10.6: склейка линий без пары в обе стороны, отношение (v2 = 0, v2 пусто, v1 пусто), N по мере 1")
+    void twoMeasuresMergeAndRatio() {
+        long second = data.publishedSource();
+        data.applySource(second, List.of(
+                new SourceRow("10.01.2026", 200, 1, "TEST-1", "TEST G1"),
+                new SourceRow("15.02.2026", 50, 1, "TEST-1", "TEST g9"),
+                new SourceRow("11.03.2026", 0, 1, "TEST-1", "TEST g3"),
+                new SourceRow("20.05.2026", 70, 1, "TEST-1", "TEST g1"),
+                new SourceRow(null, 30, 1, "TEST-1", "TEST g1")), JAN_FROM, JAN_TO);
+        long id = twoMeasures("TEST merge", byDate("TEST мера 1", sourceId, 1, null, groupLevel(), null),
+                byDate("TEST мера 2", second, 1, null, groupLevel(), null));
+
+        ReportView view = service.view(id, null);
+
+        assertThat(view.year()).isEqualTo(2026);
+        assertThat(view.ytdMonth()).isEqualTo(4);
+        assertThat(view.measures()).containsExactly(new MeasureInfo("TEST мера 1", 1, 0, false),
+                new MeasureInfo("TEST мера 2", 1, 0, false));
+        assertThat(view.undated2()).isEqualTo(new RptModel.Undated(1, "30"));
+        assertThat(view.lines()).extracting(Line1::key)
+                .containsExactly(G1, "test g2", "test g3", "test g9", null);
+
+        Line1 g1 = view.lines().get(0);
+        assertThat(g1.total()).isEqualTo("4700.75");
+        assertThat(g1.m2().cells().get(4)).isEqualTo("70");
+        assertThat(g1.m2().total()).isEqualTo("200");
+        assertThat(g1.m2().count()).isEqualTo(1);
+        assertThat(g1.ratio().cells().getFirst()).isEqualTo("2000.250000");
+        assertThat(g1.ratio().total()).isEqualTo("2350.375000");
+
+        Line1 g2 = view.lines().get(1);
+        assertThat(g2.m2()).isNull();
+        assertThat(g2.ratio().cells()).hasSize(12).containsOnlyNulls();
+        assertThat(g2.ratio().total()).isNull();
+
+        Line1 g3 = view.lines().get(2);
+        assertThat(g3.m2().cells().get(2)).isEqualTo("0");
+        assertThat(g3.ratio().cells().get(2)).isNull();
+        assertThat(g3.ratio().total()).isNull();
+
+        Line1 g9 = view.lines().get(3);
+        assertThat(g9.name()).isEqualTo("TEST g9");
+        assertThat(g9.cells()).hasSize(12).containsOnlyNulls();
+        assertThat(g9.total()).isNull();
+        assertThat(g9.count()).isZero();
+        assertThat(g9.m2().total()).isEqualTo("50");
+        assertThat(g9.ratio().cells().get(1)).isEqualTo("0");
+        assertThat(g9.ratio().total()).isEqualTo("0");
+
+        assertThat(view.lines().getLast().m2()).isNull();
+        assertThat(view.grand().m2().total()).isEqualTo("250");
+        assertThat(view.grand().m2().cells().get(4)).isEqualTo("70");
+        assertThat(addUp(view.lines().stream().filter(line -> line.m2() != null).map(line -> line.m2().total()).toList()))
+                .isEqualByComparingTo(number(view.grand().m2().total()));
+        assertThat(addUp(view.grand().m2().cells().subList(0, view.ytdMonth())))
+                .isEqualByComparingTo(number(view.grand().m2().total()));
+
+        CellRows total2 = service.cells(id, new CellQuery(2026, new Period(RptModel.PERIOD_YEAR, null), List.of(G1), 0, 2));
+        assertThat(total2.total()).isEqualTo(1);
+        assertThat(total2.value()).isEqualTo("200");
+        assertThat(total2.items()).singleElement().satisfies(item -> assertThat(item.column()).isNull());
+        CellRows may2 = service.cells(id, new CellQuery(2026, new Period(RptModel.PERIOD_MONTH, 5), List.of(G1), 0, 2));
+        assertThat(may2.value()).isEqualTo("70");
+        CellRows undated2 = service.cells(id, new CellQuery(null, new Period(RptModel.PERIOD_UNDATED, null), List.of(), 0, 2));
+        assertThat(undated2.total()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("10.6 п.4: мера 2 на двух уровнях — подытог = Σ её строк, общий = Σ уровня 1, итог = месяцы 1…N")
+    void secondMeasureConverges() {
+        long second = data.publishedSource();
+        data.applySource(second, List.of(
+                new SourceRow("10.01.2026", 100, 1, "TEST-1", "TEST g1"),
+                new SourceRow("12.02.2026", 20.5, 1, "TEST-2", "TEST g2"),
+                new SourceRow("03.03.2026", 7, 1, "TEST-9", null),
+                new SourceRow("09.04.2026", 1.25, 1, "TEST-1", "TEST g1"),
+                new SourceRow("20.05.2026", 1000, 1, "TEST-2", "TEST g1")), JAN_FROM, JAN_TO);
+        RefPart ref = new RefPart(refId, 1, List.of(new KeyPair(RptTestData.CODE, RptTestData.REF_CODE)));
+        LevelPart level1 = new LevelPart(RptModel.ORIGIN_REF, RptTestData.REF_NAME);
+        long id = twoMeasures("TEST converge", byDate("TEST мера 1", sourceId, DIVISOR, ref, level1, groupLevel()),
+                byDate("TEST мера 2", second, 1, ref, level1, groupLevel()));
+
+        ReportView view = service.view(id, 2026);
+
+        assertThat(view.ytdMonth()).isEqualTo(4);
+        RptModel.M2 grand = view.grand().m2();
+        assertThat(grand.total()).isEqualTo("128.75");
+        List<Line1> withM2 = view.lines().stream().filter(line -> line.m2() != null).toList();
+        assertThat(withM2).isNotEmpty();
+        assertThat(addUp(withM2.stream().map(line -> line.m2().total()).toList()))
+                .isEqualByComparingTo(number(grand.total()));
+        assertMonthsAdd(grand.cells(), withM2.stream().map(line -> line.m2().cells()).toList());
+        assertMonthsMakeYtd(grand, view.ytdMonth());
+        for (Line1 line : withM2) {
+            List<Line2> children = line.lines().stream().filter(child -> child.m2() != null).toList();
+            assertThat(addUp(children.stream().map(child -> child.m2().total()).toList()))
+                    .as(String.valueOf(line.key())).isEqualByComparingTo(number(line.m2().total()));
+            assertMonthsAdd(line.m2().cells(), children.stream().map(child -> child.m2().cells()).toList());
+            assertMonthsMakeYtd(line.m2(), view.ytdMonth());
+            children.forEach(child -> assertMonthsMakeYtd(child.m2(), view.ytdMonth()));
+        }
+    }
+
+    @Test
+    @DisplayName("10.6 п.1, 10.8: обе меры колонками-месяцами одного источника — года нет, таблица считается, строки с колонкой")
+    void bothMeasuresByMonthColumns() {
+        long id = twoMeasures("TEST months",
+                byMonthColumns("TEST план", RptTestData.months(RptTestData.AMOUNT, RptTestData.QTY)),
+                byMonthColumns("TEST факт", RptTestData.months(RptTestData.QTY)));
+
+        ReportView view = service.view(id, null);
+
+        assertThat(view.years()).isEmpty();
+        assertThat(view.year()).isNull();
+        assertThat(view.lines()).isNotEmpty();
+        assertThat(view.ytdMonth()).isEqualTo(2);
+        assertThat(view.measures()).extracting(RptModel.MeasureInfo::byMonthColumns).containsExactly(true, true);
+        assertThat(view.labels().measure()).isEqualTo("TEST план");
+        assertThat(view.undated()).isNull();
+        assertThat(view.undated2()).isNull();
+        assertThat(view.grand().cells().subList(0, 2)).containsExactly("7350.75", "11");
+        assertThat(view.grand().total()).isEqualTo("7361.75");
+        assertThat(view.grand().m2().cells().getFirst()).isEqualTo("11");
+        assertThat(view.grand().m2().total()).isEqualTo("11");
+        assertThat(view.grand().ratio().cells().subList(0, 2)).containsExactly("66825.000000", null);
+        assertThat(view.grand().ratio().total()).isEqualTo("66925.000000");
+
+        CellRows second = service.cells(id, new CellQuery(null, new Period(RptModel.PERIOD_YEAR, null), List.of(), 0, 2));
+        assertThat(second.total()).isEqualTo(8);
+        assertThat(second.value()).isEqualTo("11");
+        assertThat(second.items()).hasSize(8).allSatisfy(item -> {
+            assertThat(item.column()).isEqualTo("Количество TEST");
+            assertThat(item.date()).isNull();
+        });
+        CellRows first = service.cells(id, new CellQuery(null, new Period(RptModel.PERIOD_YEAR, null), List.of(), 0));
+        assertThat(first.total()).isEqualTo(16);
+        assertThat(first.value()).isEqualTo("7361.75");
+        assertThat(first.items()).extracting(RptModel.CellItem::column)
+                .containsOnly("Сумма TEST", "Количество TEST");
+        assertCellInvalid(id, new CellQuery(null, new Period(RptModel.PERIOD_UNDATED, null), List.of(), 0, 2), "period");
+    }
+
+    @Test
+    @DisplayName("10.8: мера 2 у отчёта без неё или неизвестная мера — 422 RPT_CELL_INVALID у measure")
+    void invalidCellMeasure() {
+        long id = twoLevels();
+
+        assertCellInvalid(id, new CellQuery(2026, new Period(RptModel.PERIOD_YEAR, null), List.of(), 0, 2), "measure");
+        assertCellInvalid(id, new CellQuery(2026, new Period(RptModel.PERIOD_YEAR, null), List.of(), 0, 3), "measure");
+    }
+
+    @Test
+    @DisplayName("2.3, 10.3: из анкеты источника меры 2 убрана колонка уровня — 409 RPT_DEFINITION_STALE у second.level1.field")
+    void staleSecondMeasure() {
+        long first = data.publishedSource();
+        data.applySource(first, List.of(new SourceRow("15.01.2026", 1, 1, "TEST-1", "TEST g1")), JAN_FROM, JAN_TO);
+        long id = twoMeasures("TEST stale", byDate("TEST мера 1", first, 1, null, groupLevel(), null),
+                byDate("TEST мера 2", sourceId, 1, null, groupLevel(), null));
+        int version = data.republishSourceWithoutGroup(sourceId, LocalDate.of(2026, 7, 1));
+        data.applySourceWithoutGroup(sourceId, version, List.of(
+                new SourceRow("15.07.2026", 10, 1, "TEST-1", null)), LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+
+        assertThatThrownBy(() -> service.view(id, null)).isInstanceOfSatisfying(ApiException.class, e -> {
+            assertThat(e.getErrorCode().getDefaultStatus()).isEqualTo(409);
+            assertThat(e.getMessage()).isEqualTo(RptErrors.RPT_DEFINITION_STALE);
+            assertThat(e.getFieldErrors()).extracting(FieldErrorItem::field, FieldErrorItem::code)
+                    .containsExactly(tuple("second.level1.field", RptErrors.RPT_COLUMN_UNKNOWN));
+        });
+    }
+
     // ---------- помощники ----------
 
     /** Отчёт: уровень 1 — название справочника, уровень 2 — группа источника, мера — сумма, делитель 1000. */
@@ -327,6 +522,35 @@ class RptViewServiceTest extends EmbeddedPostgresTest {
     private static DefinitionInput input(String name, long source, RefPart ref, LevelPart level1, LevelPart level2,
                                          Measure measure, int divisor) {
         return new DefinitionInput(name, source, 1, RptTestData.DATE, measure, divisor, 2, ref, level1, level2, null);
+    }
+
+    /** Отчёт из двух мер: мера 1 — поля описания, мера 2 — {@code second}. */
+    private long twoMeasures(String name, MeasureInput first, MeasureInput second) {
+        return definitions.create(new DefinitionInput(name, first.sourceId(), first.sourceSheet(), first.dateField(),
+                first.measure(), first.divisor(), first.decimals(), first.ref(), first.level1(), first.level2(), null,
+                first.name(), first.monthFields(), second), userId).id();
+    }
+
+    /** Мера по колонке-дате: сумма колонки суммы, 0 знаков. */
+    private static MeasureInput byDate(String name, long source, int divisor, RefPart ref, LevelPart level1,
+                                       LevelPart level2) {
+        return new MeasureInput(name, source, 1, RptTestData.DATE, null,
+                new Measure(RptModel.MEASURE_TOTAL, RptTestData.AMOUNT), divisor, 0, ref, level1, level2);
+    }
+
+    /** Мера колонками-месяцами источника {@code sourceId}, один уровень — группа. */
+    private MeasureInput byMonthColumns(String name, List<String> months) {
+        return new MeasureInput(name, sourceId, 1, null, months, null, 1, 0, null, groupLevel(), null);
+    }
+
+    private static LevelPart groupLevel() {
+        return new LevelPart(RptModel.ORIGIN_SOURCE, RptTestData.GROUP);
+    }
+
+    /** Итог меры 2 = Σ её месяцев 1…N; строк за 1…N нет — итог пуст, месяцы 1…N пусты. */
+    private static void assertMonthsMakeYtd(RptModel.M2 part, int ytdMonth) {
+        BigDecimal total = part.total() == null ? BigDecimal.ZERO : number(part.total());
+        assertThat(addUp(part.cells().subList(0, ytdMonth))).isEqualByComparingTo(total);
     }
 
     private CellRows yearCell(long id, List<String> path) {

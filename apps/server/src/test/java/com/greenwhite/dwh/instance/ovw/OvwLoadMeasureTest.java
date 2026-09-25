@@ -22,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -35,7 +36,11 @@ import java.util.function.LongSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Замер «Обзора данных» на 100 000 TEST-строк одного листа: «строки» и «группы» не дольше 2 с (AC-8). */
+/**
+ * Замер «Обзора данных» на 100 000 TEST-строк одного листа: «строки» и «группы» не дольше 2 с (AC-8).
+ * Замер: только {@code -Dperf=true}, предел — требование стенда.
+ */
+@EnabledIfSystemProperty(named = "perf", matches = "true")
 class OvwLoadMeasureTest extends EmbeddedPostgresTest {
 
     private static final long ROWS_TOTAL = 100_000;
