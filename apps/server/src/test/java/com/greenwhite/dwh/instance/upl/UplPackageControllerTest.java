@@ -328,19 +328,21 @@ class UplPackageControllerTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("Новый месяц AC-4: скрытая применённая загрузка отдаёт replacedBy, скрывающая и неприменённая — нет")
+    @DisplayName("Новый месяц AC-4, AC-5: «Применить» сначала у Б, потом у А — ответ А отдаёт replacedBy, Б и неприменённая С — нет")
     void replacedByInListAndApplyResponse() throws Exception {
         Session admin = login(adminLogin);
         String idA = uploadAndParse(admin, "2026-01-01", "2026-06-30");
-        var appliedA = send(admin, post(BASE + "/" + idA + "/apply"));
-        assertThat(appliedA.getStatus()).as(appliedA.getContentAsString()).isEqualTo(200);
-
         String idB = uploadAndParse(admin, "2026-01-01", "2026-07-31");
+        String idC = uploadAndParse(admin, "2026-01-01", "2026-08-31");
+
         var appliedB = send(admin, post(BASE + "/" + idB + "/apply"));
         assertThat(appliedB.getStatus()).as(appliedB.getContentAsString()).isEqualTo(200);
         assertThat(appliedB.getContentAsString()).doesNotContain("replacedBy");
 
-        String idC = uploadAndParse(admin, "2026-01-01", "2026-08-31");
+        var appliedA = send(admin, post(BASE + "/" + idA + "/apply"));
+        assertThat(appliedA.getStatus()).as(appliedA.getContentAsString()).isEqualTo(200);
+        assertThat((String) read(appliedA, "$.replacedBy.id")).isEqualTo(idB);
+        assertThat((String) read(appliedA, "$.replacedBy.periodTo")).isEqualTo("2026-07-31");
 
         var list = sendGet(admin, BASE, 200);
         String itemA = "$.items[?(@.id == '" + idA + "')]";

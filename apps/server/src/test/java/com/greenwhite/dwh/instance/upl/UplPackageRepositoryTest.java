@@ -117,14 +117,44 @@ class UplPackageRepositoryTest extends EmbeddedPostgresTest {
     }
 
     @Test
-    @DisplayName("AC-4: неприменённая загрузка с пересекающимся периодом ничего не скрывает и не помечается")
+    @DisplayName("AC-4: «получена», «проверена», «отклонена» не помечаются и ничего не прячут")
     void notAppliedPackageNeitherHidesNorIsMarked() {
         PackageRow a = applied(date(1, 1), date(6, 30));
-        PackageRow c = verifiedPackage(date(1, 1), date(8, 31));
+        PackageRow verified = verifiedPackage(date(1, 1), date(6, 30));
+        PackageRow received = receivedPackage(date(1, 1), date(6, 30));
+        PackageRow rejected = parsedPackage(UplPackageTestData.brokenStructure(), date(1, 1), date(6, 30));
+        assertThat(rejected.status()).isEqualTo(UplPackageModel.REJECTED);
+        PackageRow b = applied(date(1, 1), date(7, 31));
 
-        assertThat(visibleLoadIds()).containsExactly(a.loadId());
-        assertThat(reload(a).replacedBy()).isNull();
-        assertThat(reload(c).replacedBy()).isNull();
+        assertThat(visibleLoadIds()).containsExactly(b.loadId());
+        assertThat(reload(a).replacedBy().id()).isEqualTo(b.publicId());
+        assertNotMarked(verified, UplPackageModel.VERIFIED);
+        assertNotMarked(received, UplPackageModel.RECEIVED);
+        assertNotMarked(rejected, UplPackageModel.REJECTED);
+        assertThat(reload(b).replacedBy()).isNull();
+
+        PackageRow laterVerified = verifiedPackage(date(1, 1), date(8, 31));
+        PackageRow laterReceived = receivedPackage(date(1, 1), date(8, 31));
+
+        assertThat(visibleLoadIds()).containsExactly(b.loadId());
+        assertThat(reload(b).replacedBy()).isNull();
+        assertNotMarked(laterVerified, UplPackageModel.VERIFIED);
+        assertNotMarked(laterReceived, UplPackageModel.RECEIVED);
+    }
+
+    @Test
+    @DisplayName("AC-4: загрузки другого источника не влияют")
+    void otherSourceDoesNotHide() {
+        long otherSourceId = UplPackageTestData.publishedSource(sources, userId, LocalDate.of(2026, 1, 1));
+        PackageRow x = applied(sourceId, date(1, 1), date(6, 30));
+        PackageRow y = applied(otherSourceId, date(1, 1), date(7, 31));
+
+        assertThat(repo.appliedPackages(sourceId).stream().map(AppliedPackage::loadId).toList())
+                .containsExactly(x.loadId());
+        assertThat(repo.appliedPackages(otherSourceId).stream().map(AppliedPackage::loadId).toList())
+                .containsExactly(y.loadId());
+        assertThat(reload(x).replacedBy()).isNull();
+        assertThat(reload(y).replacedBy()).isNull();
     }
 
     @Test
@@ -174,8 +204,19 @@ class UplPackageRepositoryTest extends EmbeddedPostgresTest {
                 .param("id", loadId).query(Long.class).single();
     }
 
+    private void assertNotMarked(PackageRow row, String expectedStatus) {
+        PackageRow reloaded = reload(row);
+        assertThat(reloaded.replacedBy()).isNull();
+        assertThat(reloaded.status()).isEqualTo(expectedStatus);
+    }
+
     private PackageRow applied(LocalDate from, LocalDate to) {
-        PackageRow row = verifiedPackage(from, to);
+        return applied(sourceId, from, to);
+    }
+
+    private PackageRow applied(long source, LocalDate from, LocalDate to) {
+        PackageRow row = parsedPackage(source, UplPackageTestData.workbook(3, 0), from, to);
+        assertThat(row.status()).isEqualTo(UplPackageModel.VERIFIED);
         PackageRow applied = applies.apply(row.publicId().toString(), userId);
         assertThat(applied.status()).isEqualTo(UplPackageModel.APPLIED);
         return applied;
@@ -187,12 +228,26 @@ class UplPackageRepositoryTest extends EmbeddedPostgresTest {
         return row;
     }
 
+    private PackageRow receivedPackage(LocalDate from, LocalDate to) {
+        PackageRow row = registeredPackage(sourceId, UplPackageTestData.workbook(3, 0), from, to);
+        assertThat(row.status()).isEqualTo(UplPackageModel.RECEIVED);
+        return row;
+    }
+
     private PackageRow parsedPackage(byte[] content, LocalDate from, LocalDate to) {
-        FileRecord file = files.uploadFile("TEST.xlsx", UplPackageTestData.XLSX_MIME,
-                new ByteArrayInputStream(content), content.length, userId);
-        PackageRow row = packages.register(new NewPackage(sourceId, 1, from, to, file.id(),
-                file.originalName(), file.sha256(), file.sizeBytes(), userId));
+        return parsedPackage(sourceId, content, from, to);
+    }
+
+    private PackageRow parsedPackage(long source, byte[] content, LocalDate from, LocalDate to) {
+        PackageRow row = registeredPackage(source, content, from, to);
         parseJob.run(Map.of("packageId", row.publicId().toString()));
         return packages.get(row.publicId().toString());
+    }
+
+    private PackageRow registeredPackage(long source, byte[] content, LocalDate from, LocalDate to) {
+        FileRecord file = files.uploadFile("TEST.xlsx", UplPackageTestData.XLSX_MIME,
+                new ByteArrayInputStream(content), content.length, userId);
+        return packages.register(new NewPackage(source, 1, from, to, file.id(),
+                file.originalName(), file.sha256(), file.sizeBytes(), userId));
     }
 }
