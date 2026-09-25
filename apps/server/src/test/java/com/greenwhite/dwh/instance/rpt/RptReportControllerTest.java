@@ -175,6 +175,8 @@ class RptReportControllerTest extends EmbeddedPostgresTest {
         var view = send(admin, get(report("/view?year=2026")));
         assertThat(view.getStatus()).as(view.getContentAsString()).isEqualTo(200);
         assertThat((Integer) read(view, "$.year")).isEqualTo(2026);
+        assertThat(view.getContentAsString()).as("null-поля отдаются всегда (экран проверяет !== null)")
+                .contains("\"m2\":null").contains("\"undated2\":null");
 
         var cells = send(admin, jsonPost(report("/cells"), CELLS_BODY));
         assertThat(cells.getStatus()).as(cells.getContentAsString()).isEqualTo(200);
